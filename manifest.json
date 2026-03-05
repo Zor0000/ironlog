@@ -1,0 +1,19 @@
+{
+  "name": "IronLog – Personal Gym Tracker",
+  "short_name": "IronLog",
+  "description": "Track your gym workouts, personal records, and progress.",
+  "start_url": "/ironlog/",
+  "scope": "/ironlog/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0a0a0a",
+  "background_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
