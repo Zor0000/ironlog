@@ -83,6 +83,7 @@ function renderTodayLog() {
 
 function toggleLogEx(ei) {
   state.todayExercises[ei].expanded = !state.todayExercises[ei].expanded;
+  saveWorkoutDraft();
   renderTodayLog();
 }
 
@@ -163,7 +164,6 @@ async function finishWorkout() {
 function startFreeWorkout() {
   state.todayExercises = [];
   state.showAddExerciseForm = true;
-  saveWorkoutDraft();
   renderTodayLog();
   toast('Free workout started! Add your exercises below.');
 }
