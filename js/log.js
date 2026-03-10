@@ -69,10 +69,12 @@ function updateSet(ei, si, field, val) {
   if (field === 'weight') val = val.replace(/[^0-9.]/g, '');  // digits + decimal only
   if (field === 'reps')   val = val.replace(/[^0-9]/g,  '');  // digits only
   state.todayExercises[ei].sets[si][field] = val;
+  saveWorkoutDraft();
 }
 
 function addSet(ei) {
   state.todayExercises[ei].sets.push({ weight: '', reps: '', done: false });
+  saveWorkoutDraft();
   renderTodayLog();
 }
 
@@ -94,6 +96,7 @@ function toggleDone(ei, si) {
     }
   }
 
+  saveWorkoutDraft();
   renderTodayLog();
 }
 
@@ -119,6 +122,7 @@ async function finishWorkout() {
     await loadHistory();
     await loadPRs();
     state.todayExercises = [];
+    localStorage.removeItem('il_workout_draft');
     document.getElementById('session-note').value = '';
     renderTodayLog();
     renderHistory();
