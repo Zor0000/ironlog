@@ -6,7 +6,11 @@ function renderTodayLog() {
   const f = document.getElementById('finish-section');
 
   if (!state.todayExercises.length) {
-    c.innerHTML = `<div class="empty"><div class="empty-icon">${ICON_DUMBBELL}</div><div class="empty-text">No workout started yet.<br>Go to <strong>Workouts</strong> tab and pick your muscles!</div></div>`;
+    c.innerHTML = `<div class="empty">
+      <div class="empty-icon">${ICON_DUMBBELL}</div>
+      <div class="empty-text">No workout started yet.<br>Go to <strong>Workouts</strong> tab and pick your muscles!</div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="startFreeWorkout()">＋ Start Free Workout</button>
+    </div>`;
     f.style.display = 'none';
     return;
   }
@@ -135,4 +139,12 @@ async function finishWorkout() {
     btn.textContent = '✓ Finish & Save Workout';
     btn.disabled = false;
   }
+}
+
+function startFreeWorkout() {
+  state.todayExercises = [];
+  state.showAddExerciseForm = true;
+  saveWorkoutDraft();
+  renderTodayLog();
+  toast('Free workout started! Add your exercises below.');
 }
