@@ -79,5 +79,6 @@ function startWorkout() {
   }));
   renderTodayLog();
   showPage('log', document.querySelectorAll('.nav-btn')[1]);
+  saveWorkoutDraft();
   toast('Workout started! 💪');
 }
