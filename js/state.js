@@ -17,6 +17,8 @@ let state = {
   history:         [],
   water:           0,
   prs:             {},
+  showAddExerciseForm: false,
+  _addExMode:          'reps',
 };
 
 // ─────────────────────────────────────────────────────────────

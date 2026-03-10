@@ -61,7 +61,24 @@ function renderTodayLog() {
           <button class="add-set-btn" onclick="addSet(${ei})">＋ Add Set</button>
         </div>` : ''}
       </div>`;
-    }).join('')}`;
+    }).join('')}
+    <div style="margin-top:12px">
+      ${state.showAddExerciseForm ? `
+      <div class="card" style="padding:16px;margin-bottom:8px" id="add-ex-form">
+        <div class="card-title" style="margin-bottom:12px">Add Exercise</div>
+        <input id="new-ex-name" class="set-inp" type="text" placeholder="Exercise name"
+          style="width:100%;padding:10px 12px;margin-bottom:12px;font-size:14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button id="mode-reps"   class="pill ${state._addExMode !== 'weighted' ? 'active' : ''}" onclick="setAddExMode('reps')">Reps only</button>
+          <button id="mode-weight" class="pill ${state._addExMode === 'weighted' ? 'active' : ''}" onclick="setAddExMode('weighted')">Weight + Reps</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="flex:1" onclick="confirmAddExercise()">Add</button>
+          <button class="btn" style="flex:0 0 auto;background:var(--surface2)" onclick="cancelAddExercise()">✕</button>
+        </div>
+      </div>` : `
+      <button class="add-set-btn" style="width:100%;padding:14px;font-size:14px" onclick="openAddExerciseForm()">＋ Add Exercise</button>`}
+    </div>`;
 }
 
 function toggleLogEx(ei) {
@@ -147,4 +164,44 @@ function startFreeWorkout() {
   saveWorkoutDraft();
   renderTodayLog();
   toast('Free workout started! Add your exercises below.');
+}
+
+function openAddExerciseForm() {
+  state.showAddExerciseForm = true;
+  state._addExMode = 'reps';
+  renderTodayLog();
+  document.getElementById('new-ex-name')?.focus();
+}
+
+function cancelAddExercise() {
+  state.showAddExerciseForm = false;
+  renderTodayLog();
+}
+
+function setAddExMode(mode) {
+  state._addExMode = mode;
+  renderTodayLog();
+  document.getElementById('new-ex-name')?.focus();
+}
+
+function confirmAddExercise() {
+  const nameEl = document.getElementById('new-ex-name');
+  const name = nameEl?.value.trim();
+  if (!name) { toast('Enter an exercise name first'); return; }
+
+  const isWeighted = state._addExMode === 'weighted';
+  state.todayExercises.push({
+    name,
+    bodyweight: !isWeighted,
+    timed:      false,
+    custom:     true,
+    expanded:   true,
+    sets:       [{ weight: '', reps: '', done: false }],
+  });
+
+  state.showAddExerciseForm = false;
+  saveWorkoutDraft();
+  renderTodayLog();
+  document.getElementById('finish-section').style.display = 'block';
+  toast('Exercise added!');
 }
