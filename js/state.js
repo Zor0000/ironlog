@@ -49,3 +49,34 @@ function updateHeaderDate() {
   if (d)  d.textContent  = now.toLocaleDateString('en-US', { weekday: 'long' });
   if (dt) dt.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+// ─────────────────────────────────────────────────────────────
+//  WORKOUT DRAFT PERSISTENCE
+// ─────────────────────────────────────────────────────────────
+function saveWorkoutDraft() {
+  if (state.todayExercises.length) {
+    localStorage.setItem('il_workout_draft', JSON.stringify({
+      exercises: state.todayExercises,
+      muscle:    state.selectedMuscle,
+      split:     state.selectedSplit,
+    }));
+  } else {
+    localStorage.removeItem('il_workout_draft');
+  }
+}
+
+function loadWorkoutDraft() {
+  const raw = localStorage.getItem('il_workout_draft');
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if (Array.isArray(d.exercises) && d.exercises.length) {
+      state.todayExercises = d.exercises;
+      if (d.muscle) state.selectedMuscle = d.muscle;
+      if (d.split)  state.selectedSplit  = d.split;
+    }
+  } catch (e) {
+    console.warn('Failed to restore workout draft:', e);
+    localStorage.removeItem('il_workout_draft');
+  }
+}
