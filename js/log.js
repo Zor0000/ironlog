@@ -69,8 +69,8 @@ function renderTodayLog() {
         <input id="new-ex-name" class="set-inp" type="text" placeholder="Exercise name"
           style="width:100%;padding:10px 12px;margin-bottom:12px;font-size:14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
         <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button id="mode-reps"   class="pill ${state._addExMode !== 'weighted' ? 'active' : ''}" onclick="setAddExMode('reps')">Reps only</button>
-          <button id="mode-weight" class="pill ${state._addExMode === 'weighted' ? 'active' : ''}" onclick="setAddExMode('weighted')">Weight + Reps</button>
+          <button id="mode-reps"   class="pill ${state.addExMode !== 'weighted' ? 'active' : ''}" onclick="setAddExMode('reps')">Reps only</button>
+          <button id="mode-weight" class="pill ${state.addExMode === 'weighted' ? 'active' : ''}" onclick="setAddExMode('weighted')">Weight + Reps</button>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary" style="flex:1" onclick="confirmAddExercise()">Add</button>
@@ -144,6 +144,8 @@ async function finishWorkout() {
     await loadPRs();
     state.todayExercises = [];
     localStorage.removeItem('il_workout_draft');
+    state.showAddExerciseForm = false;
+    state.addExMode = 'reps';
     document.getElementById('session-note').value = '';
     renderTodayLog();
     renderHistory();
@@ -168,7 +170,7 @@ function startFreeWorkout() {
 
 function openAddExerciseForm() {
   state.showAddExerciseForm = true;
-  state._addExMode = 'reps';
+  state.addExMode = 'reps';
   renderTodayLog();
   document.getElementById('new-ex-name')?.focus();
 }
@@ -179,7 +181,7 @@ function cancelAddExercise() {
 }
 
 function setAddExMode(mode) {
-  state._addExMode = mode;
+  state.addExMode = mode;
   renderTodayLog();
   document.getElementById('new-ex-name')?.focus();
 }
@@ -189,7 +191,7 @@ function confirmAddExercise() {
   const name = nameEl?.value.trim();
   if (!name) { toast('Enter an exercise name first'); return; }
 
-  const isWeighted = state._addExMode === 'weighted';
+  const isWeighted = state.addExMode === 'weighted';
   state.todayExercises.push({
     name,
     bodyweight: !isWeighted,
@@ -202,6 +204,5 @@ function confirmAddExercise() {
   state.showAddExerciseForm = false;
   saveWorkoutDraft();
   renderTodayLog();
-  document.getElementById('finish-section').style.display = 'block';
   toast('Exercise added!');
 }
