@@ -72,8 +72,8 @@ function loadWorkoutDraft() {
     const d = JSON.parse(raw);
     if (Array.isArray(d.exercises) && d.exercises.length) {
       state.todayExercises = d.exercises;
-      if (d.muscle) state.selectedMuscle = d.muscle;
-      if (d.split)  state.selectedSplit  = d.split;
+      state.selectedMuscle = d.muscle;
+      state.selectedSplit  = d.split;
     }
   } catch (e) {
     console.warn('Failed to restore workout draft:', e);
