@@ -32,11 +32,12 @@ window.addEventListener('load', async () => {
   }
 
   // React to login/logout from any tab
-  sb.auth.onAuthStateChange(async (_event, session) => {
-    if (session?.user) {
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user && !currentUser) {
       document.getElementById('auth-screen').classList.remove('visible');
       await bootApp(session.user);
-    } else {
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
       document.getElementById('app').classList.remove('visible');
       showAuth();
     }
@@ -71,6 +72,7 @@ async function bootApp(user) {
   document.getElementById('stats-user-name').textContent = 'Keep grinding, ' + name + ' 🔥';
 
   state.water = parseInt(localStorage.getItem('il_water_' + today()) || '0');
+  loadWorkoutDraft();
 
   await loadHistory();
   await loadPRs();
