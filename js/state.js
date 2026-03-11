@@ -7,8 +7,10 @@ let sb, currentUser;
 //  APP STATE
 // ─────────────────────────────────────────────────────────────
 let state = {
-  selectedSplit:   'PPL',
+  selectedSplit:   null,
+  selectedDay:     null,
   selectedMuscle:  null,
+  workoutStep:     'split',
   todayExercises:  [],
   timerRunning:    false,
   timerSecs:       90,
