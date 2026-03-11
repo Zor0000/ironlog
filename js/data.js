@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  SPLITS & MUSCLES
 // ─────────────────────────────────────────────────────────────
-const SPLITS = ['Full Body', 'PPL', 'Upper/Lower', 'Bro Split'];
+const SPLITS = ['Full Body', 'PPL', 'Upper/Lower', 'Bro Split', 'Single Muscle'];
 
 const MUSCLE_ICONS = {
   // Two pectoral lobes meeting at the sternum
@@ -42,25 +42,26 @@ const MUSCLES = [
   { id: 'legs',      label: 'Legs',      icon: MUSCLE_ICONS.legs },
   { id: 'shoulders', label: 'Shoulders', icon: MUSCLE_ICONS.shoulders },
   { id: 'arms',      label: 'Arms',      icon: MUSCLE_ICONS.arms },
+  { id: 'triceps',   label: 'Triceps',   icon: MUSCLE_ICONS.arms },
+  { id: 'biceps',    label: 'Biceps',    icon: MUSCLE_ICONS.arms },
   { id: 'core',      label: 'Core',      icon: MUSCLE_ICONS.core },
 ];
 
-// Split-day labels shown under muscle selection
-const PPL_DAY = {
-  chest:     'Push Day',
-  shoulders: 'Push Day',
-  arms:      'Push Day (Triceps) + Pull Day (Biceps)',
-  back:      'Pull Day',
-  legs:      'Leg Day',
-  core:      'Any Day',
-};
-const UL_DAY = {
-  chest:     'Upper Day',
-  shoulders: 'Upper Day',
-  arms:      'Upper Day',
-  back:      'Upper Day',
-  legs:      'Lower Day',
-  core:      'Lower Day',
+// ─────────────────────────────────────────────────────────────
+//  SPLIT → DAY → MUSCLE MAPPING
+//  Splits listed here show a "day" step before muscle selection.
+//  Splits NOT listed skip the day step and show all 6 default muscles.
+// ─────────────────────────────────────────────────────────────
+const SPLIT_DAYS = {
+  'PPL': [
+    { day: 'Push', muscles: ['chest', 'shoulders', 'triceps'] },
+    { day: 'Pull', muscles: ['back', 'biceps'] },
+    { day: 'Legs', muscles: ['legs', 'core'] },
+  ],
+  'Upper/Lower': [
+    { day: 'Upper', muscles: ['chest', 'back', 'shoulders', 'arms'] },
+    { day: 'Lower', muscles: ['legs', 'core'] },
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -125,13 +126,15 @@ const WORKOUTS = {
       { name: 'Rear Delt Fly',            sets: 3, reps: '15–20', tip: 'Bend forward 45°. Raise elbows to shoulder height. Rear delts are critical for posture and shoulder health.' },
       { name: 'Cable Front Raise',        sets: 3, reps: '12–15', tip: 'Single cable, alternate arms. Raise to eye level. Keep core tight. Front delts get worked by pressing too.' },
     ],
-    arms: [ // Triceps on Push Day + Biceps on Pull Day (both shown)
-      { name: 'Tricep Pushdown (Cable)',    sets: 3, reps: '12–15', tip: 'Push Day — Triceps. Lock elbows at sides. Push all the way to full extension. Rope or straight bar.' },
-      { name: 'Overhead Tricep Extension',  sets: 3, reps: '12',    tip: 'Push Day — Triceps. Dumbbell overhead. Lower slowly behind head. Best for long tricep head stretch.' },
-      { name: 'Tricep Dips',                sets: 3, reps: '10–15', tip: 'Push Day — Triceps. Stay upright for tricep focus. Elbows back. Control the descent.', bodyweight: true },
-      { name: 'Barbell / EZ-Bar Curl',      sets: 3, reps: '10–12', tip: 'Pull Day — Biceps. Heavy and strict. No swinging. Elbows pinned at sides. Full range of motion.' },
-      { name: 'Hammer Curl',                sets: 3, reps: '10–12', tip: 'Pull Day — Biceps. Neutral grip. Works brachialis for arm girth. Alternate arms, full range.' },
-      { name: 'Incline Dumbbell Curl',      sets: 2, reps: '12',    tip: 'Pull Day — Biceps. Arms hang behind you on incline bench. Maximum stretch at bottom for peak.' },
+    triceps: [ // Push Day
+      { name: 'Tricep Pushdown (Cable)',    sets: 3, reps: '12–15', tip: 'Lock elbows at sides. Push all the way to full extension. Rope or straight bar.' },
+      { name: 'Overhead Tricep Extension',  sets: 3, reps: '12',    tip: 'Dumbbell overhead. Lower slowly behind head. Best for long tricep head stretch.' },
+      { name: 'Tricep Dips',                sets: 3, reps: '10–15', tip: 'Stay upright for tricep focus. Elbows back. Control the descent.', bodyweight: true },
+    ],
+    biceps: [ // Pull Day
+      { name: 'Barbell / EZ-Bar Curl',      sets: 3, reps: '10–12', tip: 'Heavy and strict. No swinging. Elbows pinned at sides. Full range of motion.' },
+      { name: 'Hammer Curl',                sets: 3, reps: '10–12', tip: 'Neutral grip. Works brachialis for arm girth. Alternate arms, full range.' },
+      { name: 'Incline Dumbbell Curl',      sets: 2, reps: '12',    tip: 'Arms hang behind you on incline bench. Maximum stretch at bottom for peak.' },
     ],
     back: [ // Pull Day
       { name: 'Deadlift',                    sets: 3, reps: '4–6',   tip: 'Bar over mid-foot. Neutral spine. Push the floor away — don\'t think of it as pulling. Biggest strength builder.' },
@@ -259,3 +262,5 @@ const WORKOUTS = {
     ],
   },
 };
+// Single Muscle reuses Bro Split exercise data
+WORKOUTS['Single Muscle'] = WORKOUTS['Bro Split'];
