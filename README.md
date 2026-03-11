@@ -7,6 +7,9 @@ A beginner-friendly gym tracking PWA (Progressive Web App) that works on iPhone,
 - 💪 **Workout Suggestions** — Validated beginner exercises for Chest, Back, Legs, Shoulders, Arms, Core
 - 🔀 **Split Support** — Full Body, PPL, Upper/Lower, Bro Split with day labeling
 - 📝 **Set Logger** — Log weight (kg) + reps per set; mark sets as done
+- ➕ **Custom Exercises** — Add any exercise to your active session with a name and choice of Reps only or Weight + Reps
+- 🆓 **Free Workout Mode** — Start a blank session without picking a muscle group; build it entirely from custom exercises
+- 💾 **Draft Persistence** — In-progress workout survives screen lock, app background, and token refresh — never lose your sets
 - ⏱️ **Rest Timer** — Auto-starts on set completion (1 min / 1:30 / 2 min / 3 min presets)
 - 📅 **Workout History** — Full session history saved to database
 - 🏆 **Personal Records** — Auto-detected and saved when you beat your best weight
@@ -116,7 +119,7 @@ git push -u origin main
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Vanilla HTML/CSS/JS (single file) |
+| Frontend | Vanilla HTML/CSS/JS (multi-file PWA, no build step) |
 | Database | Supabase (PostgreSQL) |
 | Auth | Supabase Auth (email/password) |
 | Hosting | GitHub Pages (free) |
