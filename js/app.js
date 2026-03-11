@@ -76,8 +76,7 @@ async function bootApp(user) {
 
   await loadHistory();
   await loadPRs();
-  renderSplits();
-  renderMuscles();
+  renderWorkoutStep();
   renderTodayLog();
 }
 
@@ -89,4 +88,5 @@ function showPage(name, btn) {
   if (name === 'stats')   renderStats();
   if (name === 'history') renderHistory();
   if (name === 'log')     renderTodayLog();
+  if (name === 'workouts') renderWorkoutStep();
 }
