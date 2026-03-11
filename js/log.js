@@ -5,7 +5,7 @@ function renderTodayLog() {
   const c = document.getElementById('log-content');
   const f = document.getElementById('finish-section');
 
-  if (!state.todayExercises.length) {
+  if (!state.todayExercises.length && !state.showAddExerciseForm) {
     c.innerHTML = `<div class="empty">
       <div class="empty-icon">${ICON_DUMBBELL}</div>
       <div class="empty-text">No workout started yet.<br>Go to <strong>Workouts</strong> tab and pick your muscles!</div>
