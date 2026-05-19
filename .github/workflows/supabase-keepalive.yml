@@ -1,0 +1,25 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Every 3 days at 09:00 UTC — well under Supabase free-tier 1-week idle pause
+    - cron: '0 9 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        env:
+          SUPABASE_URL: https://dvqevdydldxjqjrpkkjc.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0
+        run: |
+          set -e
+          code=$(curl -s -o /tmp/body -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/exercises?select=id&limit=1")
+          echo "HTTP $code"
+          cat /tmp/body
+          test "$code" = "200"
