@@ -17,6 +17,7 @@ final class AppState: ObservableObject {
     @Published var todayExercises: [ActiveExercise] = []
     @Published var showAddExerciseForm = false
     @Published var addExerciseWeighted = false
+    @Published var workoutNote = ""
 
     @Published var sessions: [WorkoutSession] = []
     @Published var personalRecords: [String: PersonalRecord] = [:]
@@ -36,6 +37,22 @@ final class AppState: ObservableObject {
 
     var waterToday: Int {
         waterByDay[Date().dayKey] ?? 0
+    }
+
+    var hasActiveWorkout: Bool {
+        !todayExercises.isEmpty || showAddExerciseForm || !workoutNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var completedSetCount: Int {
+        todayExercises.reduce(0) { total, exercise in
+            total + exercise.sets.filter(\.done).count
+        }
+    }
+
+    var validCompletedSetCount: Int {
+        todayExercises.reduce(0) { total, exercise in
+            total + exercise.sets.filter { loggedSet(for: exercise, set: $0) != nil }.count
+        }
     }
 
     var stats: (sets: Int, volume: Double, streak: Int) {
@@ -62,6 +79,13 @@ final class AppState: ObservableObject {
     }
 
     func boot() async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") {
+            await localStore.clear()
+            supabase.signOut()
+        }
+        #endif
+
         let snapshot = await localStore.load()
         sessions = snapshot.sessions.sorted { $0.createdAt > $1.createdAt }
         personalRecords = Dictionary(uniqueKeysWithValues: snapshot.personalRecords.map { ($0.exerciseName, $0) })
@@ -70,6 +94,14 @@ final class AppState: ObservableObject {
             todayExercises = draft.exercises
             selectedMuscle = draft.muscle
             selectedSplit = draft.split
+            selectedDay = draft.day
+            workoutStep = draft.step ?? (draft.exercises.isEmpty ? .split : .workout)
+            showAddExerciseForm = draft.showAddExerciseForm ?? false
+            addExerciseWeighted = draft.addExerciseWeighted ?? false
+            workoutNote = draft.note ?? ""
+            if !draft.exercises.isEmpty || draft.showAddExerciseForm == true || !(draft.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                selectedTab = .log
+            }
         }
         user = supabase.currentUser
         if user != nil {
@@ -124,7 +156,6 @@ final class AppState: ObservableObject {
         selectedDay = nil
         selectedMuscle = nil
         workoutStep = library.splitDays[split] == nil ? .muscle : .day
-        persistDraft()
     }
 
     func selectDay(_ day: String) {
@@ -139,7 +170,16 @@ final class AppState: ObservableObject {
     }
 
     func startWorkout() {
+        guard !hasActiveWorkout else {
+            selectedTab = .log
+            showToast("Finish or discard the current workout first")
+            return
+        }
         let templates = library.exercises(split: selectedSplit, muscle: selectedMuscle)
+        guard !templates.isEmpty else {
+            showToast("No exercises found for this workout")
+            return
+        }
         todayExercises = templates.map { template in
             ActiveExercise(
                 name: template.name,
@@ -154,19 +194,39 @@ final class AppState: ObservableObject {
     }
 
     func startFreeWorkout() {
+        guard !hasActiveWorkout else {
+            selectedTab = .log
+            showToast("Finish or discard the current workout first")
+            return
+        }
         selectedSplit = "Free Workout"
+        selectedDay = nil
         selectedMuscle = nil
+        workoutStep = .split
         todayExercises = []
         showAddExerciseForm = true
         selectedTab = .log
+        persistDraft()
         showToast("Free workout started")
+    }
+
+    func continueWorkout() {
+        selectedTab = .log
+        showToast("Workout still in progress")
+    }
+
+    func discardWorkout() {
+        resetActiveWorkout()
+        persistAll(clearDraft: true)
+        selectedTab = .workouts
+        showToast("Workout discarded")
     }
 
     func updateSet(exerciseID: ActiveExercise.ID, setID: WorkoutSet.ID, weight: String? = nil, reps: String? = nil) {
         guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
               let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
         if let weight {
-            todayExercises[ei].sets[si].weight = weight.filter { "0123456789.".contains($0) }
+            todayExercises[ei].sets[si].weight = sanitizeDecimal(weight)
         }
         if let reps {
             todayExercises[ei].sets[si].reps = reps.filter(\.isNumber)
@@ -177,14 +237,23 @@ final class AppState: ObservableObject {
     func toggleDone(exerciseID: ActiveExercise.ID, setID: WorkoutSet.ID) {
         guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
               let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
-        todayExercises[ei].sets[si].done.toggle()
         let exercise = todayExercises[ei]
         let set = todayExercises[ei].sets[si]
         if set.done {
-            startTimer()
-            if isNewPR(exercise: exercise, set: set) {
-                showToast("New PR on \(exercise.name)")
-            }
+            todayExercises[ei].sets[si].done = false
+            persistDraft()
+            return
+        }
+        var candidate = set
+        candidate.done = true
+        guard loggedSet(for: exercise, set: candidate) != nil else {
+            showToast(validationMessage(for: exercise))
+            return
+        }
+        todayExercises[ei].sets[si].done = true
+        startTimer()
+        if isNewPR(exercise: exercise, set: set) {
+            showToast("New PR on \(exercise.name)")
         }
         persistDraft()
     }
@@ -195,9 +264,47 @@ final class AppState: ObservableObject {
         persistDraft()
     }
 
+    func removeSet(exerciseID: ActiveExercise.ID, setID: WorkoutSet.ID) {
+        guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
+              let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
+        guard todayExercises[ei].sets.count > 1 else {
+            showToast("Keep at least one set")
+            return
+        }
+        todayExercises[ei].sets.remove(at: si)
+        persistDraft()
+    }
+
     func toggleExercise(_ exerciseID: ActiveExercise.ID) {
         guard let index = todayExercises.firstIndex(where: { $0.id == exerciseID }) else { return }
         todayExercises[index].expanded.toggle()
+        persistDraft()
+    }
+
+    func removeExercise(_ exerciseID: ActiveExercise.ID) {
+        guard let exercise = todayExercises.first(where: { $0.id == exerciseID }) else { return }
+        todayExercises.removeAll { $0.id == exerciseID }
+        if todayExercises.isEmpty {
+            showAddExerciseForm = true
+        }
+        persistDraft()
+        showToast("\(exercise.name) removed")
+    }
+
+    func beginAddingExercise(weighted: Bool = false) {
+        showAddExerciseForm = true
+        addExerciseWeighted = weighted
+        persistDraft()
+    }
+
+    func cancelAddingExercise() {
+        showAddExerciseForm = false
+        addExerciseWeighted = false
+        persistDraft()
+    }
+
+    func setAddExerciseWeighted(_ weighted: Bool) {
+        addExerciseWeighted = weighted
         persistDraft()
     }
 
@@ -219,12 +326,15 @@ final class AppState: ObservableObject {
         persistDraft()
     }
 
+    func updateWorkoutNote(_ note: String) {
+        workoutNote = note
+        persistDraft()
+    }
+
     func finishWorkout(note: String) async {
         let logged = todayExercises.compactMap { exercise -> LoggedExercise? in
             let sets = exercise.sets.compactMap { set -> LoggedSet? in
-                guard set.done, let reps = Int(set.reps), reps > 0 else { return nil }
-                let weight = (exercise.bodyweight || exercise.timed) ? nil : Double(set.weight)
-                return LoggedSet(weight: weight, reps: reps)
+                loggedSet(for: exercise, set: set)
             }
             guard !sets.isEmpty else { return nil }
             return LoggedExercise(name: exercise.name, bodyweight: exercise.bodyweight, timed: exercise.timed, sets: sets)
@@ -245,8 +355,7 @@ final class AppState: ObservableObject {
         )
         applyRecords(from: session)
         sessions.insert(session, at: 0)
-        todayExercises = []
-        showAddExerciseForm = false
+        resetActiveWorkout()
         persistAll(clearDraft: true)
         selectedTab = .history
         showToast("Workout saved")
@@ -342,6 +451,20 @@ final class AppState: ObservableObject {
         persistAll()
     }
 
+    func syncNow() async {
+        guard supabase.isAuthenticated else {
+            showAuth()
+            return
+        }
+        syncMessage = "Syncing..."
+        await refreshFromCloud()
+        await syncPending()
+        if syncMessage == "Syncing..." {
+            syncMessage = "Synced with Supabase"
+        }
+        showToast(syncMessage)
+    }
+
     private func refreshFromCloud() async {
         do {
             let cloudSessions = try await supabase.pullSessions()
@@ -407,6 +530,25 @@ final class AppState: ObservableObject {
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
     }
 
+    private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
+        guard set.done, let reps = Int(set.reps), reps > 0 else { return nil }
+        if exercise.bodyweight || exercise.timed {
+            return LoggedSet(weight: nil, reps: reps)
+        }
+        guard let weight = Double(set.weight), weight >= 0 else { return nil }
+        return LoggedSet(weight: weight, reps: reps)
+    }
+
+    private func validationMessage(for exercise: ActiveExercise) -> String {
+        if exercise.timed {
+            return "Enter seconds before marking the set done"
+        }
+        if exercise.bodyweight {
+            return "Enter reps before marking the set done"
+        }
+        return "Enter weight and reps before marking the set done"
+    }
+
     private func markFailed(_ id: WorkoutSession.ID, error: Error) {
         if let index = sessions.firstIndex(where: { $0.id == id }) {
             sessions[index].syncState = .failed
@@ -416,12 +558,10 @@ final class AppState: ObservableObject {
     }
 
     private func persistDraft() {
-        let draft = todayExercises.isEmpty ? nil : WorkoutDraft(exercises: todayExercises, muscle: selectedMuscle, split: selectedSplit)
-        persistAll(draft: draft)
+        persistAll(draft: currentDraft)
     }
 
     private func persistAll(clearDraft: Bool = false, draft: WorkoutDraft? = nil) {
-        let currentDraft = todayExercises.isEmpty ? nil : WorkoutDraft(exercises: todayExercises, muscle: selectedMuscle, split: selectedSplit)
         let snapshot = AppSnapshot(
             sessions: sessions,
             personalRecords: Array(personalRecords.values),
@@ -431,6 +571,46 @@ final class AppState: ObservableObject {
         Task {
             await localStore.save(snapshot)
         }
+    }
+
+    private var currentDraft: WorkoutDraft? {
+        guard hasActiveWorkout else { return nil }
+        return WorkoutDraft(
+            exercises: todayExercises,
+            muscle: selectedMuscle,
+            split: selectedSplit,
+            day: selectedDay,
+            step: workoutStep,
+            showAddExerciseForm: showAddExerciseForm,
+            addExerciseWeighted: addExerciseWeighted,
+            note: workoutNote
+        )
+    }
+
+    private func resetActiveWorkout() {
+        todayExercises = []
+        showAddExerciseForm = false
+        addExerciseWeighted = false
+        workoutNote = ""
+        selectedMuscle = nil
+        selectedDay = nil
+        selectedSplit = nil
+        workoutStep = .split
+        resetTimer()
+    }
+
+    private func sanitizeDecimal(_ value: String) -> String {
+        var output = ""
+        var didUseDecimal = false
+        for character in value {
+            if character.isNumber {
+                output.append(character)
+            } else if character == ".", !didUseDecimal {
+                output.append(character)
+                didUseDecimal = true
+            }
+        }
+        return output
     }
 
     private func showToast(_ message: String) {

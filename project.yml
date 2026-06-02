@@ -6,7 +6,7 @@ options:
 settings:
   base:
     MARKETING_VERSION: 1.0
-    CURRENT_PROJECT_VERSION: 2
+    CURRENT_PROJECT_VERSION: 3
     DEVELOPMENT_TEAM: 75LRT8TRQY
 targets:
   IronLog:
@@ -26,4 +26,28 @@ targets:
         SWIFT_VERSION: 5.0
         CODE_SIGN_STYLE: Automatic
     scheme:
-      testTargets: []
+      testTargets:
+        - IronLogTests
+        - IronLogUITests
+  IronLogTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: IronLogTests
+    dependencies:
+      - target: IronLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.ironlog.tests
+        GENERATE_INFOPLIST_FILE: YES
+  IronLogUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: IronLogUITests
+    dependencies:
+      - target: IronLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.ironlog.uitests
+        GENERATE_INFOPLIST_FILE: YES

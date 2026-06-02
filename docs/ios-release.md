@@ -9,13 +9,14 @@ Native iOS bundle:
 - App Store Connect app ID: `6771258872`
 - Team ID: `75LRT8TRQY`
 - Version: `1.0`
-- Build: `2`
+- Build: `3`
 
 ## Verified Locally
 
 The current native app has been verified with:
 
 ```bash
+xcodebuild test -project IronLog.xcodeproj -scheme IronLog -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
 xcodebuild -project IronLog.xcodeproj -scheme IronLog -destination 'generic/platform=iOS Simulator' build
 xcodebuild -project IronLog.xcodeproj -scheme IronLog -destination 'generic/platform=iOS' -archivePath build/IronLog.xcarchive archive
 xcodebuild -exportArchive -archivePath build/IronLog.xcarchive -exportPath build/export -exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates
@@ -27,7 +28,7 @@ The IPA contains:
 
 - `CFBundleIdentifier = com.parthjadhav.ironlog`
 - `CFBundleShortVersionString = 1.0`
-- `CFBundleVersion = 2`
+- `CFBundleVersion = 3`
 - `ITSAppUsesNonExemptEncryption = false`
 - `PrivacyInfo.xcprivacy`
 - `workouts.json`
@@ -62,9 +63,9 @@ The build was uploaded with the installed `asc` CLI.
 
 Uploaded/TestFlight state:
 
-- Upload ID / Build ID: `4574e9d0-06d6-4ddb-868d-9d8dba044d74`
+- Upload ID / Build ID: `b254395a-b44a-4cfb-875b-37ef7f6168bc`
 - Version: `1.0`
-- Build: `2`
+- Build: `3`
 - Platform: `iOS`
 - Processing state: `VALID`
 - TestFlight internal state: `IN_BETA_TESTING`

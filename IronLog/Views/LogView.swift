@@ -2,8 +2,8 @@ import SwiftUI
 
 struct LogView: View {
     @EnvironmentObject private var app: AppState
-    @State private var note = ""
     @State private var newExerciseName = ""
+    @State private var showDiscardConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -21,6 +21,15 @@ struct LogView: View {
         .scrollIndicators(.hidden)
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
+        .confirmationDialog("Discard the workout in progress?", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
+            Button("Discard Workout", role: .destructive) {
+                NativeFeedback.light()
+                withAnimation(AppMotion.smooth) {
+                    app.discardWorkout()
+                }
+            }
+            Button("Keep Logging", role: .cancel) {}
+        }
     }
 
     private var emptyState: some View {
@@ -41,6 +50,7 @@ struct LogView: View {
                 Label("Start Free Workout", systemImage: "plus")
             }
             .buttonStyle(PrimaryButtonStyle())
+            .accessibilityIdentifier("start-free-workout-button")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 36)
@@ -48,11 +58,8 @@ struct LogView: View {
 
     private var activeLog: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("Today").sectionTitle()
-                let muscle = app.library.muscle(app.selectedMuscle)
-                Pill(text: [muscle?.label, app.selectedSplit].compactMap(\.self).joined(separator: " · "))
-            }
+            logHeader
+            progressCard
 
             ForEach(Array(app.todayExercises.enumerated()), id: \.element.id) { index, exercise in
                 LogExerciseCard(exercise: exercise)
@@ -67,7 +74,10 @@ struct LogView: View {
                     .tracking(1.5)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted)
-                TextEditor(text: $note)
+                TextEditor(text: Binding(
+                    get: { app.workoutNote },
+                    set: { app.updateWorkoutNote($0) }
+                ))
                     .frame(minHeight: 72)
                     .scrollContentBackground(.hidden)
                     .padding(8)
@@ -80,14 +90,62 @@ struct LogView: View {
             Button {
                 NativeFeedback.success()
                 Task {
-                    await app.finishWorkout(note: note)
-                    note = ""
+                    await app.finishWorkout(note: app.workoutNote)
                 }
             } label: {
                 Label("Finish & Save Workout", systemImage: "checkmark")
             }
             .buttonStyle(PrimaryButtonStyle())
+            .accessibilityIdentifier("finish-workout-button")
         }
+    }
+
+    private var logHeader: some View {
+        HStack(spacing: 8) {
+            Text("Today").sectionTitle()
+            let muscle = app.library.muscle(app.selectedMuscle)
+            Pill(text: [muscle?.label, app.selectedSplit].compactMap(\.self).joined(separator: " · "))
+            Spacer()
+            Button {
+                NativeFeedback.selection()
+                showDiscardConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .bold))
+                    .frame(width: 36, height: 36)
+                    .foregroundStyle(Theme.danger)
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
+            }
+            .buttonStyle(TactileButtonStyle())
+        }
+    }
+
+    private var progressCard: some View {
+        let totalSets = app.todayExercises.reduce(0) { $0 + $1.sets.count }
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(app.validCompletedSetCount)/\(totalSets)")
+                    .font(.system(size: 28, weight: .black))
+                    .fontWidth(.condensed)
+                    .foregroundStyle(Theme.accent)
+                Text("valid sets ready to save")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.muted2)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("\(app.todayExercises.count)")
+                    .font(.system(size: 28, weight: .black))
+                    .fontWidth(.condensed)
+                    .foregroundStyle(Theme.text)
+                Text("exercises")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.muted2)
+            }
+        }
+        .cardStyle()
     }
 
     private var addExerciseBlock: some View {
@@ -101,72 +159,74 @@ struct LogView: View {
                         .foregroundStyle(Theme.muted)
                     TextField("Exercise name", text: $newExerciseName)
                         .fieldStyle()
+                        .accessibilityIdentifier("new-exercise-name-field")
                     HStack {
-                Button {
-                    NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) {
-                        app.addExerciseWeighted = false
+                        Button {
+                            NativeFeedback.selection()
+                            withAnimation(AppMotion.quick) {
+                                app.setAddExerciseWeighted(false)
+                            }
+                        } label: {
+                            Pill(text: "Reps only", isActive: !app.addExerciseWeighted)
+                        }
+                        .buttonStyle(TactileButtonStyle())
+                        Button {
+                            NativeFeedback.selection()
+                            withAnimation(AppMotion.quick) {
+                                app.setAddExerciseWeighted(true)
+                            }
+                        } label: {
+                            Pill(text: "Weight + Reps", isActive: app.addExerciseWeighted)
+                        }
+                        .buttonStyle(TactileButtonStyle())
                     }
-                } label: {
-                    Pill(text: "Reps only", isActive: !app.addExerciseWeighted)
-                }
-                .buttonStyle(TactileButtonStyle())
-                Button {
-                    NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) {
-                        app.addExerciseWeighted = true
-                    }
-                } label: {
-                    Pill(text: "Weight + Reps", isActive: app.addExerciseWeighted)
-                }
-                .buttonStyle(TactileButtonStyle())
-            }
-            HStack {
-                Button("Add") {
-                    NativeFeedback.light()
-                    withAnimation(AppMotion.quick) {
-                        app.addExercise(name: newExerciseName)
-                        newExerciseName = ""
-                    }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                Button {
-                    NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) {
-                        app.showAddExerciseForm = false
-                    }
-                } label: {
+                    HStack {
+                        Button("Add") {
+                            NativeFeedback.light()
+                            withAnimation(AppMotion.quick) {
+                                app.addExercise(name: newExerciseName)
+                                newExerciseName = ""
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .accessibilityIdentifier("confirm-add-exercise-button")
+                        Button {
+                            NativeFeedback.selection()
+                            withAnimation(AppMotion.quick) {
+                                app.cancelAddingExercise()
+                            }
+                        } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .bold))
                                 .frame(width: 44, height: 44)
                                 .background(Theme.surface2)
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+                        }
+                        .foregroundStyle(Theme.text)
+                        .buttonStyle(TactileButtonStyle())
+                    }
                 }
-                .foregroundStyle(Theme.text)
-                .buttonStyle(TactileButtonStyle())
-            }
-        }
-        .cardStyle()
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-    } else {
-        Button {
-            NativeFeedback.selection()
-            withAnimation(AppMotion.quick) {
-                app.showAddExerciseForm = true
-                app.addExerciseWeighted = false
-            }
-        } label: {
+                .cardStyle()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else {
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) {
+                        app.beginAddingExercise()
+                    }
+                } label: {
                     Label("Add Exercise", systemImage: "plus")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .foregroundStyle(Theme.muted2)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [5])))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [5])))
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityIdentifier("show-add-exercise-button")
+            }
         }
-        .buttonStyle(TactileButtonStyle())
-    }
-}
     }
 }
 
@@ -261,38 +321,57 @@ struct LogExerciseCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Button {
-                NativeFeedback.selection()
-                withAnimation(AppMotion.quick) {
-                    app.toggleExercise(exercise.id)
-                }
-            } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(exercise.name)
-                                .font(.system(size: 13, weight: .semibold))
-                            if exercise.bodyweight {
-                                SmallBadge("Bodyweight")
-                            }
-                            if exercise.timed {
-                                SmallBadge("Timed")
-                            }
-                        }
-                        Text("\(exercise.sets.filter(\.done).count)/\(exercise.sets.count) sets done")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.muted2)
+            HStack(spacing: 8) {
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) {
+                        app.toggleExercise(exercise.id)
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.muted2)
-                        .rotationEffect(.degrees(exercise.expanded ? 90 : 0))
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(exercise.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                if exercise.bodyweight {
+                                    SmallBadge("Bodyweight")
+                                }
+                                if exercise.timed {
+                                    SmallBadge("Timed")
+                                }
+                            }
+                            Text("\(exercise.sets.filter(\.done).count)/\(exercise.sets.count) sets done")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.muted2)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                            .rotationEffect(.degrees(exercise.expanded ? 90 : 0))
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(14)
+                .foregroundStyle(Theme.text)
+                .buttonStyle(TactileButtonStyle())
+
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) {
+                        app.removeExercise(exercise.id)
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(Theme.muted2)
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.border))
+                }
+                .buttonStyle(TactileButtonStyle())
             }
-            .foregroundStyle(Theme.text)
-            .buttonStyle(TactileButtonStyle())
+            .padding(14)
 
             if exercise.expanded {
                 VStack(spacing: 8) {
@@ -333,11 +412,11 @@ struct LogExerciseCard: View {
                 .frame(width: 20, height: 34, alignment: .bottom)
 
             if !exercise.bodyweight && !exercise.timed {
-                SmallInput(label: "KG", value: set.weight) { value in
+                SmallInput(label: "KG", value: set.weight, identifier: "set-weight-input") { value in
                     app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                 }
             }
-            SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps) { value in
+            SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps, identifier: "set-reps-input") { value in
                 app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
             }
             Button {
@@ -356,6 +435,21 @@ struct LogExerciseCard: View {
                     .symbolEffect(.bounce, value: set.done)
             }
             .buttonStyle(TactileButtonStyle())
+            .accessibilityIdentifier("set-done-button")
+
+            Button {
+                NativeFeedback.selection()
+                withAnimation(AppMotion.quick) {
+                    app.removeSet(exerciseID: exercise.id, setID: set.id)
+                }
+            } label: {
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 30, height: 34)
+                    .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
+            }
+            .buttonStyle(TactileButtonStyle())
+            .disabled(exercise.sets.count <= 1)
         }
     }
 }
@@ -363,6 +457,7 @@ struct LogExerciseCard: View {
 struct SmallInput: View {
     let label: String
     let value: String
+    var identifier: String?
     let onChange: (String) -> Void
 
     var body: some View {
@@ -379,6 +474,7 @@ struct SmallInput: View {
                 .background(Theme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
+                .accessibilityIdentifier(identifier ?? "\(label.lowercased())-input")
         }
     }
 }

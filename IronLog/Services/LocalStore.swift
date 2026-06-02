@@ -25,6 +25,10 @@ actor LocalStore {
         guard let data = try? encoder.encode(snapshot) else { return }
         try? data.write(to: url, options: [.atomic])
     }
+
+    func clear() {
+        try? FileManager.default.removeItem(at: url)
+    }
 }
 
 enum KeychainStore {

@@ -93,6 +93,11 @@ struct WorkoutDraft: Codable, Equatable {
     var exercises: [ActiveExercise]
     var muscle: String?
     var split: String?
+    var day: String?
+    var step: WorkoutStep?
+    var showAddExerciseForm: Bool?
+    var addExerciseWeighted: Bool?
+    var note: String?
 }
 
 struct LoggedSet: Identifiable, Codable, Hashable {

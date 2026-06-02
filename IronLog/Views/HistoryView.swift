@@ -8,9 +8,26 @@ struct HistoryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 TitleBlock(title: "History", subtitle: "All your past sessions")
-                Text(app.syncMessage)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.muted2)
+                HStack(spacing: 10) {
+                    Text(app.syncMessage)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.muted2)
+                    Spacer()
+                    Button {
+                        NativeFeedback.selection()
+                        Task { await app.syncNow() }
+                    } label: {
+                        Label(app.user?.isLocal == true ? "Set Up Sync" : "Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .foregroundStyle(Theme.text)
+                            .background(Theme.surface2)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Theme.border))
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                }
 
                 if app.sessions.isEmpty {
                     emptyState

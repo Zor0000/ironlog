@@ -2,10 +2,15 @@ import SwiftUI
 
 struct WorkoutsView: View {
     @EnvironmentObject private var app: AppState
+    @State private var showDiscardConfirmation = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                if app.hasActiveWorkout {
+                    CurrentWorkoutBanner(showDiscardConfirmation: $showDiscardConfirmation)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
                 Group {
                     switch app.workoutStep {
                     case .split:
@@ -29,6 +34,18 @@ struct WorkoutsView: View {
         .background(Color.clear)
         .scrollIndicators(.hidden)
         .animation(AppMotion.screen, value: app.workoutStep)
+        .animation(AppMotion.quick, value: app.hasActiveWorkout)
+        .confirmationDialog("Discard the workout in progress?", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
+            Button("Discard Workout", role: .destructive) {
+                NativeFeedback.light()
+                withAnimation(AppMotion.smooth) {
+                    app.discardWorkout()
+                }
+            }
+            Button("Keep Logging", role: .cancel) {
+                app.continueWorkout()
+            }
+        }
     }
 
     private var splitStep: some View {
@@ -196,8 +213,67 @@ struct WorkoutsView: View {
                 Label("Start This Workout", systemImage: "play.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
+            .accessibilityIdentifier("start-suggested-workout-button")
             .padding(.top, 6)
         }
+    }
+}
+
+struct CurrentWorkoutBanner: View {
+    @EnvironmentObject private var app: AppState
+    @Binding var showDiscardConfirmation: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "bolt.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Workout in progress")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(summary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted2)
+                }
+                Spacer()
+            }
+            HStack(spacing: 9) {
+                Button {
+                    NativeFeedback.light()
+                    withAnimation(AppMotion.smooth) {
+                        app.continueWorkout()
+                    }
+                } label: {
+                    Label("Continue", systemImage: "arrow.right")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+
+                Button {
+                    NativeFeedback.selection()
+                    showDiscardConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14, weight: .bold))
+                        .frame(width: 46, height: 46)
+                        .foregroundStyle(Theme.danger)
+                        .background(Theme.surface2)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+                }
+                .buttonStyle(TactileButtonStyle())
+            }
+        }
+        .cardStyle()
+    }
+
+    private var summary: String {
+        if app.todayExercises.isEmpty {
+            return "Free workout waiting for exercises"
+        }
+        let done = app.completedSetCount
+        let total = app.todayExercises.reduce(0) { $0 + $1.sets.count }
+        return "\(app.todayExercises.count) exercises · \(done)/\(total) sets done"
     }
 }
 
