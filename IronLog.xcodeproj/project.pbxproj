@@ -1,0 +1,389 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0453CA49D82F830C4F7DE01B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */; };
+		155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BD2BA9DE192DFF44B03330 /* LogView.swift */; };
+		281B71D30098F114656AA639 /* WorkoutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */; };
+		291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4D54847F3760FF9E68C832 /* LocalStore.swift */; };
+		3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15884452B261DC7C80276FD /* RootView.swift */; };
+		40E46254FAA5036F5235C2EE /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C4FD635EC34C0285006A34 /* HistoryView.swift */; };
+		4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8AC012C1D9C2E0DBDE5761 /* Models.swift */; };
+		5259E04EE8D7387545301C37 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3546CCF1405ECC208820E429 /* Assets.xcassets */; };
+		68389DABBF5C51C093D30A71 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BC36223073AEFE8DA47054 /* Theme.swift */; };
+		89AD41ECC9F5BCC5598FDC3B /* ExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */; };
+		99A3889906271127485BDEF4 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */; };
+		AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32F525BCBC44EAA20594F626 /* IronLogApp.swift */; };
+		BFAC9AD4ADD2C0450067503A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F11C8514ADE4D2439119EAE /* AppState.swift */; };
+		C74A51E43D9CFC111A2F057B /* workouts.json in Resources */ = {isa = PBXBuildFile; fileRef = 291F4F340219B29BC3D35562 /* workouts.json */; };
+		F7DDEF65A56526D4848FCB2A /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECDB41C749882B25E25C00AA /* SupabaseService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		291F4F340219B29BC3D35562 /* workouts.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = workouts.json; sourceTree = "<group>"; };
+		32F525BCBC44EAA20594F626 /* IronLogApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogApp.swift; sourceTree = "<group>"; };
+		3546CCF1405ECC208820E429 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		47BD2BA9DE192DFF44B03330 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		70BC36223073AEFE8DA47054 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		77FD0FF6F621454F8735020E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		8B8AC012C1D9C2E0DBDE5761 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		9F11C8514ADE4D2439119EAE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrary.swift; sourceTree = "<group>"; };
+		B15884452B261DC7C80276FD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IronLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutsView.swift; sourceTree = "<group>"; };
+		DC4D54847F3760FF9E68C832 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
+		E4C4FD635EC34C0285006A34 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		ECDB41C749882B25E25C00AA /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		3F47C8A5B2BD310177171771 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				3546CCF1405ECC208820E429 /* Assets.xcassets */,
+				C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */,
+				291F4F340219B29BC3D35562 /* workouts.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		495CA01E4CE7E827A22E4F5C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6DAF1FD744C12AF759FA6153 = {
+			isa = PBXGroup;
+			children = (
+				E878063FF779C1AB1666E5A1 /* IronLog */,
+				495CA01E4CE7E827A22E4F5C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		86C6B699A050091305C25FF7 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */,
+				DC4D54847F3760FF9E68C832 /* LocalStore.swift */,
+				ECDB41C749882B25E25C00AA /* SupabaseService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		AB75DA28F96AD1ED73A9EE2D /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				E4C4FD635EC34C0285006A34 /* HistoryView.swift */,
+				47BD2BA9DE192DFF44B03330 /* LogView.swift */,
+				B15884452B261DC7C80276FD /* RootView.swift */,
+				E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */,
+				C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		E878063FF779C1AB1666E5A1 /* IronLog */ = {
+			isa = PBXGroup;
+			children = (
+				9F11C8514ADE4D2439119EAE /* AppState.swift */,
+				77FD0FF6F621454F8735020E /* Info.plist */,
+				32F525BCBC44EAA20594F626 /* IronLogApp.swift */,
+				8B8AC012C1D9C2E0DBDE5761 /* Models.swift */,
+				70BC36223073AEFE8DA47054 /* Theme.swift */,
+				3F47C8A5B2BD310177171771 /* Resources */,
+				86C6B699A050091305C25FF7 /* Services */,
+				AB75DA28F96AD1ED73A9EE2D /* Views */,
+			);
+			path = IronLog;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		68F127FF37A8B7D8E5F786A1 /* IronLog */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C72F111CCCFA6384B7653AE9 /* Build configuration list for PBXNativeTarget "IronLog" */;
+			buildPhases = (
+				5B88375E5A8E44EEE7363B59 /* Sources */,
+				14BA291800AD957122F48C92 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IronLog;
+			packageProductDependencies = (
+			);
+			productName = IronLog;
+			productReference = BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		793DCC82B1A115B1EAD8E10A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					68F127FF37A8B7D8E5F786A1 = {
+						DevelopmentTeam = 75LRT8TRQY;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E98970C7231D9BE3F54C332D /* Build configuration list for PBXProject "IronLog" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6DAF1FD744C12AF759FA6153;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 495CA01E4CE7E827A22E4F5C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				68F127FF37A8B7D8E5F786A1 /* IronLog */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		14BA291800AD957122F48C92 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5259E04EE8D7387545301C37 /* Assets.xcassets in Resources */,
+				0453CA49D82F830C4F7DE01B /* PrivacyInfo.xcprivacy in Resources */,
+				C74A51E43D9CFC111A2F057B /* workouts.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5B88375E5A8E44EEE7363B59 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BFAC9AD4ADD2C0450067503A /* AppState.swift in Sources */,
+				89AD41ECC9F5BCC5598FDC3B /* ExerciseLibrary.swift in Sources */,
+				40E46254FAA5036F5235C2EE /* HistoryView.swift in Sources */,
+				AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */,
+				291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */,
+				155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */,
+				4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */,
+				3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */,
+				99A3889906271127485BDEF4 /* StatsView.swift in Sources */,
+				F7DDEF65A56526D4848FCB2A /* SupabaseService.swift in Sources */,
+				68389DABBF5C51C093D30A71 /* Theme.swift in Sources */,
+				281B71D30098F114656AA639 /* WorkoutsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		3666C264FFBBDD59CEAABE30 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = IronLog/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.parthjadhav.ironlog;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		47DBC81C300F37B1B1B864F5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = IronLog/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.parthjadhav.ironlog;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4D2FE41C5E15B4243CD11FEE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 75LRT8TRQY;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		9B2750FE63816464E5ACA729 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 75LRT8TRQY;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C72F111CCCFA6384B7653AE9 /* Build configuration list for PBXNativeTarget "IronLog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3666C264FFBBDD59CEAABE30 /* Debug */,
+				47DBC81C300F37B1B1B864F5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E98970C7231D9BE3F54C332D /* Build configuration list for PBXProject "IronLog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9B2750FE63816464E5ACA729 /* Debug */,
+				4D2FE41C5E15B4243CD11FEE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 793DCC82B1A115B1EAD8E10A /* Project object */;
+}

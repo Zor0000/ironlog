@@ -10,6 +10,8 @@ function startTimer() {
   state.timerRunning = true;
   document.getElementById('timer-toggle').textContent = '⏸';
   document.getElementById('timer-toggle').classList.add('running');
+  document.querySelector('.timer-bar')?.classList.add('timer-active');
+  feelTap(12);
   state.timerInterval = setInterval(() => {
     if (state.timerSecs <= 0) {
       resetTimer();
@@ -27,6 +29,8 @@ function toggleTimer() {
     state.timerRunning = false;
     document.getElementById('timer-toggle').textContent = '▶';
     document.getElementById('timer-toggle').classList.remove('running');
+    document.querySelector('.timer-bar')?.classList.remove('timer-active');
+    feelTap(6);
   } else {
     startTimer();
   }
@@ -39,6 +43,8 @@ function resetTimer() {
   document.getElementById('timer-disp').textContent = fmtTime(state.timerSecs);
   document.getElementById('timer-toggle').textContent = '▶';
   document.getElementById('timer-toggle').classList.remove('running');
+  document.querySelector('.timer-bar')?.classList.remove('timer-active');
+  feelTap(6);
 }
 
 function setTimerPreset(val) {

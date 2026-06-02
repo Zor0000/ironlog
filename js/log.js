@@ -29,7 +29,7 @@ function renderTodayLog() {
       const inputLabel   = isTimed ? 'SECS' : 'REPS';
 
       return `
-      <div class="log-ex">
+      <div class="log-ex ${ex.expanded ? 'expanded' : ''}">
         <div class="log-ex-hdr" onclick="toggleLogEx(${ei})">
           <div>
             <div class="log-ex-name">
@@ -82,6 +82,7 @@ function renderTodayLog() {
 }
 
 function toggleLogEx(ei) {
+  feelTap();
   state.todayExercises[ei].expanded = !state.todayExercises[ei].expanded;
   saveWorkoutDraft();
   renderTodayLog();
@@ -95,12 +96,14 @@ function updateSet(ei, si, field, val) {
 }
 
 function addSet(ei) {
+  feelTap();
   state.todayExercises[ei].sets.push({ weight: '', reps: '', done: false });
   saveWorkoutDraft();
   renderTodayLog();
 }
 
 function toggleDone(ei, si) {
+  feelTap(12);
   const ex = state.todayExercises[ei];
   const s  = ex.sets[si];
   s.done = !s.done;
@@ -169,6 +172,7 @@ function startFreeWorkout() {
 }
 
 function openAddExerciseForm() {
+  feelTap();
   state.showAddExerciseForm = true;
   state.addExMode = 'reps';
   renderTodayLog();
@@ -176,17 +180,20 @@ function openAddExerciseForm() {
 }
 
 function cancelAddExercise() {
+  feelTap();
   state.showAddExerciseForm = false;
   renderTodayLog();
 }
 
 function setAddExMode(mode) {
+  feelTap();
   state.addExMode = mode;
   renderTodayLog();
   document.getElementById('new-ex-name')?.focus();
 }
 
 function confirmAddExercise() {
+  feelTap(12);
   const nameEl = document.getElementById('new-ex-name');
   const name = nameEl?.value.trim();
   if (!name) { toast('Enter an exercise name first'); return; }

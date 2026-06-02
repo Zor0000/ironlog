@@ -80,13 +80,24 @@ async function bootApp(user) {
   renderTodayLog();
 }
 
+const TAB_ORDER = ['workouts', 'log', 'history', 'stats'];
+
 function showPage(name, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const current = document.querySelector('.page.active');
+  const currentName = current?.id?.replace('page-', '');
+  const direction = TAB_ORDER.indexOf(name) >= TAB_ORDER.indexOf(currentName) ? 'nav-forward' : 'nav-back';
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'nav-forward', 'nav-back'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  btn.classList.add('active');
+  document.getElementById('page-' + name).classList.add(direction, 'active');
+  btn?.classList.add('active');
+  feelTap();
   if (name === 'stats')   renderStats();
   if (name === 'history') renderHistory();
   if (name === 'log')     renderTodayLog();
   if (name === 'workouts') renderWorkoutStep();
+}
+
+function feelTap(pattern = 8) {
+  if ('vibrate' in navigator) navigator.vibrate(pattern);
 }

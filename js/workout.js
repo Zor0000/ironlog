@@ -30,6 +30,7 @@ function renderStepSplit(c) {
 }
 
 function selectSplit(s) {
+  feelTap();
   state.selectedSplit = s;
   state.selectedDay = null;
   state.selectedMuscle = null;
@@ -59,6 +60,7 @@ function renderStepDay(c) {
 }
 
 function selectDay(day) {
+  feelTap();
   state.selectedDay = day;
   state.selectedMuscle = null;
   state.workoutStep = 'muscle';
@@ -106,6 +108,7 @@ function renderStepMuscle(c) {
 }
 
 function selectMuscle(id) {
+  feelTap();
   state.selectedMuscle = id;
   state.workoutStep = 'workout';
   renderWorkoutStep();
@@ -176,6 +179,7 @@ function goBackToMuscleNonDay() {
 // ── Start Workout ──────────────────────────────────────────────
 function startWorkout() {
   if (!state.selectedMuscle) return;
+  feelTap(14);
   const exercises = WORKOUTS[state.selectedSplit]?.[state.selectedMuscle] || [];
   state.todayExercises = exercises.map(ex => ({
     ...ex,

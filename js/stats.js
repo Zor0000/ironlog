@@ -55,6 +55,7 @@ function renderStats() {
 }
 
 function setWater(i) {
+  feelTap(10);
   state.water = i < state.water ? i : i + 1;
   localStorage.setItem('il_water_' + today(), state.water);
   renderStats();

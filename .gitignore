@@ -29,6 +29,7 @@ yarn-error.log*
 # Build output (if added later)
 dist/
 build/
+artifacts/
 
 # Logs
 *.log
