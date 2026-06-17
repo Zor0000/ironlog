@@ -14,6 +14,13 @@ Desktop.ini
 *.swp
 *.swo
 
+# Xcode (per-user state, not shared)
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.xcscmblueprint
+*.xccheckout
+
 # Node (if added later)
 node_modules/
 npm-debug.log*

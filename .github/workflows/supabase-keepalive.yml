@@ -2,8 +2,10 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Every 3 days at 09:00 UTC — well under Supabase free-tier 1-week idle pause
-    - cron: '0 9 */3 * *'
+    # Daily at 09:00 UTC. Runs daily (not every few days) because GitHub delays
+    # scheduled jobs and '*/N' day-of-month resets at month boundaries — both can
+    # open gaps long enough for Supabase to pause a free-tier project.
+    - cron: '0 9 * * *'
   workflow_dispatch:
 
 jobs:
@@ -16,7 +18,9 @@ jobs:
           SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0
         run: |
           set -e
+          # Retry to ride out transient DNS/5xx blips (a paused project fails DNS).
           code=$(curl -s -o /tmp/body -w "%{http_code}" \
+            --retry 5 --retry-all-errors --retry-delay 10 --max-time 30 \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
             "$SUPABASE_URL/rest/v1/exercises?select=id&limit=1")
