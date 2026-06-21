@@ -93,6 +93,8 @@ struct StatsView: View {
                                 .symbolEffect(.bounce, value: index < app.waterToday)
                         }
                         .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Glass \(index + 1)")
+                        .accessibilityValue(index < app.waterToday ? "Filled" : "Empty")
                     }
                 }
                 Spacer()

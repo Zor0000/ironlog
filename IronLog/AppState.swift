@@ -43,6 +43,21 @@ final class AppState: ObservableObject {
         !todayExercises.isEmpty || showAddExerciseForm || !workoutNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    var selectedWorkoutMuscleIDs: [String] {
+        library.muscleIDs(split: selectedSplit, day: selectedDay, selectedMuscle: selectedMuscle)
+    }
+
+    var selectedWorkoutMuscleLabel: String {
+        let labels = selectedWorkoutMuscleIDs.compactMap { library.muscle($0)?.label }
+        if labels.isEmpty { return selectedSplit ?? "Workout" }
+        if labels.count == 1 { return labels[0] }
+        return labels.joined(separator: " + ")
+    }
+
+    var activeExerciseTemplates: [ExerciseTemplate] {
+        library.exercises(split: selectedSplit, day: selectedDay, selectedMuscle: selectedMuscle)
+    }
+
     var completedSetCount: Int {
         todayExercises.reduce(0) { total, exercise in
             total + exercise.sets.filter(\.done).count
@@ -161,7 +176,7 @@ final class AppState: ObservableObject {
     func selectDay(_ day: String) {
         selectedDay = day
         selectedMuscle = nil
-        workoutStep = .muscle
+        workoutStep = .workout
     }
 
     func selectMuscle(_ muscle: String) {
@@ -175,7 +190,7 @@ final class AppState: ObservableObject {
             showToast("Finish or discard the current workout first")
             return
         }
-        let templates = library.exercises(split: selectedSplit, muscle: selectedMuscle)
+        let templates = activeExerciseTemplates
         guard !templates.isEmpty else {
             showToast("No exercises found for this workout")
             return
@@ -190,7 +205,7 @@ final class AppState: ObservableObject {
         }
         selectedTab = .log
         persistDraft()
-        showToast("Workout started")
+        showToast("\(selectedWorkoutMuscleLabel) workout started")
     }
 
     func startFreeWorkout() {
@@ -251,7 +266,7 @@ final class AppState: ObservableObject {
             return
         }
         todayExercises[ei].sets[si].done = true
-        startTimer()
+        restartTimer()
         if isNewPR(exercise: exercise, set: set) {
             showToast("New PR on \(exercise.name)")
         }
@@ -324,6 +339,20 @@ final class AppState: ObservableObject {
         showAddExerciseForm = false
         addExerciseWeighted = false
         persistDraft()
+    }
+
+    func addExercise(template: ExerciseTemplate) {
+        todayExercises.append(ActiveExercise(
+            name: template.name,
+            bodyweight: template.bodyweight,
+            timed: template.timed,
+            custom: false,
+            sets: (0..<max(template.sets, 1)).map { _ in WorkoutSet() }
+        ))
+        showAddExerciseForm = false
+        addExerciseWeighted = false
+        persistDraft()
+        showToast("\(template.name) added")
     }
 
     func updateWorkoutNote(_ note: String) {
@@ -399,8 +428,21 @@ final class AppState: ObservableObject {
     }
 
     func startTimer() {
-        if timerRunning { return }
+        guard !timerRunning else { return }
         timerRunning = true
+        runTimerLoop()
+    }
+
+    /// Restarts the rest timer from the full preset. Called when a set is
+    /// completed so each set's rest period counts down fresh rather than
+    /// resuming the previous (or paused) value.
+    func restartTimer() {
+        timerSecs = timerMax
+        timerRunning = true
+        runTimerLoop()
+    }
+
+    private func runTimerLoop() {
         timerTask?.cancel()
         timerTask = Task { [weak self] in
             while !Task.isCancelled {

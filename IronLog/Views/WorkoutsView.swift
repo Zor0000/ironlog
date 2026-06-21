@@ -35,15 +35,24 @@ struct WorkoutsView: View {
         .scrollIndicators(.hidden)
         .animation(AppMotion.screen, value: app.workoutStep)
         .animation(AppMotion.quick, value: app.hasActiveWorkout)
-        .confirmationDialog("Discard the workout in progress?", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
-            Button("Discard Workout", role: .destructive) {
-                NativeFeedback.light()
-                withAnimation(AppMotion.smooth) {
-                    app.discardWorkout()
+        .overlay {
+            if showDiscardConfirmation {
+                ConfirmActionModal(
+                    title: "Discard workout?",
+                    message: "This clears the current exercises, sets, timer and note. Saved history will not be affected.",
+                    confirmTitle: "Discard Workout",
+                    cancelTitle: "Keep Logging",
+                    systemImage: "trash"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        showDiscardConfirmation = false
+                        app.discardWorkout()
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) {
+                        showDiscardConfirmation = false
+                    }
                 }
-            }
-            Button("Keep Logging", role: .cancel) {
-                app.continueWorkout()
             }
         }
     }
@@ -102,7 +111,7 @@ struct WorkoutsView: View {
                     app.selectedSplit = nil
                 }
             }
-            TitleBlock(title: "Training Day", subtitle: "Select your training day")
+            TitleBlock(title: "Training Day", subtitle: "Start the full day in one session")
             ForEach(Array((app.library.splitDays[app.selectedSplit ?? ""] ?? []).enumerated()), id: \.element.id) { index, day in
                 Button {
                     NativeFeedback.selection()
@@ -175,42 +184,77 @@ struct WorkoutsView: View {
     }
 
     private var workoutStep: some View {
-        let muscle = app.library.muscle(app.selectedMuscle)
+        let muscles = app.selectedWorkoutMuscleIDs.compactMap { app.library.muscle($0) }
         let context = [app.selectedSplit, app.selectedDay].compactMap(\.self).joined(separator: " · ")
         return VStack(alignment: .leading, spacing: 10) {
-            BackButton(label: muscle?.label ?? "Muscle") {
+            BackButton(label: app.selectedDay ?? app.selectedWorkoutMuscleLabel) {
                 NativeFeedback.selection()
                 withAnimation(AppMotion.quick) {
-                    app.workoutStep = .muscle
-                    app.selectedMuscle = nil
+                    if app.selectedDay != nil {
+                        app.workoutStep = .day
+                        app.selectedDay = nil
+                    } else {
+                        app.workoutStep = .muscle
+                        app.selectedMuscle = nil
+                    }
                 }
             }
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("Suggested Workout")
                     .sectionTitle()
-                Pill(text: context)
+                if !context.isEmpty {
+                    Pill(text: context)
+                }
             }
-            HStack(spacing: 6) {
-                if let muscle {
+            ScrollView(.horizontal) {
+                HStack(spacing: 7) {
+                    ForEach(muscles) { muscle in
+                        Label(muscle.label, systemImage: muscle.systemImage)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.muted2)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(Theme.surface2)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Theme.border))
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+
+            ForEach(muscles) { muscle in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: muscle.systemImage)
+                        Text(muscle.label)
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.muted2)
+
+                    ForEach(Array(app.library.exercises(split: app.selectedSplit, muscle: muscle.id).enumerated()), id: \.element.id) { index, exercise in
+                        ExerciseSuggestionCard(exercise: exercise, record: app.personalRecords[exercise.name])
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .entrance(index)
+                    }
+                }
+            }
+
+            if muscles.isEmpty, let muscle = app.library.muscle(app.selectedMuscle) {
+                HStack(spacing: 6) {
                     Image(systemName: muscle.systemImage)
                     Text(muscle.label)
                 }
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.muted2)
             }
-            .font(.system(size: 12))
-            .foregroundStyle(Theme.muted2)
 
-            ForEach(Array(app.library.exercises(split: app.selectedSplit, muscle: app.selectedMuscle).enumerated()), id: \.element.id) { index, exercise in
-                ExerciseSuggestionCard(exercise: exercise, record: app.personalRecords[exercise.name])
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .entrance(index)
-            }
             Button {
                 NativeFeedback.light()
                 withAnimation(AppMotion.smooth) {
                     app.startWorkout()
                 }
             } label: {
-                Label("Start This Workout", systemImage: "play.fill")
+                Label("Start \(app.selectedDay ?? app.selectedWorkoutMuscleLabel)", systemImage: "play.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
             .accessibilityIdentifier("start-suggested-workout-button")
@@ -262,6 +306,7 @@ struct CurrentWorkoutBanner: View {
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
                 }
                 .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel("Discard workout")
             }
         }
         .cardStyle()

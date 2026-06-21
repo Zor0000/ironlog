@@ -5,6 +5,7 @@ final class SupabaseService {
     private let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0"
     private let sessionService = "IronLogSupabaseSession"
     private let sessionAccount = "current"
+    private static let iso8601 = ISO8601DateFormatter()
 
     private var auth: AuthSession? {
         didSet { persistAuth() }
@@ -139,7 +140,7 @@ final class SupabaseService {
                 exerciseID: exerciseID,
                 weightKg: record.weight,
                 reps: record.reps,
-                achievedAt: ISO8601DateFormatter().string(from: record.achievedAt)
+                achievedAt: Self.iso8601.string(from: record.achievedAt)
             )
             let _: [EmptyResponse] = try await restPost(
                 path: "/rest/v1/personal_records",

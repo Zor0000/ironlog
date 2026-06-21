@@ -40,13 +40,16 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Split Type"].waitForExistence(timeout: 6))
         app.buttons["PPL"].tap()
         app.buttons["Push"].tap()
-        app.buttons["Chest"].tap()
 
         XCTAssertTrue(app.buttons["start-suggested-workout-button"].waitForExistence(timeout: 3))
         app.buttons["start-suggested-workout-button"].tap()
 
         XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["Barbell Bench Press"].waitForExistence(timeout: 3))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Seated DB Shoulder Press"].waitForExistence(timeout: 3))
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Overhead Tricep Extension"].waitForExistence(timeout: 3))
 
         app.buttons["Workouts"].tap()
         XCTAssertTrue(app.staticTexts["Workout in progress"].waitForExistence(timeout: 3))

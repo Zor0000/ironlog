@@ -92,6 +92,102 @@
       }
     ]
   },
+  "LIBRARY": {
+    "chest": [
+      { "name": "Barbell Bench Press", "sets": 4, "reps": "6–10", "tip": "Arch slightly, feet flat. Bar touches lower chest, drive up. The king of chest mass." },
+      { "name": "Incline Barbell Press", "sets": 3, "reps": "8–10", "tip": "30–45° bench. Builds the upper chest shelf. Bar to upper chest." },
+      { "name": "Incline Dumbbell Press", "sets": 3, "reps": "10–12", "tip": "Upper chest focus. Lower until elbows dip just below bench level." },
+      { "name": "Dumbbell Bench Press", "sets": 3, "reps": "10–12", "tip": "Deeper stretch than barbell. Press dumbbells together at the top." },
+      { "name": "Decline Barbell Press", "sets": 3, "reps": "10–12", "tip": "Hits the lower chest. Slight 15–30° decline. Often skipped but effective." },
+      { "name": "Machine Chest Press", "sets": 3, "reps": "10–12", "tip": "Beginner friendly and safe. Fixed path lets you push to failure." },
+      { "name": "Cable Chest Fly", "sets": 3, "reps": "12–15", "tip": "High cables, slight elbow bend. Squeeze hard at the center." },
+      { "name": "Dumbbell Flat Fly", "sets": 3, "reps": "12–15", "tip": "Go light, arc motion. Feel the deep chest stretch at the bottom." },
+      { "name": "Pec Deck (Machine)", "sets": 3, "reps": "12–15", "tip": "Pure chest isolation. Squeeze and hold one second at peak contraction." },
+      { "name": "Push-Ups", "sets": 3, "reps": "12–15", "tip": "Body in a straight line, elbows at 45°. Add a plate on your back to progress.", "bodyweight": true },
+      { "name": "Incline Push-Ups", "sets": 3, "reps": "12–20", "tip": "Hands on a bench. Easier regression — great for beginners building up.", "bodyweight": true },
+      { "name": "Chest Dips", "sets": 3, "reps": "8–12", "tip": "Lean torso forward, flare elbows out to bias the chest. Control the descent.", "bodyweight": true }
+    ],
+    "back": [
+      { "name": "Deadlift", "sets": 3, "reps": "4–6", "tip": "Bar over mid-foot, neutral spine. Push the floor away. Biggest strength builder." },
+      { "name": "Barbell Row", "sets": 4, "reps": "6–10", "tip": "Hinge ~45°, pull bar to navel. Squeeze shoulder blades. Back stays flat." },
+      { "name": "Pendlay Row", "sets": 3, "reps": "6–8", "tip": "Each rep starts dead on the floor. Explosive pull, strict torso. Power builder." },
+      { "name": "T-Bar Row", "sets": 3, "reps": "8–10", "tip": "Neutral grip, drive elbows back. Great for mid-back thickness." },
+      { "name": "Single-Arm Dumbbell Row", "sets": 3, "reps": "10–12", "tip": "Row to your hip, not your shoulder. Elbow tracks close. Full stretch at bottom." },
+      { "name": "Lat Pulldown", "sets": 3, "reps": "10–12", "tip": "Wide grip for width. Lean back slightly, pull to upper chest, full stretch up top." },
+      { "name": "Seated Cable Row", "sets": 3, "reps": "10–12", "tip": "Sit tall, pull to belly button, hold the squeeze one second. Vary the grip." },
+      { "name": "Pull-Up / Assisted Pull-Up", "sets": 3, "reps": "6–10", "tip": "Dead hang at the bottom, chest to bar. The best exercise for lat width.", "bodyweight": true },
+      { "name": "Chin-Up", "sets": 3, "reps": "6–10", "tip": "Underhand grip hits lats and biceps. Full range, control the lowering.", "bodyweight": true },
+      { "name": "Inverted Row", "sets": 3, "reps": "10–15", "tip": "Bar in a rack at hip height. Body straight, pull chest to bar. Beginner pull-up builder.", "bodyweight": true },
+      { "name": "Straight-Arm Pulldown", "sets": 3, "reps": "15", "tip": "Arms stay straight, pull bar to thighs. Pure lat isolation and mind-muscle connection." },
+      { "name": "Back Extension", "sets": 3, "reps": "12–15", "tip": "Hinge at the hips on the bench. Squeeze glutes at the top. Strengthens the lower back.", "bodyweight": true },
+      { "name": "Barbell Shrug", "sets": 3, "reps": "12–15", "tip": "Shrug straight up to your ears, pause at the top. Builds the traps. No rolling." },
+      { "name": "Face Pulls", "sets": 3, "reps": "15–20", "tip": "Cable at eye height, pull to forehead with elbows high. Essential for shoulder health." }
+    ],
+    "legs": [
+      { "name": "Barbell Back Squat", "sets": 4, "reps": "6–10", "tip": "Bar on upper traps, chest up. Knees track toes. Hip crease below knees. King of exercises." },
+      { "name": "Front Squat", "sets": 3, "reps": "6–8", "tip": "Bar on front delts, elbows high. Stays more upright — heavy quad emphasis." },
+      { "name": "Goblet Squat", "sets": 3, "reps": "10–12", "tip": "Hold one dumbbell at your chest. Easiest squat to learn — perfect for beginners." },
+      { "name": "Leg Press (Machine)", "sets": 3, "reps": "12–15", "tip": "Feet shoulder-width, press through heels. Don't lock the knees at the top." },
+      { "name": "Romanian Deadlift", "sets": 3, "reps": "10–12", "tip": "Push hips BACK, not down. A hip hinge — feel the hamstring stretch. Back neutral." },
+      { "name": "Walking Lunges", "sets": 3, "reps": "12 each", "tip": "Big step forward, front shin vertical, back knee nearly touches the floor. Step through.", "bodyweight": true },
+      { "name": "Reverse Lunges", "sets": 3, "reps": "10 each", "tip": "Step backward instead of forward — easier on the knees. Drive through the front heel.", "bodyweight": true },
+      { "name": "Dumbbell Lunges", "sets": 3, "reps": "10 each", "tip": "Hold a dumbbell in each hand. Stationary or walking. Adds load to the basic lunge." },
+      { "name": "Bulgarian Split Squat", "sets": 3, "reps": "10 each", "tip": "Rear foot on a bench, front foot forward. Brutal but one of the best quad/glute builders.", "bodyweight": true },
+      { "name": "Step-Ups", "sets": 3, "reps": "12 each", "tip": "Step onto a bench, drive through the heel. Don't push off the back leg.", "bodyweight": true },
+      { "name": "Leg Curl (Machine)", "sets": 3, "reps": "12–15", "tip": "3-second negative. Don't let your hips rise off the pad. Full range for hamstring health." },
+      { "name": "Leg Extension (Machine)", "sets": 3, "reps": "15", "tip": "Pause and squeeze the quad at the top. Don't go too heavy — feel the contraction." },
+      { "name": "Hip Thrust", "sets": 3, "reps": "8–12", "tip": "Upper back on a bench, bar over hips. Drive hips up, squeeze glutes hard at the top." },
+      { "name": "Glute Bridge", "sets": 3, "reps": "12–15", "tip": "Floor version of the hip thrust. Squeeze glutes at the top, pause one second.", "bodyweight": true },
+      { "name": "Standing Calf Raises", "sets": 4, "reps": "15–20", "tip": "Full stretch at the bottom, pause and squeeze at the top. Calves need high reps." },
+      { "name": "Seated Calf Raises", "sets": 4, "reps": "15–20", "tip": "Bent knee targets the soleus. Slow tempo, full range, controlled stretch." },
+      { "name": "Wall Sit", "sets": 3, "reps": "45", "tip": "Back flat on the wall, thighs parallel to the floor. Hold and breathe. Burns the quads.", "timed": true, "bodyweight": true }
+    ],
+    "shoulders": [
+      { "name": "Barbell Overhead Press", "sets": 4, "reps": "6–8", "tip": "Bar at chin level, press straight up and slightly back. Core and glutes tight throughout." },
+      { "name": "Seated DB Shoulder Press", "sets": 3, "reps": "10–12", "tip": "Press straight up, elbows ~75° to the body. Don't lock out — keep tension on the delts." },
+      { "name": "Arnold Press", "sets": 3, "reps": "10–12", "tip": "Start palms facing you, rotate out as you press. Hits all three delt heads." },
+      { "name": "Dumbbell Lateral Raise", "sets": 4, "reps": "15–20", "tip": "Lead with the elbows, slight bend. Raise to shoulder height only. Go light, feel the burn." },
+      { "name": "Cable Lateral Raise", "sets": 3, "reps": "15–20", "tip": "Constant tension across the whole range. One arm at a time for a stricter stretch." },
+      { "name": "Rear Delt Fly", "sets": 3, "reps": "15–20", "tip": "Bend forward 45°, raise elbows to shoulder height. Critical for posture and balance." },
+      { "name": "Reverse Pec Deck", "sets": 3, "reps": "15–20", "tip": "Machine rear-delt fly. Lead with the elbows, squeeze the rear delts together." },
+      { "name": "Cable Front Raise", "sets": 3, "reps": "12–15", "tip": "Raise to eye level, keep the core tight. Front delts also get hit by all your pressing." },
+      { "name": "Upright Row", "sets": 3, "reps": "12", "tip": "EZ-bar or cable, pull to chin level with elbows high. Works traps and side delts." }
+    ],
+    "biceps": [
+      { "name": "Barbell Curl", "sets": 3, "reps": "8–10", "tip": "Elbows pinned at your sides. Full range, no swinging. The primary bicep mass builder." },
+      { "name": "EZ-Bar Curl", "sets": 3, "reps": "10–12", "tip": "Angled grip is easier on the wrists. Heavy and strict — keep elbows fixed." },
+      { "name": "Dumbbell Curl", "sets": 3, "reps": "10–12", "tip": "Supinate (turn pinky up) at the top for a full peak contraction. Alternate or together." },
+      { "name": "Hammer Curl", "sets": 3, "reps": "10–12", "tip": "Neutral grip (thumbs up). Builds the brachialis for arm thickness. Full range." },
+      { "name": "Incline Dumbbell Curl", "sets": 3, "reps": "12", "tip": "Arms hang behind you on an incline bench. Maximum stretch for the bicep peak." },
+      { "name": "Preacher Curl (EZ Bar)", "sets": 3, "reps": "12", "tip": "Bench enforces strict form — no cheating. Full range on the pad for peak isolation." },
+      { "name": "Concentration Curl", "sets": 3, "reps": "12", "tip": "Seated, elbow braced on the inner thigh. The ultimate single-arm peak builder." },
+      { "name": "Cable Curl", "sets": 3, "reps": "12–15", "tip": "Constant tension top to bottom. Great finisher — slow and controlled reps." }
+    ],
+    "triceps": [
+      { "name": "Close-Grip Bench Press", "sets": 3, "reps": "8–10", "tip": "Hands shoulder-width, elbows tucked. The heavy compound mass builder for triceps." },
+      { "name": "Tricep Pushdown (Cable)", "sets": 3, "reps": "12–15", "tip": "Lock elbows at your sides, push to full extension. Rope or straight bar." },
+      { "name": "Overhead Tricep Extension", "sets": 3, "reps": "12", "tip": "Dumbbell overhead, lower slowly behind the head. Best stretch for the long head." },
+      { "name": "Skull Crushers (EZ Bar)", "sets": 3, "reps": "10–12", "tip": "Lower the bar toward your forehead, elbows fixed at the ceiling. Great mass builder." },
+      { "name": "Tricep Dips", "sets": 3, "reps": "10–15", "tip": "Stay upright to bias the triceps. Elbows point back, not out. Control the descent.", "bodyweight": true },
+      { "name": "Bench Dips", "sets": 3, "reps": "12–15", "tip": "Hands on a bench behind you, feet forward. Lower until 90°. Beginner-friendly.", "bodyweight": true },
+      { "name": "Diamond Push-Ups", "sets": 3, "reps": "10–15", "tip": "Hands together under the chest forming a diamond. Tricep-focused push-up.", "bodyweight": true },
+      { "name": "Tricep Kickback", "sets": 3, "reps": "12–15", "tip": "Hinge forward, upper arm parallel to the floor. Extend and squeeze at the top." }
+    ],
+    "core": [
+      { "name": "Plank", "sets": 3, "reps": "45–60", "tip": "Squeeze glutes AND abs. Don't let the hips sag or rise. Breathe normally.", "timed": true, "bodyweight": true },
+      { "name": "Side Plank", "sets": 3, "reps": "30–45", "tip": "Stack the feet, lift the hips, body in a straight line. Builds the obliques. Each side.", "timed": true, "bodyweight": true },
+      { "name": "Hanging Leg Raise", "sets": 3, "reps": "12–15", "tip": "Dead hang, posterior pelvic tilt at the top. No swinging — use the abs, not momentum.", "bodyweight": true },
+      { "name": "Lying Leg Raise", "sets": 3, "reps": "15", "tip": "On your back, press the lower back into the floor. Lower legs slowly without arching.", "bodyweight": true },
+      { "name": "Crunch", "sets": 3, "reps": "15–20", "tip": "Curl the ribs toward the hips, don't yank the neck. Pause and squeeze at the top.", "bodyweight": true },
+      { "name": "Bicycle Crunch", "sets": 3, "reps": "20 total", "tip": "Opposite elbow to knee, slow and controlled. Rotate from the torso for the obliques.", "bodyweight": true },
+      { "name": "Russian Twist", "sets": 3, "reps": "20 total", "tip": "Lean back, feet off the floor. Rotate from the torso. Hold a plate to progress.", "bodyweight": true },
+      { "name": "Mountain Climbers", "sets": 3, "reps": "30 total", "tip": "Plank position, drive the knees to the chest quickly. Keep the hips low and core tight.", "bodyweight": true },
+      { "name": "Dead Bug", "sets": 3, "reps": "10 each", "tip": "Press the lower back into the floor. Move the opposite arm and leg slowly. Great stability.", "bodyweight": true },
+      { "name": "Cable Crunch", "sets": 3, "reps": "15–20", "tip": "Kneel at the cable, crunch ribs to hips. Keep the hips still. Builds ab thickness." },
+      { "name": "Ab Wheel Rollout", "sets": 3, "reps": "8–12", "tip": "Start from the knees, roll out until flat, pull back with the abs. Best ab strength move.", "bodyweight": true },
+      { "name": "Decline Sit-Up", "sets": 3, "reps": "15–20", "tip": "Full range on a decline bench. Hold a plate at the chest to progress.", "bodyweight": true }
+    ]
+  },
   "WORKOUTS": {
     "Full Body": {
       "chest": [

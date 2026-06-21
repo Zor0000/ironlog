@@ -76,6 +76,96 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.selectedTab, .history)
     }
 
+    func testCompletingSetRestartsRestTimerFromPreset() {
+        let app = AppState()
+        app.setTimerPreset(120)
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "60", reps: "8")
+
+        // Simulate a rest timer already partway through from a previous set.
+        app.timerSecs = 30
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+
+        XCTAssertTrue(app.timerRunning)
+        XCTAssertEqual(app.timerSecs, app.timerMax)
+        XCTAssertEqual(app.timerMax, 120)
+
+        app.resetTimer()
+    }
+
+    func testExerciseCatalogIsGlobalAndIncludesBasics() {
+        let app = AppState()
+        let muscleIDs = app.library.catalogMuscles.map(\.id)
+        XCTAssertTrue(muscleIDs.contains("legs"))
+        XCTAssertTrue(muscleIDs.contains("biceps"))
+        XCTAssertTrue(muscleIDs.contains("triceps"))
+
+        let legs = app.library.catalogExercises(muscleID: "legs", query: "")
+        XCTAssertTrue(legs.contains { $0.template.name == "Walking Lunges" })
+        XCTAssertTrue(legs.contains { $0.template.name == "Goblet Squat" })
+        XCTAssertTrue(legs.contains { $0.template.name == "Glute Bridge" })
+
+        // Search spans the whole catalog, independent of the active split/muscle.
+        let lunges = app.library.catalogExercises(muscleID: nil, query: "lunge")
+        XCTAssertTrue(lunges.contains { $0.template.name == "Walking Lunges" })
+        XCTAssertGreaterThanOrEqual(lunges.count, 3)
+    }
+
+    func testCatalogBodyweightExerciseAddsAsBodyweight() {
+        let app = AppState()
+        app.startFreeWorkout()
+        let lunge = app.library
+            .catalogExercises(muscleID: "legs", query: "walking lunges")
+            .first { $0.template.name == "Walking Lunges" }!
+
+        app.addExercise(template: lunge.template)
+
+        XCTAssertEqual(app.todayExercises.last?.name, "Walking Lunges")
+        XCTAssertEqual(app.todayExercises.last?.bodyweight, true)
+        XCTAssertFalse(app.showAddExerciseForm)
+    }
+
+    func testSplitDayStartsAllMusclesInOneWorkout() {
+        let app = AppState()
+        app.selectSplit("PPL")
+        app.selectDay("Push")
+
+        XCTAssertEqual(app.workoutStep, .workout)
+        XCTAssertEqual(app.selectedWorkoutMuscleIDs, ["chest", "shoulders", "triceps"])
+        XCTAssertTrue(app.activeExerciseTemplates.contains { $0.name == "Barbell Bench Press" })
+        XCTAssertTrue(app.activeExerciseTemplates.contains { $0.name == "Seated DB Shoulder Press" })
+        XCTAssertTrue(app.activeExerciseTemplates.contains { $0.name == "Overhead Tricep Extension" })
+
+        app.startWorkout()
+
+        XCTAssertTrue(app.todayExercises.contains { $0.name == "Barbell Bench Press" })
+        XCTAssertTrue(app.todayExercises.contains { $0.name == "Seated DB Shoulder Press" })
+        XCTAssertTrue(app.todayExercises.contains { $0.name == "Overhead Tricep Extension" })
+        XCTAssertEqual(app.selectedTab, .log)
+    }
+
+    func testTemplateExerciseCanBeAddedToActiveWorkout() {
+        let app = AppState()
+        app.selectSplit("Upper/Lower")
+        app.selectDay("Upper")
+        let template = app.activeExerciseTemplates.first { $0.name == "Barbell Bench Press" }!
+
+        app.startFreeWorkout()
+        app.selectedSplit = "Upper/Lower"
+        app.selectedDay = "Upper"
+        app.beginAddingExercise()
+        app.addExercise(template: template)
+
+        XCTAssertEqual(app.todayExercises.last?.name, "Barbell Bench Press")
+        XCTAssertEqual(app.todayExercises.last?.sets.count, template.sets)
+        XCTAssertFalse(app.todayExercises.last?.bodyweight ?? true)
+    }
+
     func testWorkoutDraftRoundTripsNavigationAndNoteContext() throws {
         let draft = WorkoutDraft(
             exercises: [

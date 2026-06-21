@@ -103,6 +103,7 @@ struct HistoryCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 }
                 .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel("Delete session from \(session.createdAt.displayDay)")
             }
             .padding(14)
             .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .bottom)

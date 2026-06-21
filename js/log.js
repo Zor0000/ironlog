@@ -109,7 +109,7 @@ function toggleDone(ei, si) {
   s.done = !s.done;
 
   if (s.done) {
-    startTimer();
+    restartTimer();
     // PR notification check
     const pr = state.prs[ex.name];
     if (ex.bodyweight || ex.timed) {

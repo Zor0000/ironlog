@@ -23,6 +23,16 @@ function startTimer() {
   }, 1000);
 }
 
+// Restart the rest timer from the full preset. Used when a set is completed
+// so each set's rest counts down fresh instead of resuming the previous value.
+function restartTimer() {
+  clearInterval(state.timerInterval);
+  state.timerRunning = false;
+  state.timerSecs = state.timerMax;
+  document.getElementById('timer-disp').textContent = fmtTime(state.timerSecs);
+  startTimer();
+}
+
 function toggleTimer() {
   if (state.timerRunning) {
     clearInterval(state.timerInterval);

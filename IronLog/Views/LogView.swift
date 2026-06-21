@@ -3,7 +3,11 @@ import SwiftUI
 struct LogView: View {
     @EnvironmentObject private var app: AppState
     @State private var newExerciseName = ""
+    @State private var exerciseSearch = ""
+    @State private var catalogFilter: String?
+    @State private var didPrimeCatalogFilter = false
     @State private var showDiscardConfirmation = false
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -21,14 +25,25 @@ struct LogView: View {
         .scrollIndicators(.hidden)
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
-        .confirmationDialog("Discard the workout in progress?", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
-            Button("Discard Workout", role: .destructive) {
-                NativeFeedback.light()
-                withAnimation(AppMotion.smooth) {
-                    app.discardWorkout()
+        .overlay {
+            if showDiscardConfirmation {
+                ConfirmActionModal(
+                    title: "Discard workout?",
+                    message: "This clears the current exercises, sets, timer and note. Saved history will not be affected.",
+                    confirmTitle: "Discard Workout",
+                    cancelTitle: "Keep Logging",
+                    systemImage: "trash"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        showDiscardConfirmation = false
+                        app.discardWorkout()
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) {
+                        showDiscardConfirmation = false
+                    }
                 }
             }
-            Button("Keep Logging", role: .cancel) {}
         }
     }
 
@@ -103,8 +118,7 @@ struct LogView: View {
     private var logHeader: some View {
         HStack(spacing: 8) {
             Text("Today").sectionTitle()
-            let muscle = app.library.muscle(app.selectedMuscle)
-            Pill(text: [muscle?.label, app.selectedSplit].compactMap(\.self).joined(separator: " · "))
+            Pill(text: [app.selectedWorkoutMuscleLabel, app.selectedSplit ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
             Spacer()
             Button {
                 NativeFeedback.selection()
@@ -119,6 +133,7 @@ struct LogView: View {
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
             }
             .buttonStyle(TactileButtonStyle())
+            .accessibilityLabel("Discard workout")
         }
     }
 
@@ -151,64 +166,10 @@ struct LogView: View {
     private var addExerciseBlock: some View {
         Group {
             if app.showAddExerciseForm {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Add Exercise")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1.5)
-                        .textCase(.uppercase)
-                        .foregroundStyle(Theme.muted)
-                    TextField("Exercise name", text: $newExerciseName)
-                        .fieldStyle()
-                        .accessibilityIdentifier("new-exercise-name-field")
-                    HStack {
-                        Button {
-                            NativeFeedback.selection()
-                            withAnimation(AppMotion.quick) {
-                                app.setAddExerciseWeighted(false)
-                            }
-                        } label: {
-                            Pill(text: "Reps only", isActive: !app.addExerciseWeighted)
-                        }
-                        .buttonStyle(TactileButtonStyle())
-                        Button {
-                            NativeFeedback.selection()
-                            withAnimation(AppMotion.quick) {
-                                app.setAddExerciseWeighted(true)
-                            }
-                        } label: {
-                            Pill(text: "Weight + Reps", isActive: app.addExerciseWeighted)
-                        }
-                        .buttonStyle(TactileButtonStyle())
-                    }
-                    HStack {
-                        Button("Add") {
-                            NativeFeedback.light()
-                            withAnimation(AppMotion.quick) {
-                                app.addExercise(name: newExerciseName)
-                                newExerciseName = ""
-                            }
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .accessibilityIdentifier("confirm-add-exercise-button")
-                        Button {
-                            NativeFeedback.selection()
-                            withAnimation(AppMotion.quick) {
-                                app.cancelAddingExercise()
-                            }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .frame(width: 44, height: 44)
-                                .background(Theme.surface2)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
-                        }
-                        .foregroundStyle(Theme.text)
-                        .buttonStyle(TactileButtonStyle())
-                    }
-                }
-                .cardStyle()
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                addExerciseForm
+                    .cardStyle()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onAppear(perform: primeCatalogFilter)
             } else {
                 Button {
                     NativeFeedback.selection()
@@ -227,6 +188,292 @@ struct LogView: View {
                 .accessibilityIdentifier("show-add-exercise-button")
             }
         }
+    }
+
+    private var addExerciseForm: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Add Exercise")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                Spacer()
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) { app.cancelAddingExercise() }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(width: 30, height: 30)
+                        .foregroundStyle(Theme.muted2)
+                        .background(Theme.surface2)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Theme.border))
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel("Close add exercise")
+            }
+
+            searchField
+            muscleFilterChips
+
+            if showCatalogResults {
+                catalogResultsList
+            } else {
+                catalogHint
+            }
+
+            customExerciseSection
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.muted2)
+            TextField("Search exercises — e.g. walking lunges", text: $exerciseSearch)
+                .font(.system(size: 14))
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($searchFocused)
+            if !exerciseSearch.isEmpty {
+                Button {
+                    NativeFeedback.selection()
+                    exerciseSearch = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
+        .background(Theme.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(searchFocused ? Theme.accent.opacity(0.5) : Theme.border))
+        .accessibilityIdentifier("exercise-template-search-field")
+    }
+
+    private var muscleFilterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                filterChip(title: "All", id: nil)
+                ForEach(app.library.catalogMuscles) { muscle in
+                    filterChip(title: muscle.label, id: muscle.id, icon: muscle.systemImage)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    private func filterChip(title: String, id: String?, icon: String? = nil) -> some View {
+        Button {
+            NativeFeedback.selection()
+            withAnimation(AppMotion.quick) { catalogFilter = id }
+        } label: {
+            HStack(spacing: 5) {
+                if let icon { Image(systemName: icon).font(.system(size: 11, weight: .semibold)) }
+                Text(title)
+            }
+            .modifier(ChipStyle(isActive: catalogFilter == id))
+        }
+        .buttonStyle(TactileButtonStyle())
+        .accessibilityLabel("\(title) exercises")
+        .accessibilityAddTraits(catalogFilter == id ? .isSelected : [])
+    }
+
+    private var catalogResultsList: some View {
+        let results = catalogResults
+        return VStack(spacing: 7) {
+            ForEach(results.prefix(catalogResultLimit)) { item in
+                Button {
+                    NativeFeedback.light()
+                    withAnimation(AppMotion.quick) {
+                        app.addExercise(template: item.template)
+                        exerciseSearch = ""
+                        searchFocused = false
+                    }
+                } label: {
+                    catalogRow(item)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityIdentifier("exercise-template-\(item.template.name)")
+            }
+
+            if results.isEmpty {
+                VStack(spacing: 4) {
+                    Text("No matching exercises")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                    Text("Add it as a custom exercise below.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted2)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+            } else if results.count > catalogResultLimit {
+                Text("+\(results.count - catalogResultLimit) more — keep typing to narrow")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 2)
+            }
+        }
+        .transition(.opacity)
+    }
+
+    private func catalogRow(_ item: CatalogExercise) -> some View {
+        let template = item.template
+        let icon = template.timed ? "timer" : (template.bodyweight ? "figure.strengthtraining.functional" : "dumbbell")
+        return HStack(spacing: 11) {
+            ZStack {
+                Circle().fill(Theme.accentDim).frame(width: 34, height: 34)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(template.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                    if catalogFilter == nil {
+                        Text(item.muscle.label)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.bg.opacity(0.5))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Theme.border))
+                    }
+                }
+                Text(catalogMeta(template))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.muted2)
+            }
+            Spacer(minLength: 6)
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(Theme.accent)
+        }
+        .padding(11)
+        .background(Theme.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Theme.border.opacity(0.8)))
+    }
+
+    private var catalogHint: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkle.magnifyingglass")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+            Text("Search or tap a muscle group to browse the full exercise library.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.muted2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var customExerciseSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Rectangle().fill(Theme.border).frame(height: 1)
+                Text("Or add your own")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize()
+                Rectangle().fill(Theme.border).frame(height: 1)
+            }
+
+            TextField("Custom exercise name", text: $newExerciseName)
+                .fieldStyle()
+                .submitLabel(.done)
+                .accessibilityIdentifier("new-exercise-name-field")
+
+            HStack(spacing: 8) {
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) { app.setAddExerciseWeighted(false) }
+                } label: {
+                    Pill(text: "Reps only", isActive: !app.addExerciseWeighted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) { app.setAddExerciseWeighted(true) }
+                } label: {
+                    Pill(text: "Weight + Reps", isActive: app.addExerciseWeighted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                NativeFeedback.light()
+                withAnimation(AppMotion.quick) {
+                    app.addExercise(name: newExerciseName)
+                    newExerciseName = ""
+                }
+            } label: {
+                Label("Add Custom Exercise", systemImage: "plus")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .accessibilityIdentifier("confirm-add-exercise-button")
+        }
+    }
+
+    private var catalogResultLimit: Int { 24 }
+
+    private var showCatalogResults: Bool {
+        !exerciseSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || catalogFilter != nil
+    }
+
+    private var catalogResults: [CatalogExercise] {
+        app.library.catalogExercises(muscleID: catalogFilter, query: exerciseSearch)
+    }
+
+    private func catalogMeta(_ template: ExerciseTemplate) -> String {
+        var parts = ["\(template.sets)×\(template.reps) \(template.timed ? "sec" : "reps")"]
+        if template.bodyweight || template.timed {
+            parts.append(template.timed ? "Timed" : "Bodyweight")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func primeCatalogFilter() {
+        guard !didPrimeCatalogFilter else { return }
+        didPrimeCatalogFilter = true
+        if catalogFilter == nil, let muscle = app.selectedMuscle, app.library.library[muscle] != nil {
+            catalogFilter = muscle
+        }
+    }
+}
+
+/// Compact pill styling for the muscle filter row.
+private struct ChipStyle: ViewModifier {
+    let isActive: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 12, weight: isActive ? .bold : .medium))
+            .foregroundStyle(isActive ? .black : Theme.text)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 7)
+            .background(isActive ? Theme.accent : Theme.surface2)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(isActive ? Theme.accent : Theme.border))
     }
 }
 
@@ -265,6 +512,7 @@ struct TimerCard: View {
                         .symbolEffect(.bounce, value: app.timerRunning)
                 }
                 .timerButton(active: app.timerRunning)
+                .accessibilityLabel(app.timerRunning ? "Pause rest timer" : "Start rest timer")
                 Button {
                     NativeFeedback.light()
                     withAnimation(AppMotion.quick) {
@@ -274,6 +522,7 @@ struct TimerCard: View {
                     Image(systemName: "arrow.counterclockwise")
                 }
                 .timerButton()
+                .accessibilityLabel("Reset rest timer")
                 Menu {
                     ForEach(presets, id: \.self) { value in
                         Button(format(value)) {
@@ -291,6 +540,8 @@ struct TimerCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 }
                 .foregroundStyle(Theme.text)
+                .accessibilityLabel("Rest duration")
+                .accessibilityValue(format(app.timerMax))
             }
         }
         .cardStyle()
@@ -370,6 +621,7 @@ struct LogExerciseCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.border))
                 }
                 .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel("Remove \(exercise.name)")
             }
             .padding(14)
 
@@ -412,11 +664,11 @@ struct LogExerciseCard: View {
                 .frame(width: 20, height: 34, alignment: .bottom)
 
             if !exercise.bodyweight && !exercise.timed {
-                SmallInput(label: "KG", value: set.weight, identifier: "set-weight-input") { value in
+                SmallInput(label: "KG", value: set.weight, keyboard: .decimalPad, identifier: "set-weight-input") { value in
                     app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                 }
             }
-            SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps, identifier: "set-reps-input") { value in
+            SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps, keyboard: .numberPad, identifier: "set-reps-input") { value in
                 app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
             }
             Button {
@@ -436,6 +688,7 @@ struct LogExerciseCard: View {
             }
             .buttonStyle(TactileButtonStyle())
             .accessibilityIdentifier("set-done-button")
+            .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
 
             Button {
                 NativeFeedback.selection()
@@ -450,6 +703,7 @@ struct LogExerciseCard: View {
             }
             .buttonStyle(TactileButtonStyle())
             .disabled(exercise.sets.count <= 1)
+            .accessibilityLabel("Remove set")
         }
     }
 }
@@ -457,6 +711,7 @@ struct LogExerciseCard: View {
 struct SmallInput: View {
     let label: String
     let value: String
+    var keyboard: UIKeyboardType = .numberPad
     var identifier: String?
     let onChange: (String) -> Void
 
@@ -466,7 +721,7 @@ struct SmallInput: View {
                 .font(.system(size: 9))
                 .foregroundStyle(Theme.muted2)
             TextField("0", text: Binding(get: { value }, set: onChange))
-                .keyboardType(label == "KG" ? .decimalPad : .numberPad)
+                .keyboardType(keyboard)
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
