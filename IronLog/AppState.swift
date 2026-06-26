@@ -126,6 +126,11 @@ final class AppState: ObservableObject {
             user = localUser
             syncMessage = "Saved on this iPhone"
         }
+
+        // Re-show the Lock Screen activity for a workout resumed from disk.
+        if hasActiveWorkout {
+            updateLiveActivity(clearedDraft: false)
+        }
     }
 
     func signIn(email: String, password: String) async {
@@ -613,6 +618,13 @@ final class AppState: ObservableObject {
         Task {
             await localStore.save(snapshot)
         }
+        updateLiveActivity(clearedDraft: clearDraft)
+    }
+
+    /// Internal entry point for the Live Activity bridge, which lives in another
+    /// file and therefore can't reach the private persistence helpers.
+    func persistAfterReconcile() {
+        persistDraft()
     }
 
     private var currentDraft: WorkoutDraft? {

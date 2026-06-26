@@ -89,6 +89,9 @@ fi
 echo "  found device: $DEVICE_ID"
 
 # --- build (signed with your personal team, dev bundle id) -------------------
+# BASE_BUNDLE_ID drives BOTH targets: the app becomes $DEV_BUNDLE_ID and the
+# Live Activity widget becomes $DEV_BUNDLE_ID.IronLogWidget, so they stay a
+# matching app/extension pair without colliding.
 echo "▸ Building $SCHEME for device (team $TEAM_ID, bundle $DEV_BUNDLE_ID)…"
 xcodebuild \
   -project "$PROJECT" \
@@ -98,7 +101,7 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   -allowProvisioningUpdates \
   DEVELOPMENT_TEAM="$TEAM_ID" \
-  PRODUCT_BUNDLE_IDENTIFIER="$DEV_BUNDLE_ID" \
+  BASE_BUNDLE_ID="$DEV_BUNDLE_ID" \
   CODE_SIGN_STYLE=Automatic \
   build
 

@@ -15,6 +15,7 @@ xcodebuild -project IronLog.xcodeproj \
   -scheme IronLog \
   -destination 'generic/platform=iOS' \
   -archivePath build/IronLog.xcarchive \
+  -allowProvisioningUpdates \
   archive
 
 xcodebuild -exportArchive \
