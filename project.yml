@@ -8,6 +8,8 @@ settings:
     MARKETING_VERSION: 1.0
     CURRENT_PROJECT_VERSION: 3
     DEVELOPMENT_TEAM: 75LRT8TRQY
+# NOTE: IronLog.xcodeproj is committed and authoritative (XcodeGen is not run at
+# checkout). Keep this file in sync when adding targets, but the .xcodeproj wins.
 targets:
   IronLog:
     type: application
@@ -16,9 +18,12 @@ targets:
       - path: IronLog
     resources:
       - path: IronLog/Resources
+    dependencies:
+      - target: IronLogWidgetExtension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.ironlog
+        BASE_BUNDLE_ID: com.parthjadhav.ironlog
+        PRODUCT_BUNDLE_IDENTIFIER: $(BASE_BUNDLE_ID)
         INFOPLIST_FILE: IronLog/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: 1
@@ -29,6 +34,27 @@ targets:
       testTargets:
         - IronLogTests
         - IronLogUITests
+  # Lock-screen / Dynamic Island Live Activity for logging sets without unlocking.
+  # The four shared Live/* files are compiled into both the app and this extension;
+  # AppState+LiveActivity.swift stays app-only (it references AppState).
+  IronLogWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: IronLogWidget
+      - path: IronLog/Live/LiveWorkoutModels.swift
+      - path: IronLog/Live/WorkoutActivityAttributes.swift
+      - path: IronLog/Live/LiveWorkoutEngine.swift
+      - path: IronLog/Live/WorkoutLiveActivityIntents.swift
+    settings:
+      base:
+        BASE_BUNDLE_ID: com.parthjadhav.ironlog
+        PRODUCT_BUNDLE_IDENTIFIER: $(BASE_BUNDLE_ID).IronLogWidget
+        INFOPLIST_FILE: IronLogWidget/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: 1
+        SWIFT_VERSION: 5.0
+        CODE_SIGN_STYLE: Automatic
   IronLogTests:
     type: bundle.unit-test
     platform: iOS
