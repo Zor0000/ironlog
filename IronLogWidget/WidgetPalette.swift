@@ -6,7 +6,7 @@ import SwiftUI
 /// Activity's dark background tint in both light and dark system appearance.
 enum WidgetPalette {
     static let accent = Color(red: 0.831, green: 1.0, blue: 0.29)
-    static let success = Color(red: 0.40, green: 0.92, blue: 0.58)
+    static let success = Color(red: 0.29, green: 0.87, blue: 0.50)
     static let text = Color(red: 0.96, green: 0.96, blue: 0.96)
     static let muted = Color(red: 0.62, green: 0.62, blue: 0.64)
     static let surfaceDeep = Color(red: 0.07, green: 0.07, blue: 0.08)

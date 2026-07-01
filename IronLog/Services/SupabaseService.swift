@@ -18,7 +18,7 @@ final class SupabaseService {
     }
 
     var currentUser: UserProfile? {
-        auth.map { UserProfile(id: $0.user.id, email: $0.user.email, fullName: $0.user.userMetadata?["full_name"]) }
+        auth.map { UserProfile(id: $0.user.id, email: $0.user.email, fullName: $0.user.userMetadata?.fullName) }
     }
 
     var isAuthenticated: Bool {
@@ -274,7 +274,16 @@ struct AuthSession: Codable {
 struct AuthUser: Codable {
     var id: String
     var email: String
-    var userMetadata: [String: String]?
+    var userMetadata: UserMetadata?
+}
+
+/// Only the field IronLog reads out of Supabase's `user_metadata`. Decoding a
+/// dedicated struct (rather than `[String: String]`) keeps sign-in resilient
+/// when Supabase includes non-string values such as `email_verified` in the
+/// metadata — a raw `[String: String]` decode would throw on those and surface
+/// as a spurious sign-in failure.
+struct UserMetadata: Codable {
+    var fullName: String?
 }
 
 struct SignUpResponse: Codable {}
