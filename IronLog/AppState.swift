@@ -33,6 +33,11 @@ final class AppState: ObservableObject {
     private let supabase = SupabaseService()
     private var timerTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
+    /// Serializes disk writes. `persistAll` can fire many times in quick
+    /// succession (e.g. on every keystroke in a set field); chaining each save
+    /// onto the previous one guarantees the most recent snapshot is the last
+    /// one written, rather than racing independent tasks onto the actor.
+    private var saveTask: Task<Void, Never>?
     private let localUser = UserProfile(id: "local", email: "local@ironlog", fullName: "Local Athlete", isLocal: true)
 
     var waterToday: Int {
@@ -127,8 +132,14 @@ final class AppState: ObservableObject {
             syncMessage = "Saved on this iPhone"
         }
 
-        // Re-show the Lock Screen activity for a workout resumed from disk.
+        // Re-show the Lock Screen activity for a workout resumed from disk. Fold
+        // in any sets the user logged from the Lock Screen while the app was
+        // terminated *first*: the engine's snapshot is newer than the on-disk
+        // draft in that case, and rebuilding the activity from the draft would
+        // otherwise discard those edits. The scene-phase reconcile can't cover
+        // this on a cold launch because it races draft loading here.
         if hasActiveWorkout {
+            reconcileFromLiveActivity()
             updateLiveActivity(clearedDraft: false)
         }
     }
@@ -205,7 +216,7 @@ final class AppState: ObservableObject {
                 name: template.name,
                 bodyweight: template.bodyweight,
                 timed: template.timed,
-                sets: (0..<template.sets).map { _ in WorkoutSet() }
+                sets: (0..<max(template.sets, 1)).map { _ in WorkoutSet() }
             )
         }
         selectedTab = .log
@@ -250,6 +261,14 @@ final class AppState: ObservableObject {
         }
         if let reps {
             todayExercises[ei].sets[si].reps = reps.filter(\.isNumber)
+        }
+        // A set stays editable after it is marked done. If an edit drops it below
+        // the validation bar (e.g. the weight is cleared), clear the done flag so
+        // the checkmark, the "valid sets" count and the saved session never
+        // disagree — otherwise a set could look logged yet vanish on save.
+        if todayExercises[ei].sets[si].done,
+           loggedSet(for: todayExercises[ei], set: todayExercises[ei].sets[si]) == nil {
+            todayExercises[ei].sets[si].done = false
         }
         persistDraft()
     }
@@ -615,7 +634,9 @@ final class AppState: ObservableObject {
             waterByDay: waterByDay,
             draft: clearDraft ? nil : (draft ?? currentDraft)
         )
-        Task {
+        let previous = saveTask
+        saveTask = Task { [localStore] in
+            await previous?.value
             await localStore.save(snapshot)
         }
         updateLiveActivity(clearedDraft: clearDraft)

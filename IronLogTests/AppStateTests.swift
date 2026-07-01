@@ -39,6 +39,46 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.validCompletedSetCount, 1)
     }
 
+    func testClearingValueOnCompletedSetUnmarksItDone() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "60", reps: "8")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        XCTAssertTrue(app.todayExercises[0].sets[0].done)
+        XCTAssertEqual(app.validCompletedSetCount, 1)
+
+        // Clearing the weight on an already-completed set must drop the done flag
+        // so the checkmark and the saved session can never disagree.
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "")
+
+        XCTAssertFalse(app.todayExercises[0].sets[0].done)
+        XCTAssertEqual(app.validCompletedSetCount, 0)
+    }
+
+    func testEditingCompletedSetToAnotherValidValueKeepsItDone() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Squat")
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100", reps: "5")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+
+        // A correction that stays valid must not clear the completed state.
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "105")
+
+        XCTAssertTrue(app.todayExercises[0].sets[0].done)
+        XCTAssertEqual(app.todayExercises[0].sets[0].weight, "105")
+        XCTAssertEqual(app.validCompletedSetCount, 1)
+    }
+
     func testDiscardWorkoutClearsActiveStateAndTimer() {
         let app = AppState()
         app.startFreeWorkout()

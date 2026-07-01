@@ -70,16 +70,16 @@ private struct LockScreenView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 11) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+        HStack(alignment: .center, spacing: 11) {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(WidgetPalette.accent)
-                .frame(width: 30, height: 30)
+                .frame(width: 34, height: 34)
                 .overlay {
                     Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.black)
                 }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(state.currentExercise?.name ?? state.title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(WidgetPalette.text)
@@ -90,7 +90,7 @@ private struct LockScreenView: View {
                     trailing: subtitle
                 )
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 10)
             RestBadge(state: state)
         }
     }
@@ -245,29 +245,28 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
     let up: Up
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
-                .tracking(0.5)
+                .tracking(0.6)
                 .foregroundStyle(WidgetPalette.muted)
             HStack(spacing: 0) {
                 Button(intent: down) { stepIcon("minus") }
                     .buttonStyle(.plain)
-                Spacer(minLength: 2)
+                Spacer(minLength: 4)
                 Text(value)
                     .font(.system(size: 22, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(WidgetPalette.text)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Spacer(minLength: 2)
+                Spacer(minLength: 4)
                 Button(intent: up) { stepIcon("plus") }
                     .buttonStyle(.plain)
             }
-            .padding(.horizontal, 8)
         }
-        .padding(.vertical, 9)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity)
         .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
@@ -282,28 +281,44 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
     }
 }
 
+/// Single-line status pill. Centers cleanly against the title and never clips,
+/// unlike a stacked caption + value. Fixed-width timer prevents reflow as digits change.
 private struct RestBadge: View {
     let state: LiveWorkoutState
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 1) {
-            Text("Rest")
-                .font(.system(size: 10, weight: .medium))
-                .tracking(0.4)
-                .foregroundStyle(WidgetPalette.muted)
-            if let endsAt = state.restEndsAt, endsAt > Date() {
+        if let endsAt = state.restEndsAt, endsAt > Date() {
+            pill(tint: WidgetPalette.accent) {
+                Image(systemName: "timer")
+                    .font(.system(size: 11, weight: .bold))
                 Text(timerInterval: Date()...endsAt, countsDown: true)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
-                    .foregroundStyle(WidgetPalette.accent)
-                    .frame(maxWidth: 56, alignment: .trailing)
-            } else {
+                    .frame(minWidth: 34, alignment: .leading)
+            }
+        } else {
+            pill(tint: WidgetPalette.success) {
+                Circle()
+                    .fill(WidgetPalette.success)
+                    .frame(width: 6, height: 6)
                 Text("Ready")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(WidgetPalette.success)
+                    .font(.system(size: 13, weight: .semibold))
             }
         }
+    }
+
+    private func pill<Content: View>(
+        tint: Color,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 5) {
+            content()
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(tint.opacity(0.14), in: Capsule())
+        .overlay(Capsule().stroke(tint.opacity(0.22), lineWidth: 1))
     }
 }
 

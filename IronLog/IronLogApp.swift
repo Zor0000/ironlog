@@ -9,6 +9,7 @@ struct IronLogApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .tint(Theme.accent)
                 .task {
                     await appState.boot()
                 }
