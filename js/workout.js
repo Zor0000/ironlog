@@ -179,6 +179,13 @@ function goBackToMuscleNonDay() {
 // ── Start Workout ──────────────────────────────────────────────
 function startWorkout() {
   if (!state.selectedMuscle) return;
+
+  // Don't silently discard an in-progress workout that has real data.
+  if (workoutHasUnsavedData() &&
+      !confirm('You have a workout in progress. Starting a new one will discard those unsaved sets. Continue?')) {
+    return;
+  }
+
   feelTap(14);
   const exercises = WORKOUTS[state.selectedSplit]?.[state.selectedMuscle] || [];
   state.todayExercises = exercises.map(ex => ({

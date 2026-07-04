@@ -17,11 +17,15 @@ function renderTodayLog() {
 
   f.style.display = 'block';
   const m = MUSCLES.find(x => x.id === state.selectedMuscle);
+  const chipParts = [];
+  if (m) chipParts.push(`${m.icon} ${m.label}`);
+  if (state.selectedSplit) chipParts.push(state.selectedSplit);
+  const chipHTML = chipParts.join(' · ');
 
   c.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px">
       <div class="section-label">TODAY</div>
-      <span class="chip">${m?.icon || ''} ${m?.label || ''} · ${state.selectedSplit}</span>
+      <span class="chip">${chipHTML}</span>
     </div>
     ${state.todayExercises.map((ex, ei) => {
       const isBodyweight = ex.bodyweight || false;
@@ -67,6 +71,7 @@ function renderTodayLog() {
       <div class="card" style="padding:16px;margin-bottom:8px" id="add-ex-form">
         <div class="card-title" style="margin-bottom:12px">Add Exercise</div>
         <input id="new-ex-name" class="set-inp" type="text" placeholder="Exercise name"
+          value="${escapeHtml(state.newExName)}" oninput="setNewExName(this.value)"
           style="width:100%;padding:10px 12px;margin-bottom:12px;font-size:14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text)">
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <button id="mode-reps"   class="pill ${state.addExMode !== 'weighted' ? 'active' : ''}" onclick="setAddExMode('reps')">Reps only</button>
@@ -150,6 +155,8 @@ async function finishWorkout() {
     localStorage.removeItem('il_workout_draft');
     state.showAddExerciseForm = false;
     state.addExMode = 'reps';
+    state.newExName = '';
+    resetTimer();
     document.getElementById('session-note').value = '';
     renderTodayLog();
     renderHistory();
@@ -166,7 +173,11 @@ async function finishWorkout() {
 
 function startFreeWorkout() {
   state.todayExercises = [];
+  state.selectedSplit = 'Free Workout';
+  state.selectedMuscle = null;
   state.showAddExerciseForm = true;
+  state.addExMode = 'reps';
+  state.newExName = '';
   renderTodayLog();
   toast('Free workout started! Add your exercises below.');
 }
@@ -175,6 +186,7 @@ function openAddExerciseForm() {
   feelTap();
   state.showAddExerciseForm = true;
   state.addExMode = 'reps';
+  state.newExName = '';
   renderTodayLog();
   document.getElementById('new-ex-name')?.focus();
 }
@@ -182,6 +194,7 @@ function openAddExerciseForm() {
 function cancelAddExercise() {
   feelTap();
   state.showAddExerciseForm = false;
+  state.newExName = '';
   renderTodayLog();
 }
 
@@ -209,6 +222,7 @@ function confirmAddExercise() {
   });
 
   state.showAddExerciseForm = false;
+  state.newExName = '';
   saveWorkoutDraft();
   renderTodayLog();
   toast('Exercise added!');
