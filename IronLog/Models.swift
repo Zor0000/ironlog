@@ -146,6 +146,25 @@ struct AppSnapshot: Codable {
     var draft: WorkoutDraft?
 }
 
+// ─────────────────────────────────────────────────────────────
+//  WEIGHT / PERFORMANCE HELPERS  (shared logic — see CLAUDE design rules)
+//  Weight is stored canonically in KG everywhere. `formatWeight` is the single
+//  chokepoint that turns a KG value into a display string, so a future kg/lb
+//  toggle is a one-function flip. Unit is fixed to kg for now.
+// ─────────────────────────────────────────────────────────────
+
+/// Display string for a KG weight, e.g. "60 kg" / "62.5 kg".
+/// Reuses `clean(_:)` so the number matches everywhere it is shown.
+func formatWeight(_ kg: Double) -> String {
+    "\(clean(kg)) kg"
+}
+
+/// Epley estimated 1-rep max, in KG: weight * (1 + reps/30). 0 when N/A.
+func estimated1RM(weightKg: Double, reps: Int) -> Double {
+    guard weightKg > 0, reps > 0 else { return 0 }
+    return weightKg * (1 + Double(reps) / 30)
+}
+
 extension Date {
     var dayKey: String {
         Self.dayFormatter.string(from: self)

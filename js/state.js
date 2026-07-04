@@ -78,6 +78,46 @@ function workoutHasUnsavedData() {
 }
 
 // ─────────────────────────────────────────────────────────────
+//  WEIGHT / PERFORMANCE HELPERS  (shared logic — see CLAUDE design rules)
+//  Weight is stored canonically in KG everywhere. formatWeight is the single
+//  chokepoint that turns a KG value into a display string, so a future kg/lb
+//  toggle is a one-function flip. Unit is fixed to kg for now.
+// ─────────────────────────────────────────────────────────────
+
+// Cleaned numeric portion of a KG weight: integer when whole, else 1 decimal.
+// (Mirrors the iOS `clean(_:)` helper so both clients render identically.)
+function cleanWeight(kg) {
+  const n = Number(kg);
+  if (!isFinite(n)) return '';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+// Display string for a KG weight, e.g. "60 kg" / "62.5 kg".
+function formatWeight(kg) {
+  const s = cleanWeight(kg);
+  return s === '' ? '' : s + ' kg';
+}
+
+// Epley estimated 1-rep max, in KG: weight * (1 + reps/30). 0 when not applicable.
+function estimated1RM(weightKg, reps) {
+  const w = Number(weightKg), r = Number(reps);
+  if (!isFinite(w) || !isFinite(r) || w <= 0 || r <= 0) return 0;
+  return w * (1 + r / 30);
+}
+
+// Most recent prior session containing `exerciseName` (exact name match).
+// Returns that session's exercise object { name, sets:[{weight, reps}] }, or
+// null when the exercise has no history. `state.history` is newest-first, so
+// callers map by set index and fall back to the last set.
+function lastPerformance(exerciseName) {
+  for (const session of state.history) {
+    const ex = session.exercises.find(e => e.name === exerciseName);
+    if (ex && ex.sets.length) return ex;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────
 //  WORKOUT DRAFT PERSISTENCE
 // ─────────────────────────────────────────────────────────────
 function saveWorkoutDraft() {

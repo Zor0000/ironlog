@@ -98,6 +98,20 @@ final class AppState: ObservableObject {
         return (sets, volume, streak)
     }
 
+    /// The most recent saved session that contains `exerciseName` (exact match),
+    /// returned as its `LoggedExercise`. Callers map by set index and fall back
+    /// to the last set. `sessions` is kept newest-first, so the first hit wins.
+    /// Returns nil when the exercise has no history.
+    func lastPerformance(exerciseName: String) -> LoggedExercise? {
+        for session in sessions {
+            if let exercise = session.exercises.first(where: { $0.name == exerciseName }),
+               !exercise.sets.isEmpty {
+                return exercise
+            }
+        }
+        return nil
+    }
+
     func boot() async {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") {
