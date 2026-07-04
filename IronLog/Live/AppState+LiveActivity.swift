@@ -70,10 +70,9 @@ extension AppState {
     /// workout is finished/discarded. Called from `persistAll`.
     func updateLiveActivity(clearedDraft: Bool) {
         if clearedDraft || !hasActiveWorkout {
-            Task { await LiveWorkoutEngine.shared.end() }
+            LiveWorkoutEngine.shared.end()
         } else {
-            let state = buildLiveState()
-            Task { await LiveWorkoutEngine.shared.sync(state) }
+            LiveWorkoutEngine.shared.sync(buildLiveState())
         }
     }
 
@@ -117,6 +116,9 @@ extension AppState {
             if !timerRunning { startTimer() }
         }
 
-        if changed { persistAfterReconcile() }
+        // Persist so lock-screen navigation (Next/Prev) and set edits both survive,
+        // and re-sync the activity (coalesced, so a no-op change costs nothing).
+        _ = changed
+        persistAfterReconcile()
     }
 }

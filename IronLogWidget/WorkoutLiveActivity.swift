@@ -48,14 +48,20 @@ struct WorkoutLiveActivity: Widget {
 
 // MARK: - Lock Screen
 
-/// Compact, single-screen layout. Three rows (header / steppers / actions) sized
-/// to stay within the Lock Screen Live Activity height budget so nothing clips.
+/// Full-size lock-screen card. Larger, more tappable controls than a stock
+/// Live Activity — a big weight/reps stepper pair and a primary action row with
+/// exercise navigation — so a set can be dialed in and logged without unlocking.
+///
+/// Sizing note: the lock-screen Live Activity has a firm height ceiling; iOS
+/// renders the card blank (not clipped) if the content exceeds it. Every metric
+/// here is tuned to keep the three rows (header / steppers / actions) inside that
+/// budget while staying as large as the budget allows.
 private struct LockScreenView: View {
     let state: LiveWorkoutState
     let unit: String
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 7) {
             header
             if state.isComplete {
                 completeBanner
@@ -64,33 +70,35 @@ private struct LockScreenView: View {
                 actions
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 16)
-        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
+        .padding(.top, 9)
+        .padding(.bottom, 9)
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 11) {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+        HStack(alignment: .center, spacing: 9) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(WidgetPalette.accent)
-                .frame(width: 34, height: 34)
+                .frame(width: 32, height: 32)
                 .overlay {
                     Image(systemName: "dumbbell.fill")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.black)
                 }
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(state.currentExercise?.name ?? state.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(WidgetPalette.text)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 ProgressPips(
                     sets: state.currentExercise?.sets ?? [],
                     currentSetIndex: state.currentSetIndex ?? 0,
                     trailing: subtitle
                 )
             }
-            Spacer(minLength: 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 4)
             RestBadge(state: state)
         }
     }
@@ -107,20 +115,22 @@ private struct LockScreenView: View {
     @ViewBuilder private var steppers: some View {
         let exercise = state.currentExercise
         let showWeight = !(exercise?.bodyweight ?? false) && !(exercise?.timed ?? false)
-        HStack(spacing: 11) {
+        HStack(spacing: 8) {
             if showWeight {
                 StepperTile(
                     label: unit,
                     value: nonEmpty(state.currentSet?.weight),
                     down: DecreaseWeightIntent(),
-                    up: IncreaseWeightIntent()
+                    up: IncreaseWeightIntent(),
+                    size: .large
                 )
             }
             StepperTile(
                 label: (exercise?.timed ?? false) ? "SECS" : "REPS",
                 value: nonEmpty(state.currentSet?.reps),
                 down: DecreaseRepsIntent(),
-                up: IncreaseRepsIntent()
+                up: IncreaseRepsIntent(),
+                size: .large
             )
         }
     }
@@ -132,81 +142,86 @@ private struct LockScreenView: View {
 
     @ViewBuilder private var actions: some View {
         let hasOpenSet = state.currentExercise?.sets.contains { !$0.done } ?? false
+        let showNav = state.exercises.count > 1
+        let isFirst = state.currentExerciseIndex <= 0
         let isLast = state.currentExerciseIndex >= state.exercises.count - 1
-        HStack(spacing: 11) {
+
+        HStack(spacing: 8) {
+            if showNav {
+                Button(intent: PreviousExerciseIntent()) {
+                    navIcon("chevron.left")
+                }
+                .buttonStyle(.plain)
+                .disabled(isFirst)
+                .opacity(isFirst ? 0.4 : 1)
+            }
+
             if hasOpenSet {
                 Button(intent: LogSetIntent()) {
-                    ActionLabel(title: "Log set", systemImage: "checkmark", leadingIcon: true)
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(WidgetPalette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    actionLabel("Log set", systemImage: "checkmark", tint: .black, background: WidgetPalette.accent)
                 }
                 .buttonStyle(.plain)
             } else {
                 Button(intent: UndoSetIntent()) {
-                    ActionLabel(title: "Undo", systemImage: "arrow.uturn.backward", leadingIcon: true)
-                        .foregroundStyle(WidgetPalette.text)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    actionLabel("Undo", systemImage: "arrow.uturn.backward", tint: WidgetPalette.text, background: WidgetPalette.secondaryButton)
                 }
                 .buttonStyle(.plain)
             }
 
-            Button(intent: NextExerciseIntent()) {
-                ActionLabel(title: "Next", systemImage: "arrow.right", leadingIcon: false)
-                    .foregroundStyle(isLast ? WidgetPalette.muted : WidgetPalette.text)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            if showNav {
+                Button(intent: NextExerciseIntent()) {
+                    navIcon("chevron.right")
+                }
+                .buttonStyle(.plain)
+                .disabled(isLast)
+                .opacity(isLast ? 0.4 : 1)
             }
-            .buttonStyle(.plain)
-            .disabled(isLast)
-            .opacity(isLast ? 0.45 : 1)
         }
+    }
+
+    private func actionLabel(_ title: String, systemImage: String, tint: Color, background: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage).font(.system(size: 14, weight: .bold))
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .foregroundStyle(tint)
+        .frame(maxWidth: .infinity)
+        .frame(height: 36)
+        .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func navIcon(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(WidgetPalette.text)
+            .frame(width: 36, height: 36)
+            .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var completeBanner: some View {
         HStack(spacing: 11) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 22))
+                .font(.system(size: 24))
                 .foregroundStyle(WidgetPalette.accent)
             VStack(alignment: .leading, spacing: 1) {
                 Text("All sets logged")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(WidgetPalette.text)
                 Text("Open IronLog to save")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(WidgetPalette.muted)
             }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
 
 // MARK: - Components
-
-/// Title + icon, icon on the leading or trailing edge.
-private struct ActionLabel: View {
-    let title: String
-    let systemImage: String
-    let leadingIcon: Bool
-
-    var body: some View {
-        HStack(spacing: 7) {
-            if leadingIcon { icon }
-            Text(title).font(.system(size: 15, weight: .semibold))
-            if !leadingIcon { icon }
-        }
-    }
-
-    private var icon: some View {
-        Image(systemName: systemImage).font(.system(size: 13, weight: .bold))
-    }
-}
 
 /// Inline set-progress pips followed by the context text — lives on the
 /// header's subtitle line so it costs no extra height.
@@ -221,13 +236,14 @@ private struct ProgressPips: View {
                 ForEach(Array(sets.enumerated()), id: \.offset) { index, set in
                     Capsule()
                         .fill(fill(for: set, at: index))
-                        .frame(width: index == currentSetIndex && !set.done ? 12 : 5, height: 5)
+                        .frame(width: index == currentSetIndex && !set.done ? 14 : 6, height: 6)
                 }
             }
             Text(trailing)
-                .font(.system(size: 11))
+                .font(.system(size: 10))
                 .foregroundStyle(WidgetPalette.muted)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
     }
 
@@ -239,15 +255,32 @@ private struct ProgressPips: View {
 }
 
 private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
+    /// Two calibrated size classes: `large` for the roomy lock-screen card and
+    /// `regular` for the tighter Dynamic Island expanded view.
+    enum Size {
+        case regular, large
+
+        var value: CGFloat { self == .large ? 22 : 22 }
+        var label: CGFloat { self == .large ? 10 : 10 }
+        var button: CGFloat { self == .large ? 32 : 30 }
+        var buttonIcon: CGFloat { self == .large ? 13 : 13 }
+        var buttonCorner: CGFloat { self == .large ? 9 : 9 }
+        var vPadding: CGFloat { self == .large ? 5 : 10 }
+        var hPadding: CGFloat { self == .large ? 9 : 10 }
+        var corner: CGFloat { self == .large ? 12 : 12 }
+        var rowSpacing: CGFloat { self == .large ? 3 : 5 }
+    }
+
     let label: String
     let value: String
     let down: Down
     let up: Up
+    var size: Size = .regular
 
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: size.rowSpacing) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: size.label, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(WidgetPalette.muted)
             HStack(spacing: 0) {
@@ -255,7 +288,7 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
                     .buttonStyle(.plain)
                 Spacer(minLength: 4)
                 Text(value)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: size.value, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(WidgetPalette.text)
                     .lineLimit(1)
@@ -265,19 +298,19 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
                     .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 10)
+        .padding(.vertical, size.vPadding)
+        .padding(.horizontal, size.hPadding)
         .frame(maxWidth: .infinity)
-        .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
+        .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: size.corner, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: size.corner, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
     }
 
     private func stepIcon(_ name: String) -> some View {
         Image(systemName: name)
-            .font(.system(size: 13, weight: .bold))
+            .font(.system(size: size.buttonIcon, weight: .bold))
             .foregroundStyle(WidgetPalette.text)
-            .frame(width: 30, height: 30)
-            .background(WidgetPalette.stepButton, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .frame(width: size.button, height: size.button)
+            .background(WidgetPalette.stepButton, in: RoundedRectangle(cornerRadius: size.buttonCorner, style: .continuous))
     }
 }
 
@@ -290,19 +323,19 @@ private struct RestBadge: View {
         if let endsAt = state.restEndsAt, endsAt > Date() {
             pill(tint: WidgetPalette.accent) {
                 Image(systemName: "timer")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                 Text(timerInterval: Date()...endsAt, countsDown: true)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .monospacedDigit()
-                    .frame(minWidth: 34, alignment: .leading)
+                    .frame(minWidth: 38, alignment: .leading)
             }
         } else {
             pill(tint: WidgetPalette.success) {
                 Circle()
                     .fill(WidgetPalette.success)
-                    .frame(width: 6, height: 6)
+                    .frame(width: 7, height: 7)
                 Text("Ready")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
             }
         }
     }
@@ -315,8 +348,8 @@ private struct RestBadge: View {
             content()
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
         .background(tint.opacity(0.14), in: Capsule())
         .overlay(Capsule().stroke(tint.opacity(0.22), lineWidth: 1))
     }
