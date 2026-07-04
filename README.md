@@ -4,7 +4,7 @@ A simple, free gym tracker with two clients that share one backend: a **native i
 
 ## Features
 
-- **Exercise catalog** — 100+ exercises across 7 muscle groups, each with sets, reps, and form tips
+- **Exercise catalog** — 80+ exercises across 7 muscle groups, each with sets, reps, and form tips
 - **Splits** — Full Body, PPL, Upper/Lower, Bro Split, with multi-muscle days
 - **Set logger** — log weight + reps per set, mark sets done
 - **Custom exercises** — add anything mid-workout (reps only, or weight + reps)

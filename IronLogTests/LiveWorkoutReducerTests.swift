@@ -137,3 +137,65 @@ final class LiveWorkoutReducerTests: XCTestCase {
         XCTAssertEqual(LiveWorkoutReducer.formatWeight(100), "100")
     }
 }
+
+@MainActor
+final class LiveWorkoutEngineTests: XCTestCase {
+    override func setUp() async throws {
+        LiveWorkoutEngine.shared.end()
+        await LiveWorkoutEngine.shared.waitForPendingOperations()
+    }
+
+    override func tearDown() async throws {
+        LiveWorkoutEngine.shared.end()
+        await LiveWorkoutEngine.shared.waitForPendingOperations()
+    }
+
+    private func sample() -> LiveWorkoutState {
+        LiveWorkoutState(
+            title: "Arms",
+            exercises: [
+                LiveExercise(name: "Curl", sets: [LiveSet(weight: "20", reps: "10"), LiveSet()])
+            ]
+        )
+    }
+
+    func testSyncPersistsStateAndMutateAdvancesSet() async {
+        let engine = LiveWorkoutEngine.shared
+        engine.sync(sample())
+        await engine.waitForPendingOperations()
+        XCTAssertEqual(engine.currentState?.currentSet?.reps, "10")
+
+        await engine.mutate { LiveWorkoutReducer.logCurrentSet($0) }
+        XCTAssertEqual(engine.currentState?.exercises.first?.sets.first?.done, true)
+        XCTAssertEqual(engine.currentState?.currentSetNumber, 2)
+        XCTAssertEqual(engine.currentState?.currentSet?.weight, "20") // carried over
+    }
+
+    func testEndClearsPersistedState() async {
+        let engine = LiveWorkoutEngine.shared
+        engine.sync(sample())
+        await engine.waitForPendingOperations()
+        XCTAssertNotNil(engine.currentState)
+
+        engine.end()
+        await engine.waitForPendingOperations()
+        XCTAssertNil(engine.currentState)
+    }
+
+    /// Reproduces the finish race: a `sync` built from the active workout is
+    /// immediately followed by `end()`. FIFO serialization must leave no state
+    /// behind (i.e. no orphan activity resurrected after the finish).
+    func testSyncFollowedByEndLeavesNoState() async {
+        let engine = LiveWorkoutEngine.shared
+        engine.sync(sample())
+        engine.end()
+        await engine.waitForPendingOperations()
+        XCTAssertNil(engine.currentState)
+    }
+
+    func testMutateWithoutStateIsNoOp() async {
+        let engine = LiveWorkoutEngine.shared
+        await engine.mutate { LiveWorkoutReducer.nextExercise($0) }
+        XCTAssertNil(engine.currentState)
+    }
+}
