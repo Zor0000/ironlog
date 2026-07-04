@@ -15,15 +15,16 @@ function renderHistory() {
   list.innerHTML = state.history.map(s => {
     const m  = MUSCLES.find(x => x.id === s.muscle);
     const ts = s.exercises.reduce((a, e) => a + e.sets.length, 0);
+    const tagLabel = m ? `${m.icon} ${m.label}` : (s.split || 'Workout');
 
     return `<div class="hist-card">
       <div class="hist-hdr">
         <div>
           <div class="hist-date">${s.date}</div>
-          <div class="hist-sub">${ts} sets · ${s.split}</div>
+          <div class="hist-sub">${ts} ${ts === 1 ? 'set' : 'sets'}${s.split ? ' · ' + s.split : ''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="hist-tag">${m?.icon || ''} ${m?.label || s.muscle}</span>
+          <span class="hist-tag">${tagLabel}</span>
           <button class="delete-session-btn" onclick="deleteSession('${s.id}')" title="Delete session">${ICON_TRASH}</button>
         </div>
       </div>

@@ -21,6 +21,7 @@ let state = {
   prs:             {},
   showAddExerciseForm: false,
   addExMode:           'reps',
+  newExName:           '',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -52,6 +53,28 @@ function updateHeaderDate() {
   const dt = document.getElementById('hdr-date');
   if (d)  d.textContent  = now.toLocaleDateString('en-US', { weekday: 'long' });
   if (dt) dt.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Escape a string for safe interpolation into an HTML attribute value.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Keep the in-progress "Add Exercise" name in state so re-renders (mode toggle,
+// marking a set done, etc.) don't wipe what the user has typed.
+function setNewExName(v) {
+  state.newExName = v;
+}
+
+// True when the current workout has anything worth preserving — a logged/entered
+// set or a session note. Used to warn before a new workout overwrites it.
+function workoutHasUnsavedData() {
+  const noteEl = document.getElementById('session-note');
+  const hasNote = noteEl && noteEl.value.trim() !== '';
+  const hasSets = state.todayExercises.some(ex =>
+    ex.sets.some(s => s.done || s.weight !== '' || s.reps !== ''));
+  return Boolean(hasSets || hasNote);
 }
 
 // ─────────────────────────────────────────────────────────────
