@@ -156,6 +156,10 @@ final class AppState: ObservableObject {
             reconcileFromLiveActivity()
             updateLiveActivity(clearedDraft: false)
         }
+
+        #if DEBUG
+        applyDemoSeedIfRequested()
+        #endif
     }
 
     func signIn(email: String, password: String) async {
@@ -713,3 +717,126 @@ final class AppState: ObservableObject {
         }
     }
 }
+
+#if DEBUG
+// ─────────────────────────────────────────────────────────────
+//  DEMO SEED  (App Store / marketing screenshots only)
+//  Populates the in-memory store with realistic data so the four tabs and the
+//  Lock-Screen Live Activity look "lived in" for capture. Gated behind launch
+//  arguments AND `#if DEBUG`, so it is impossible to reach in a release build,
+//  and it never writes to disk (no `persistAll`), so it can't clobber real data.
+//
+//  Enable via simctl, e.g.:
+//    xcrun simctl launch booted com.parthjadhav.ironlog -seedDemo YES -seedTab stats
+//    xcrun simctl launch booted com.parthjadhav.ironlog -seedDemo YES -seedActive YES -seedTab log
+// ─────────────────────────────────────────────────────────────
+extension AppState {
+    func applyDemoSeedIfRequested() {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "seedDemo") else { return }
+
+        // Clear any stale draft the local store may have restored, so every
+        // non-active screen (Workouts / History / Stats) starts clean.
+        resetActiveWorkout()
+
+        // A cloud-signed-in athlete reads better than "Local Athlete" for marketing.
+        user = UserProfile(id: "demo", email: "alex@ironlog.app", fullName: "Alex Carter")
+        syncMessage = "Synced with Supabase"
+
+        let calendar = Calendar.current
+        func day(_ offset: Int) -> Date {
+            let base = calendar.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
+            return calendar.date(bySettingHour: 18, minute: 20, second: 0, of: base) ?? base
+        }
+        func exercise(_ name: String, _ sets: [(Double?, Int)], bodyweight: Bool = false) -> LoggedExercise {
+            LoggedExercise(name: name, bodyweight: bodyweight, timed: false,
+                           sets: sets.map { LoggedSet(weight: $0.0, reps: $0.1) })
+        }
+        func session(_ offset: Int, muscle: String, split: String, note: String? = nil,
+                     _ exercises: [LoggedExercise]) -> WorkoutSession {
+            WorkoutSession(createdAt: day(offset), muscle: muscle, split: split,
+                           note: note, exercises: exercises, syncState: .synced)
+        }
+
+        sessions = [
+            session(0, muscle: "chest", split: "PPL", note: "Felt strong on bench today.", [
+                exercise("Barbell Bench Press", [(82.5, 8), (85, 6), (85, 5), (80, 7)]),
+                exercise("Incline Dumbbell Press", [(30, 10), (32, 9), (32, 8)]),
+                exercise("Seated DB Shoulder Press", [(24, 11), (24, 10), (24, 9)]),
+                exercise("Tricep Pushdown (Cable)", [(35, 14), (35, 12), (32.5, 12)]),
+            ]),
+            session(1, muscle: "back", split: "PPL", [
+                exercise("Deadlift", [(140, 5), (150, 3), (150, 3)]),
+                exercise("Barbell Row", [(70, 8), (72.5, 8), (72.5, 7)]),
+                exercise("Single-Arm Dumbbell Row", [(34, 10), (34, 10), (34, 9)]),
+                exercise("Barbell Curl", [(35, 10), (37.5, 8), (37.5, 8)]),
+            ]),
+            session(2, muscle: "legs", split: "PPL", note: "New squat PR!", [
+                exercise("Barbell Back Squat", [(110, 8), (120, 6), (125, 5)]),
+                exercise("Romanian Deadlift", [(90, 10), (95, 10), (95, 9)]),
+                exercise("Leg Press (Machine)", [(200, 14), (220, 12), (220, 12)]),
+            ]),
+            session(3, muscle: "chest", split: "PPL", [
+                exercise("Barbell Bench Press", [(80, 8), (82.5, 7), (82.5, 6)]),
+                exercise("Dumbbell Bench Press", [(30, 10), (30, 10), (30, 9)]),
+                exercise("Barbell Overhead Press", [(50, 8), (52.5, 6), (52.5, 6)]),
+            ]),
+            session(4, muscle: "back", split: "PPL", [
+                exercise("Pendlay Row", [(75, 6), (77.5, 6), (77.5, 5)]),
+                exercise("T-Bar Row", [(60, 10), (60, 10), (60, 9)]),
+                exercise("Hammer Curl", [(16, 12), (18, 10), (18, 10)]),
+            ]),
+            session(6, muscle: "legs", split: "Upper/Lower", [
+                exercise("Front Squat", [(80, 8), (85, 6), (85, 6)]),
+                exercise("Goblet Squat", [(40, 12), (40, 12), (40, 11)]),
+                exercise("Leg Press (Machine)", [(200, 15), (210, 12), (210, 12)]),
+            ]),
+            session(8, muscle: "shoulders", split: "Bro Split", note: "Delts on fire.", [
+                exercise("Barbell Overhead Press", [(50, 8), (50, 7), (47.5, 8)]),
+                exercise("Dumbbell Lateral Raise", [(12, 18), (12, 16), (10, 18)]),
+                exercise("Arnold Press", [(20, 12), (20, 11), (20, 10)]),
+            ]),
+        ].sorted { $0.createdAt > $1.createdAt }
+
+        recalculateRecords()
+        waterByDay[Date().dayKey] = 5
+
+        // Optional: a live, half-logged Push session for the Log tab + Live Activity.
+        if defaults.bool(forKey: "seedActive") {
+            selectedSplit = "PPL"
+            selectedDay = "Push"
+            selectedMuscle = nil
+            workoutStep = .workout
+            todayExercises = [
+                ActiveExercise(name: "Barbell Bench Press", bodyweight: false, timed: false, sets: [
+                    WorkoutSet(weight: "82.5", reps: "8", done: true),
+                    WorkoutSet(weight: "85", reps: "6", done: true),
+                    WorkoutSet(weight: "85", reps: "5", done: false),
+                ]),
+                ActiveExercise(name: "Seated DB Shoulder Press", bodyweight: false, timed: false, sets: [
+                    WorkoutSet(weight: "24", reps: "11", done: true),
+                    WorkoutSet(weight: "24", reps: "10", done: false),
+                    WorkoutSet(weight: "24", reps: "", done: false),
+                ]),
+                ActiveExercise(name: "Tricep Pushdown (Cable)", bodyweight: false, timed: false, sets: [
+                    WorkoutSet(weight: "35", reps: "", done: false),
+                    WorkoutSet(weight: "", reps: "", done: false),
+                    WorkoutSet(weight: "", reps: "", done: false),
+                ]),
+            ]
+            timerMax = 90
+            timerSecs = 68
+            timerRunning = true
+            updateLiveActivity(clearedDraft: false)
+        }
+
+        switch defaults.string(forKey: "seedTab") {
+        case "workouts": selectedTab = .workouts
+        case "log": selectedTab = .log
+        case "history": selectedTab = .history
+        case "stats": selectedTab = .stats
+        default: break
+        }
+    }
+}
+#endif

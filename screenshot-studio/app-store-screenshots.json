@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 2,
+  "appName": "IronLog",
+  "themeId": "dark-bold",
+  "connectedCanvas": false,
+  "locales": [
+    "en"
+  ],
+  "locale": "en",
+  "device": "iphone",
+  "orientation": "portrait",
+  "appIcon": "/app-icon.png",
+  "slidesByDevice": {
+    "iphone": [
+      {
+        "id": "il_hero",
+        "layout": "hero",
+        "label": {
+          "en": "MEET IRONLOG"
+        },
+        "headline": {
+          "en": "Track your gains.\nOwn your progress."
+        },
+        "screenshot": "/screenshots/02-log.png"
+      },
+      {
+        "id": "il_split",
+        "layout": "device-bottom",
+        "label": {
+          "en": "PICK YOUR SPLIT"
+        },
+        "headline": {
+          "en": "Full Body, PPL,\nUpper/Lower & more."
+        },
+        "screenshot": "/screenshots/01-workouts.png"
+      },
+      {
+        "id": "il_stats",
+        "layout": "device-top",
+        "label": {
+          "en": "SEE PROGRESS"
+        },
+        "headline": {
+          "en": "Streaks, PRs and\nvolume, visualized."
+        },
+        "screenshot": "/screenshots/04-stats.png",
+        "inverted": true
+      },
+      {
+        "id": "il_history",
+        "layout": "device-bottom",
+        "label": {
+          "en": "NEVER FORGET A LIFT"
+        },
+        "headline": {
+          "en": "Every session,\nsynced to the cloud."
+        },
+        "screenshot": "/screenshots/03-history.png"
+      }
+    ],
+    "android": [
+      {
+        "id": "s_mr7icjj8_5",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Sell one\nidea per slide."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mr7icjj8_6",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Your headline\nlives here."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mr7icjj8_7",
+        "layout": "two-devices",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Show two\nscreens at once."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mr7icjj8_8",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 03"
+        },
+        "headline": {
+          "en": "Flip the contrast\nfor visual rhythm."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mr7icjj8_9",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "ipad": [
+      {
+        "id": "s_mr7icjj8_a",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nthe big screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mr7icjj8_b",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Built for\nfocus."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mr7icjj8_c",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Always within reach."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "android-7": [
+      {
+        "id": "s_mr7icjj8_d",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Pocket-sized\npower."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mr7icjj8_e",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Wide canvas,\nbigger ideas."
+        },
+        "screenshot": ""
+      }
+    ],
+    "android-10": [
+      {
+        "id": "s_mr7icjj8_f",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nthe big screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mr7icjj8_g",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Wide canvas,\nbigger ideas."
+        },
+        "screenshot": ""
+      }
+    ],
+    "feature-graphic": [
+      {
+        "id": "s_mr7icjj8_h",
+        "layout": "feature-graphic",
+        "label": {},
+        "headline": {
+          "en": "Your tagline goes here."
+        },
+        "screenshot": ""
+      }
+    ]
+  }
+}
