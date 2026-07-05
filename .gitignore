@@ -28,6 +28,17 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 
+# Next.js build output (website/, screenshot-studio/)
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Installed agent skills / tooling — reinstall with `npx skills add`
+.agents/
+.claude/skills/
+skills-lock.json
+bun.lock
+
 # Environment / secrets
 .env
 .env.local
