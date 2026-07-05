@@ -31,6 +31,7 @@ function renderTodayLog() {
       const isBodyweight = ex.bodyweight || false;
       const isTimed      = ex.timed || false;
       const inputLabel   = isTimed ? 'SECS' : 'REPS';
+      const ref          = lastPerformance(ex.name);  // last session with this exercise
 
       return `
       <div class="log-ex ${ex.expanded ? 'expanded' : ''}">
@@ -46,22 +47,37 @@ function renderTodayLog() {
           <span style="color:var(--muted2);font-size:16px">${ex.expanded ? '▾' : '▸'}</span>
         </div>
         ${ex.expanded ? `<div class="log-ex-body">
-          ${ex.sets.map((s, si) => `
+          ${ex.sets.map((s, si) => {
+            // Previous-set reference: same exercise + set index (fallback: last
+            // set). Non-destructive — it only seeds placeholders and a muted hint.
+            const refSet   = ref ? (ref.sets[si] || ref.sets[ref.sets.length - 1]) : null;
+            const hasRefWt = refSet && refSet.weight != null && refSet.weight > 0;
+            const wPlace   = hasRefWt ? cleanWeight(refSet.weight) : '0';
+            const rPlace   = refSet ? String(refSet.reps) : '0';
+            let refLabel = '';
+            if (refSet) {
+              if (isTimed)               refLabel = 'Last: ' + refSet.reps + 's';
+              else if (isBodyweight || !hasRefWt) refLabel = 'Last: ' + refSet.reps + ' reps';
+              else                       refLabel = 'Last: ' + formatWeight(refSet.weight) + ' × ' + refSet.reps;
+            }
+            return `
             <div class="set-row">
               <div class="set-num">${si + 1}</div>
               ${!isBodyweight && !isTimed ? `
               <div class="inp-wrap">
                 <div class="inp-lbl">KG</div>
-                <input class="set-inp" type="text" inputmode="decimal" placeholder="0" value="${s.weight}"
+                <input class="set-inp" type="text" inputmode="decimal" placeholder="${wPlace}" value="${s.weight}"
                   onchange="updateSet(${ei},${si},'weight',this.value)">
               </div>` : ''}
               <div class="inp-wrap">
                 <div class="inp-lbl">${inputLabel}</div>
-                <input class="set-inp" type="text" inputmode="numeric" placeholder="0" value="${s.reps}"
+                <input class="set-inp" type="text" inputmode="numeric" placeholder="${rPlace}" value="${s.reps}"
                   onchange="updateSet(${ei},${si},'reps',this.value)">
               </div>
               <button class="done-btn ${s.done ? 'done' : ''}" onclick="toggleDone(${ei},${si})">${s.done ? '✓' : ''}</button>
-            </div>`).join('')}
+            </div>
+            ${refLabel ? `<div class="set-ref">${refLabel}</div>` : ''}`;
+          }).join('')}
           <button class="add-set-btn" onclick="addSet(${ei})">＋ Add Set</button>
         </div>` : ''}
       </div>`;

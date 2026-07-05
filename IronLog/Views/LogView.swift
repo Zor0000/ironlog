@@ -571,7 +571,9 @@ struct LogExerciseCard: View {
     let exercise: ActiveExercise
 
     var body: some View {
-        VStack(spacing: 0) {
+        // Previous-set reference for this exercise (most recent prior session).
+        let reference = app.lastPerformance(exerciseName: exercise.name)
+        return VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Button {
                     NativeFeedback.selection()
@@ -628,7 +630,7 @@ struct LogExerciseCard: View {
             if exercise.expanded {
                 VStack(spacing: 8) {
                     ForEach(exercise.sets) { set in
-                        setRow(set)
+                        setRow(set, reference: reference)
                     }
                     Button {
                         NativeFeedback.light()
@@ -656,61 +658,85 @@ struct LogExerciseCard: View {
         .animation(AppMotion.quick, value: exercise.expanded)
     }
 
-    private func setRow(_ set: WorkoutSet) -> some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            Text("\((exercise.sets.firstIndex(where: { $0.id == set.id }) ?? 0) + 1)")
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 20, height: 34, alignment: .bottom)
+    private func setRow(_ set: WorkoutSet, reference: LoggedExercise?) -> some View {
+        let index = exercise.sets.firstIndex(where: { $0.id == set.id }) ?? 0
+        // Same set index from last time, falling back to that session's last set.
+        let refSet = reference.map { $0.sets.indices.contains(index) ? $0.sets[index] : $0.sets.last } ?? nil
+        let hasRefWeight = (refSet?.weight ?? 0) > 0
 
-            if !exercise.bodyweight && !exercise.timed {
-                SmallInput(label: "KG", value: set.weight, keyboard: .decimalPad, identifier: "set-weight-input") { value in
-                    app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
-                }
-            }
-            SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps, keyboard: .numberPad, identifier: "set-reps-input") { value in
-                app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
-            }
-            Button {
-                NativeFeedback.success()
-                withAnimation(AppMotion.quick) {
-                    app.toggleDone(exerciseID: exercise.id, setID: set.id)
-                }
-            } label: {
-                Image(systemName: set.done ? "checkmark" : "circle")
-                    .font(.system(size: 15, weight: .bold))
-                    .frame(width: 34, height: 34)
-                    .foregroundStyle(set.done ? .black : Theme.muted2)
-                    .background(set.done ? Theme.success : .clear)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(set.done ? Theme.success : Theme.border, lineWidth: 1.5))
-                    .symbolEffect(.bounce, value: set.done)
-            }
-            .buttonStyle(TactileButtonStyle())
-            .accessibilityIdentifier("set-done-button")
-            .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .bottom, spacing: 8) {
+                Text("\(index + 1)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 20, height: 34, alignment: .bottom)
 
-            Button {
-                NativeFeedback.selection()
-                withAnimation(AppMotion.quick) {
-                    app.removeSet(exerciseID: exercise.id, setID: set.id)
+                if !exercise.bodyweight && !exercise.timed {
+                    SmallInput(label: "KG", value: set.weight, placeholder: hasRefWeight ? clean(refSet!.weight!) : "0", keyboard: .decimalPad, identifier: "set-weight-input") { value in
+                        app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
+                    }
                 }
-            } label: {
-                Image(systemName: "minus.circle")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 30, height: 34)
-                    .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
+                SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps, placeholder: refSet.map { String($0.reps) } ?? "0", keyboard: .numberPad, identifier: "set-reps-input") { value in
+                    app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
+                }
+                Button {
+                    NativeFeedback.success()
+                    withAnimation(AppMotion.quick) {
+                        app.toggleDone(exerciseID: exercise.id, setID: set.id)
+                    }
+                } label: {
+                    Image(systemName: set.done ? "checkmark" : "circle")
+                        .font(.system(size: 15, weight: .bold))
+                        .frame(width: 34, height: 34)
+                        .foregroundStyle(set.done ? .black : Theme.muted2)
+                        .background(set.done ? Theme.success : .clear)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(set.done ? Theme.success : Theme.border, lineWidth: 1.5))
+                        .symbolEffect(.bounce, value: set.done)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityIdentifier("set-done-button")
+                .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
+
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) {
+                        app.removeSet(exerciseID: exercise.id, setID: set.id)
+                    }
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 30, height: 34)
+                        .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .disabled(exercise.sets.count <= 1)
+                .accessibilityLabel("Remove set")
             }
-            .buttonStyle(TactileButtonStyle())
-            .disabled(exercise.sets.count <= 1)
-            .accessibilityLabel("Remove set")
+
+            if let refText = referenceLabel(refSet) {
+                Text(refText)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.leading, 28)
+                    .accessibilityIdentifier("set-reference")
+            }
         }
+    }
+
+    /// Muted "Last: …" hint mirroring the web client's `.set-ref` line.
+    private func referenceLabel(_ refSet: LoggedSet?) -> String? {
+        guard let refSet else { return nil }
+        if exercise.timed { return "Last: \(refSet.reps)s" }
+        if exercise.bodyweight || (refSet.weight ?? 0) <= 0 { return "Last: \(refSet.reps) reps" }
+        return "Last: \(formatWeight(refSet.weight ?? 0)) × \(refSet.reps)"
     }
 }
 
 struct SmallInput: View {
     let label: String
     let value: String
+    var placeholder: String = "0"
     var keyboard: UIKeyboardType = .numberPad
     var identifier: String?
     let onChange: (String) -> Void
@@ -720,7 +746,7 @@ struct SmallInput: View {
             Text(label)
                 .font(.system(size: 9))
                 .foregroundStyle(Theme.muted2)
-            TextField("0", text: Binding(get: { value }, set: onChange))
+            TextField(placeholder, text: Binding(get: { value }, set: onChange))
                 .keyboardType(keyboard)
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)

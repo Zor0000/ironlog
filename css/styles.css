@@ -149,6 +149,7 @@ button { -webkit-user-select:none; user-select:none; }
 .inp-lbl { font-size:9px; color:var(--muted2); letter-spacing:0.5px; text-transform:uppercase; }
 .set-inp { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px; color:var(--text); font-size:14px; font-family:'DM Sans',sans-serif; text-align:center; transition:border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out), background 0.2s var(--ease-out); }
 .set-inp:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-dim); }
+.set-ref { margin:-4px 0 8px 28px; font-size:10px; color:var(--muted); letter-spacing:0.2px; }
 .done-btn { width:32px; height:32px; border-radius:50%; border:1.5px solid var(--border); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; transition:background 0.2s var(--ease-out), border-color 0.2s var(--ease-out), transform 0.16s var(--ease-snap), box-shadow 0.2s var(--ease-out); }
 .done-btn.done { background:var(--success); border-color:var(--success); animation:checkPop 0.26s var(--ease-snap) both; box-shadow:0 0 0 4px rgba(74,222,128,0.08); }
 .add-set-btn { width:100%; padding:8px; border:1px dashed var(--border); border-radius:8px; background:none; color:var(--muted2); font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif; margin-top:3px; transition:border-color 0.2s var(--ease-out), color 0.2s var(--ease-out), background 0.2s var(--ease-out), transform 0.16s var(--ease-snap); }

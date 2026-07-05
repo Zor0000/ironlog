@@ -237,4 +237,45 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(decoded.addExerciseWeighted, true)
         XCTAssertEqual(decoded.note, "Paused reps")
     }
+
+    // MARK: - Shared helpers (Phase 0)
+
+    func testFormatWeightRendersKgWithCleanNumber() {
+        XCTAssertEqual(formatWeight(60), "60 kg")
+        XCTAssertEqual(formatWeight(100.0), "100 kg")
+        XCTAssertEqual(formatWeight(62.5), "62.5 kg")
+    }
+
+    func testEstimatedOneRepMaxUsesEpleyFormula() {
+        // Epley: weight * (1 + reps/30) — note it does NOT collapse to the raw
+        // weight at 1 rep (100 * (1 + 1/30) = 103.33), matching the spec formula.
+        XCTAssertEqual(estimated1RM(weightKg: 100, reps: 1), 103.3333, accuracy: 0.001)
+        XCTAssertEqual(estimated1RM(weightKg: 60, reps: 10), 80, accuracy: 0.0001)
+        // Non-applicable inputs collapse to 0.
+        XCTAssertEqual(estimated1RM(weightKg: 0, reps: 5), 0)
+        XCTAssertEqual(estimated1RM(weightKg: 80, reps: 0), 0)
+    }
+
+    func testLastPerformanceReturnsMostRecentPriorSessionByExactName() {
+        let app = AppState()
+        let older = WorkoutSession(
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            muscle: nil, split: nil, note: nil,
+            exercises: [LoggedExercise(name: "Bench Press", bodyweight: false, timed: false,
+                                       sets: [LoggedSet(weight: 60, reps: 8)])]
+        )
+        let newer = WorkoutSession(
+            createdAt: Date(timeIntervalSince1970: 2_000),
+            muscle: nil, split: nil, note: nil,
+            exercises: [LoggedExercise(name: "Bench Press", bodyweight: false, timed: false,
+                                       sets: [LoggedSet(weight: 65, reps: 6), LoggedSet(weight: 65, reps: 5)])]
+        )
+        // AppState keeps `sessions` newest-first.
+        app.sessions = [newer, older]
+
+        let reference = app.lastPerformance(exerciseName: "Bench Press")
+        XCTAssertEqual(reference?.sets.count, 2)
+        XCTAssertEqual(reference?.sets.first?.weight, 65)
+        XCTAssertNil(app.lastPerformance(exerciseName: "Deadlift"))
+    }
 }
