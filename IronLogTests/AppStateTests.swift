@@ -246,16 +246,6 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(formatWeight(62.5), "62.5 kg")
     }
 
-    func testEstimatedOneRepMaxUsesEpleyFormula() {
-        // Epley: weight * (1 + reps/30) — note it does NOT collapse to the raw
-        // weight at 1 rep (100 * (1 + 1/30) = 103.33), matching the spec formula.
-        XCTAssertEqual(estimated1RM(weightKg: 100, reps: 1), 103.3333, accuracy: 0.001)
-        XCTAssertEqual(estimated1RM(weightKg: 60, reps: 10), 80, accuracy: 0.0001)
-        // Non-applicable inputs collapse to 0.
-        XCTAssertEqual(estimated1RM(weightKg: 0, reps: 5), 0)
-        XCTAssertEqual(estimated1RM(weightKg: 80, reps: 0), 0)
-    }
-
     func testLastPerformanceReturnsMostRecentPriorSessionByExactName() {
         let app = AppState()
         let older = WorkoutSession(

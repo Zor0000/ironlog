@@ -98,13 +98,6 @@ function formatWeight(kg) {
   return s === '' ? '' : s + ' kg';
 }
 
-// Epley estimated 1-rep max, in KG: weight * (1 + reps/30). 0 when not applicable.
-function estimated1RM(weightKg, reps) {
-  const w = Number(weightKg), r = Number(reps);
-  if (!isFinite(w) || !isFinite(r) || w <= 0 || r <= 0) return 0;
-  return w * (1 + r / 30);
-}
-
 // Most recent prior session containing `exerciseName` (exact name match).
 // Returns that session's exercise object { name, sets:[{weight, reps}] }, or
 // null when the exercise has no history. `state.history` is newest-first, so
