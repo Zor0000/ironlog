@@ -123,14 +123,13 @@ function goBackToDay() {
 
 // ── Step 4: Suggested Workout ──────────────────────────────────
 function renderStepWorkout(c) {
-  const backFn = SPLIT_DAYS[state.selectedSplit] ? 'goBackToMuscle' : 'goBackToMuscleNonDay';
   const m = MUSCLES.find(x => x.id === state.selectedMuscle);
   const dayLabel = state.selectedDay ? ' · ' + state.selectedDay : '';
   const contextChip = state.selectedSplit + dayLabel;
   const exercises = WORKOUTS[state.selectedSplit]?.[state.selectedMuscle] || [];
 
   c.innerHTML = `
-    <button class="wizard-back" onclick="${backFn}()">← ${m?.label || 'Back'}</button>
+    <button class="wizard-back" onclick="goBackToMuscle()">← ${m?.label || 'Back'}</button>
     <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
       <div class="section-label">SUGGESTED WORKOUT</div>
       <span class="chip">${contextChip}</span>
@@ -165,12 +164,6 @@ function renderStepWorkout(c) {
 }
 
 function goBackToMuscle() {
-  state.workoutStep = 'muscle';
-  state.selectedMuscle = null;
-  renderWorkoutStep();
-}
-
-function goBackToMuscleNonDay() {
   state.workoutStep = 'muscle';
   state.selectedMuscle = null;
   renderWorkoutStep();

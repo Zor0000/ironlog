@@ -159,12 +159,6 @@ func formatWeight(_ kg: Double) -> String {
     "\(clean(kg)) kg"
 }
 
-/// Epley estimated 1-rep max, in KG: weight * (1 + reps/30). 0 when N/A.
-func estimated1RM(weightKg: Double, reps: Int) -> Double {
-    guard weightKg > 0, reps > 0 else { return 0 }
-    return weightKg * (1 + Double(reps) / 30)
-}
-
 extension Date {
     var dayKey: String {
         Self.dayFormatter.string(from: self)
