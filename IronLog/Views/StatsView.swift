@@ -4,6 +4,7 @@ import Charts
 struct StatsView: View {
     @EnvironmentObject private var app: AppState
     @State private var chartExercise: String?
+    @State private var showAllRecords = false
 
     var body: some View {
         ScrollView {
@@ -227,7 +228,9 @@ struct StatsView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted2)
             } else {
-                ForEach(Array(app.personalRecords.values.sorted { $0.exerciseName < $1.exerciseName }.enumerated()), id: \.element.id) { index, record in
+                let sorted = app.personalRecords.values.sorted { $0.exerciseName < $1.exerciseName }
+                let shown = showAllRecords ? sorted : Array(sorted.prefix(recordsLimit))
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, record in
                     HStack {
                         Text(record.exerciseName)
                             .font(.system(size: 12, weight: .medium))
@@ -240,10 +243,25 @@ struct StatsView: View {
                     .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .bottom)
                     .entrance(index, offset: 8)
                 }
+                if sorted.count > recordsLimit {
+                    Button {
+                        NativeFeedback.selection()
+                        withAnimation(AppMotion.quick) { showAllRecords.toggle() }
+                    } label: {
+                        Text(showAllRecords ? "Show less" : "Show all \(sorted.count)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 4)
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                }
             }
         }
         .cardStyle()
     }
+
+    private var recordsLimit: Int { 5 }
 
     private var weekDates: [Date] {
         let calendar = Calendar.current

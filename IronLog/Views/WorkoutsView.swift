@@ -35,26 +35,7 @@ struct WorkoutsView: View {
         .scrollIndicators(.hidden)
         .animation(AppMotion.screen, value: app.workoutStep)
         .animation(AppMotion.quick, value: app.hasActiveWorkout)
-        .overlay {
-            if showDiscardConfirmation {
-                ConfirmActionModal(
-                    title: "Discard workout?",
-                    message: "This clears the current exercises, sets, timer and note. Saved history will not be affected.",
-                    confirmTitle: "Discard Workout",
-                    cancelTitle: "Keep Logging",
-                    systemImage: "trash"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        showDiscardConfirmation = false
-                        app.discardWorkout()
-                    }
-                } cancel: {
-                    withAnimation(AppMotion.quick) {
-                        showDiscardConfirmation = false
-                    }
-                }
-            }
-        }
+        .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
     }
 
     private var splitStep: some View {
@@ -226,7 +207,8 @@ struct WorkoutsView: View {
 
     private var workoutStep: some View {
         let muscles = app.selectedWorkoutMuscleIDs.compactMap { app.library.muscle($0) }
-        let context = [app.selectedSplit, app.selectedDay].compactMap(\.self).joined(separator: " · ")
+        // Split only — the day already shows in the back button and Start button.
+        let context = app.selectedSplit ?? ""
         return VStack(alignment: .leading, spacing: 10) {
             BackButton(label: app.selectedDay ?? app.selectedWorkoutMuscleLabel) {
                 NativeFeedback.selection()
