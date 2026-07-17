@@ -1,9 +1,9 @@
 # IronLog Project Context
 
 ## Overview
-IronLog is a beginner-friendly personal gym tracker. It is completely free, has no third-party dependencies on either client, and uses Supabase as its backend. Two clients share the same backend:
-1. A Progressive Web App (PWA) — Vanilla HTML/CSS/JS, hosted on GitHub Pages.
-2. A Native iOS App — SwiftUI, zero third-party SDK dependencies.
+IronLog is a beginner-friendly personal gym tracker. It is completely free, has no third-party SDK dependencies, and uses Supabase as its backend: a Native iOS App (SwiftUI).
+
+> The project previously also shipped a web PWA (vanilla HTML/CSS/JS on GitHub Pages). It was discontinued in favor of focusing solely on the iOS app; its `index.html`/`js/`/`css/` and Playwright tests were removed. `privacy.html` remains hosted on GitHub Pages since the app's Settings screen links to it.
 
 ## Architecture
 
@@ -14,13 +14,7 @@ IronLog is a beginner-friendly personal gym tracker. It is completely free, has 
 - **Security**: Row Level Security (RLS) — users only access their own data.
 - **Keep-alive**: `.github/workflows/supabase-keepalive.yml` pings the REST endpoint daily to prevent free-tier auto-pause.
 
-### 2. Frontend: Web App (PWA)
-- **Tech Stack**: Vanilla HTML5, CSS3, JavaScript. No build steps or bundlers.
-- **Hosting**: GitHub Pages (`main` branch, root `/`).
-- **Key files**: `index.html`, `js/log.js`, `js/timer.js`, `css/`.
-- **Testing**: `test_features.py`, `test_ui.py`, `test_wizard.py` (Python + Playwright).
-
-### 3. Frontend: iOS App (Native)
+### 2. Frontend: iOS App (Native)
 - **Tech Stack**: Swift 5, SwiftUI.
 - **Project file**: `IronLog.xcodeproj` is committed directly — no XcodeGen step needed at checkout.
 - **Dependencies**: None. Supabase REST API called via native `URLSession` in `SupabaseService.swift`.
@@ -41,18 +35,12 @@ Log sets from the Lock Screen / Dynamic Island without unlocking, like a music p
 - **Add Exercise form**: searchable catalog with muscle-group filter chips, inline in the log screen.
 - **Splits**: PPL, Full Body, Upper/Lower, Bro Split. Multi-muscle days (e.g. "Legs + Core") start in a single session via `selectedWorkoutMuscleIDs`.
 - **ConfirmActionModal**: reusable modal (`IronLog/Views/ConfirmActionModal.swift`) used for destructive actions (discard workout). Triggered by the workout-level trash button in LogView and WorkoutsView.
-- **Rest Timer**: auto-restarts from the full preset (`restartTimer()`) each time a set is marked done — both in the iOS app and the web PWA (`js/timer.js`).
+- **Rest Timer**: auto-restarts from the full preset (`restartTimer()`) each time a set is marked done.
 - **Draft Persistence**: in-progress workout survives app restarts via `LocalStore`.
 - **Stats & PRs**: volume, streaks, personal records auto-detected on save.
 - **Water Tracker**: 8-glass daily counter.
 
 ## Development Workflow
-
-### Web PWA
-```bash
-python -m http.server 8765   # local server at http://localhost:8765
-python test_features.py      # run Playwright feature tests
-```
 
 ### iOS App — Simulator
 ```bash
