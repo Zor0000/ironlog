@@ -6,7 +6,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var notificationStatus: UNAuthorizationStatus?
-    private let presets = [60, 90, 120, 180]
 
     var body: some View {
         ZStack {
@@ -138,12 +137,12 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionLabel("Rest Timer Default")
             HStack(spacing: 8) {
-                ForEach(presets, id: \.self) { value in
+                ForEach(restTimerPresets, id: \.self) { value in
                     Button {
                         NativeFeedback.selection()
                         app.setTimerPreset(value)
                     } label: {
-                        Pill(text: "\(value / 60):\(String(format: "%02d", value % 60))", isActive: app.timerMax == value)
+                        Pill(text: formatDuration(value), isActive: app.timerMax == value)
                     }
                     .buttonStyle(TactileButtonStyle())
                 }

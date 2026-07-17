@@ -196,6 +196,14 @@ func formatWeight(_ kg: Double) -> String {
     "\(formatWeightValue(kg)) \(currentWeightUnit.label)"
 }
 
+/// Rest-timer default durations (seconds) offered in the Log and Settings tabs.
+let restTimerPresets = [60, 90, 120, 180]
+
+/// "m:ss" for a seconds count, e.g. 90 → "1:30".
+func formatDuration(_ seconds: Int) -> String {
+    "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+}
+
 extension Date {
     var dayKey: String {
         Self.dayFormatter.string(from: self)

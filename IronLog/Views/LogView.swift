@@ -25,26 +25,7 @@ struct LogView: View {
         .scrollIndicators(.hidden)
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
-        .overlay {
-            if showDiscardConfirmation {
-                ConfirmActionModal(
-                    title: "Discard workout?",
-                    message: "This clears the current exercises, sets, timer and note. Saved history will not be affected.",
-                    confirmTitle: "Discard Workout",
-                    cancelTitle: "Keep Logging",
-                    systemImage: "trash"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        showDiscardConfirmation = false
-                        app.discardWorkout()
-                    }
-                } cancel: {
-                    withAnimation(AppMotion.quick) {
-                        showDiscardConfirmation = false
-                    }
-                }
-            }
-        }
+        .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
     }
 
     private var emptyState: some View {
@@ -479,7 +460,6 @@ private struct ChipStyle: ViewModifier {
 
 struct TimerCard: View {
     @EnvironmentObject private var app: AppState
-    private let presets = [60, 90, 120, 180]
     private var progress: Double {
         guard app.timerMax > 0 else { return 0 }
         return Double(app.timerSecs) / Double(app.timerMax)
@@ -493,7 +473,7 @@ struct TimerCard: View {
                     .tracking(1)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted2)
-                Text(format(app.timerSecs))
+                Text(formatDuration(app.timerSecs))
                     .font(.system(size: 40, weight: .black))
                     .fontWidth(.condensed)
                     .tracking(2)
@@ -524,14 +504,14 @@ struct TimerCard: View {
                 .timerButton()
                 .accessibilityLabel("Reset rest timer")
                 Menu {
-                    ForEach(presets, id: \.self) { value in
-                        Button(format(value)) {
+                    ForEach(restTimerPresets, id: \.self) { value in
+                        Button(formatDuration(value)) {
                             NativeFeedback.selection()
                             app.setTimerPreset(value)
                         }
                     }
                 } label: {
-                    Text(format(app.timerMax))
+                    Text(formatDuration(app.timerMax))
                         .font(.system(size: 12, weight: .bold))
                         .padding(.horizontal, 10)
                         .frame(height: 38)
@@ -541,7 +521,7 @@ struct TimerCard: View {
                 }
                 .foregroundStyle(Theme.text)
                 .accessibilityLabel("Rest duration")
-                .accessibilityValue(format(app.timerMax))
+                .accessibilityValue(formatDuration(app.timerMax))
             }
         }
         .cardStyle()
@@ -559,10 +539,6 @@ struct TimerCard: View {
         }
         .animation(AppMotion.quick, value: app.timerRunning)
         .animation(.linear(duration: 0.2), value: app.timerSecs)
-    }
-
-    private func format(_ seconds: Int) -> String {
-        "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
     }
 }
 

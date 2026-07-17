@@ -89,3 +89,38 @@ struct ConfirmActionModal: View {
         }
     }
 }
+
+/// Discard-workout confirmation overlay shared by the Log and Workouts tabs.
+private struct DiscardWorkoutOverlay: ViewModifier {
+    @EnvironmentObject private var app: AppState
+    @Binding var isPresented: Bool
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if isPresented {
+                ConfirmActionModal(
+                    title: "Discard workout?",
+                    message: "This clears the current exercises, sets, timer and note. Saved history will not be affected.",
+                    confirmTitle: "Discard Workout",
+                    cancelTitle: "Keep Logging",
+                    systemImage: "trash"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        isPresented = false
+                        app.discardWorkout()
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) {
+                        isPresented = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    func discardWorkoutOverlay(isPresented: Binding<Bool>) -> some View {
+        modifier(DiscardWorkoutOverlay(isPresented: isPresented))
+    }
+}
