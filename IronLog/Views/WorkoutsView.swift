@@ -60,6 +60,8 @@ struct WorkoutsView: View {
     private var splitStep: some View {
         VStack(alignment: .leading, spacing: 14) {
             TitleBlock(title: "Split Type", subtitle: "Choose your training program")
+            freeWorkoutCard
+                .entrance(0)
             if app.library.splits.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Workout library unavailable", systemImage: "exclamationmark.triangle")
@@ -95,11 +97,50 @@ struct WorkoutsView: View {
                         }
                         .foregroundStyle(Theme.text)
                         .buttonStyle(TactileButtonStyle())
-                        .entrance(index)
+                        .entrance(index + 1)
                     }
                 }
             }
         }
+    }
+
+    /// Accent-tinted "start empty" card, set apart from the plain split rows so
+    /// it reads as the fast path, not just another split. Skips the wizard —
+    /// `startFreeWorkout()` drops straight into the log with the add-exercise form.
+    private var freeWorkoutCard: some View {
+        Button {
+            NativeFeedback.light()
+            withAnimation(AppMotion.smooth) {
+                app.startFreeWorkout()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Free Workout")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.text)
+                    Text("Start empty — add any exercise on the fly")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted2)
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+            .padding(14)
+            .background(Theme.accentDim)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.accent.opacity(0.45), lineWidth: 1))
+        }
+        .buttonStyle(TactileButtonStyle())
+        .accessibilityIdentifier("split-free-workout-button")
     }
 
     private var dayStep: some View {
