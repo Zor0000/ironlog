@@ -118,7 +118,7 @@ struct LogView: View {
     private var logHeader: some View {
         HStack(spacing: 8) {
             Text("Today").sectionTitle()
-            Pill(text: [app.selectedWorkoutMuscleLabel, app.selectedSplit ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
+            Pill(text: contextLabel)
             Spacer()
             Button {
                 NativeFeedback.selection()
@@ -135,6 +135,13 @@ struct LogView: View {
             .buttonStyle(TactileButtonStyle())
             .accessibilityLabel("Discard workout")
         }
+    }
+
+    /// Muscle label + split, deduped — a free workout has both equal to "Free Workout".
+    private var contextLabel: String {
+        let muscle = app.selectedWorkoutMuscleLabel
+        let split = app.selectedSplit ?? ""
+        return split.isEmpty || split == muscle ? muscle : "\(muscle) · \(split)"
     }
 
     private var progressCard: some View {
@@ -593,7 +600,7 @@ struct LogExerciseCard: View {
                                     SmallBadge("Timed")
                                 }
                             }
-                            Text("\(exercise.sets.filter(\.done).count)/\(exercise.sets.count) sets done")
+                            Text("\(exercise.sets.filter(\.done).count)/\(exercise.sets.count) \(exercise.sets.count == 1 ? "set" : "sets") done")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.muted2)
                         }
@@ -674,11 +681,11 @@ struct LogExerciseCard: View {
                 if !exercise.bodyweight && !exercise.timed {
                     // Label + reference placeholder follow the display unit;
                     // typed input converts back to kg at the save boundary.
-                    SmallInput(label: currentWeightUnit.fieldLabel, value: set.weight, placeholder: hasRefWeight ? formatWeightValue(refSet!.weight!) : "0", keyboard: .decimalPad, identifier: "set-weight-input") { value in
+                    SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, placeholder: hasRefWeight ? formatWeightValue(refSet!.weight!) : "0", keyboard: .decimalPad, identifier: "set-weight-input") { value in
                         app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                     }
                 }
-                SmallInput(label: exercise.timed ? "SECS" : "REPS", value: set.reps, placeholder: refSet.map { String($0.reps) } ?? "0", keyboard: .numberPad, identifier: "set-reps-input") { value in
+                SmallInput(label: index == 0 ? (exercise.timed ? "SECS" : "REPS") : "", value: set.reps, placeholder: refSet.map { String($0.reps) } ?? "0", keyboard: .numberPad, identifier: "set-reps-input") { value in
                     app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
                 }
                 Button {
@@ -745,9 +752,12 @@ struct SmallInput: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.muted2)
+            // Empty label = no header row; callers show it on the first set only.
+            if !label.isEmpty {
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Theme.muted2)
+            }
             TextField(placeholder, text: Binding(get: { value }, set: onChange))
                 .keyboardType(keyboard)
                 .multilineTextAlignment(.center)

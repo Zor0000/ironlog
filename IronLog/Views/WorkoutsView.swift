@@ -247,22 +247,6 @@ struct WorkoutsView: View {
                     Pill(text: context)
                 }
             }
-            ScrollView(.horizontal) {
-                HStack(spacing: 7) {
-                    ForEach(muscles) { muscle in
-                        Label(muscle.label, systemImage: muscle.systemImage)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Theme.muted2)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Theme.surface2)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Theme.border))
-                    }
-                }
-            }
-            .scrollIndicators(.hidden)
-
             ForEach(muscles) { muscle in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
@@ -359,7 +343,8 @@ struct CurrentWorkoutBanner: View {
         }
         let done = app.completedSetCount
         let total = app.todayExercises.reduce(0) { $0 + $1.sets.count }
-        return "\(app.todayExercises.count) exercises · \(done)/\(total) sets done"
+        let count = app.todayExercises.count
+        return "\(count) \(count == 1 ? "exercise" : "exercises") · \(done)/\(total) \(total == 1 ? "set" : "sets") done"
     }
 }
 

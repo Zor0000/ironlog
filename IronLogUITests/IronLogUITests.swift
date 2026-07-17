@@ -32,8 +32,11 @@ final class IronLogUITests: XCTestCase {
         app.buttons["finish-workout-button"].tap()
 
         XCTAssertTrue(app.staticTexts["History"].waitForExistence(timeout: 4))
+        // Collapsed card shows date + split only; expanding reveals exercises.
+        XCTAssertTrue(app.staticTexts["1 set · Free Workout · local"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Push Ups"].exists)
+        app.buttons["history-card-toggle"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Push Ups"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["1 sets · Free Workout · local"].exists)
     }
 
     func testSettingsOpensFromGearAndShowsAccountControls() {
@@ -77,9 +80,13 @@ final class IronLogUITests: XCTestCase {
         app.buttons["set-done-button"].firstMatch.tap()
         app.buttons["finish-workout-button"].tap()
 
-        // Tap the card → edit sheet → change reps → save → card updates.
-        XCTAssertTrue(app.staticTexts["Push Ups"].waitForExistence(timeout: 4))
-        app.staticTexts["Push Ups"].tap()
+        // Expand the card → exercises drop down → pencil opens the edit sheet →
+        // change reps → save → expanded card updates.
+        let cardToggle = app.buttons["history-card-toggle"].firstMatch
+        XCTAssertTrue(cardToggle.waitForExistence(timeout: 4))
+        cardToggle.tap()
+        XCTAssertTrue(app.staticTexts["Push Ups"].waitForExistence(timeout: 3))
+        app.buttons["edit-session-button"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Edit Session"].waitForExistence(timeout: 3))
         let editReps = app.textFields["edit-reps-input"].firstMatch
         editReps.doubleTap() // select-all, so typing replaces "12"

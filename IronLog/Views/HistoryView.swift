@@ -34,9 +34,7 @@ struct HistoryView: View {
                     emptyState
                 } else {
                     ForEach(Array(app.sessions.enumerated()), id: \.element.id) { index, session in
-                        HistoryCard(session: session, deleteTarget: $deleteTarget)
-                            .contentShape(Rectangle())
-                            .onTapGesture { editTarget = session }
+                        HistoryCard(session: session, deleteTarget: $deleteTarget, editTarget: $editTarget)
                             .entrance(index)
                     }
                 }
@@ -91,21 +89,56 @@ struct HistoryCard: View {
     @EnvironmentObject private var app: AppState
     let session: WorkoutSession
     @Binding var deleteTarget: WorkoutSession?
+    @Binding var editTarget: WorkoutSession?
+    @State private var expanded = false
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(session.createdAt.displayDay)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("\(setCount) sets · \(session.split ?? "Workout") · \(syncText)")
-                        .font(.system(size: 10))
+            HStack(spacing: 8) {
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) {
+                        expanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(session.createdAt.displayDay)
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("\(setCount) \(setCount == 1 ? "set" : "sets") · \(session.split ?? "Workout") · \(syncText)")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.muted2)
+                        }
+                        Spacer()
+                        if let muscle = app.library.muscle(session.muscle) {
+                            Pill(text: muscle.label)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                            .rotationEffect(.degrees(expanded ? 90 : 0))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .foregroundStyle(Theme.text)
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityIdentifier("history-card-toggle")
+                .accessibilityLabel("\(session.createdAt.displayDay), \(session.split ?? "Workout"), \(expanded ? "collapse" : "expand")")
+
+                Button {
+                    NativeFeedback.selection()
+                    editTarget = session
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .frame(width: 30, height: 30)
                         .foregroundStyle(Theme.muted2)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 }
-                Spacer()
-                if let muscle = app.library.muscle(session.muscle) {
-                    Pill(text: muscle.label)
-                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityIdentifier("edit-session-button")
+                .accessibilityLabel("Edit session from \(session.createdAt.displayDay)")
+
                 Button {
                     NativeFeedback.selection()
                     withAnimation(AppMotion.quick) {
@@ -122,40 +155,46 @@ struct HistoryCard: View {
                 .accessibilityLabel("Delete session from \(session.createdAt.displayDay)")
             }
             .padding(14)
-            .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .bottom)
 
-            ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, exercise in
-                HStack(alignment: .top) {
-                    Text(exercise.name)
-                        .font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    Text(exercise.sets.map(setLabel).joined(separator: ", "))
+            if expanded {
+                VStack(spacing: 0) {
+                    ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, exercise in
+                        HStack(alignment: .top) {
+                            Text(exercise.name)
+                                .font(.system(size: 12, weight: .medium))
+                            Spacer()
+                            Text(exercise.sets.map(setLabel).joined(separator: ", "))
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.muted2)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .top)
+                        .entrance(index, offset: 8)
+                    }
+
+                    if let note = session.note, !note.isEmpty {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "note.text")
+                            Text(note)
+                        }
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted2)
-                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .top)
+                    }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .bottom)
-                .entrance(index, offset: 8)
-            }
-
-            if let note = session.note, !note.isEmpty {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "note.text")
-                    Text(note)
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.muted2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(expanded ? Theme.accent.opacity(0.24) : Theme.border))
         .shadow(color: .black.opacity(0.18), radius: 14, y: 8)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+        .animation(AppMotion.quick, value: expanded)
     }
 
     private var setCount: Int {
@@ -290,11 +329,11 @@ struct EditSessionSheet: View {
                         .foregroundStyle(Theme.muted)
                         .frame(width: 20, height: 34, alignment: .bottom)
                     if !exercise.wrappedValue.bodyweight && !exercise.wrappedValue.timed {
-                        SmallInput(label: currentWeightUnit.fieldLabel, value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
+                        SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
                             exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
                         }
                     }
-                    SmallInput(label: exercise.wrappedValue.timed ? "SECS" : "REPS", value: set.reps, identifier: "edit-reps-input") { value in
+                    SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? "SECS" : "REPS") : "", value: set.reps, identifier: "edit-reps-input") { value in
                         exercise.wrappedValue.sets[index].reps = value.filter(\.isNumber)
                     }
                     Button {
