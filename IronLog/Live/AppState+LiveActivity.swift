@@ -81,24 +81,14 @@ extension AppState {
     /// Safe to call on every foreground transition.
     func reconcileFromLiveActivity() {
         guard hasActiveWorkout, let live = LiveWorkoutEngine.shared.currentState else { return }
-        var changed = false
 
         for liveExercise in live.exercises {
             guard let ei = todayExercises.firstIndex(where: { $0.id == liveExercise.id }) else { continue }
             for liveSet in liveExercise.sets {
                 guard let si = todayExercises[ei].sets.firstIndex(where: { $0.id == liveSet.id }) else { continue }
-                if todayExercises[ei].sets[si].weight != liveSet.weight {
-                    todayExercises[ei].sets[si].weight = liveSet.weight
-                    changed = true
-                }
-                if todayExercises[ei].sets[si].reps != liveSet.reps {
-                    todayExercises[ei].sets[si].reps = liveSet.reps
-                    changed = true
-                }
-                if todayExercises[ei].sets[si].done != liveSet.done {
-                    todayExercises[ei].sets[si].done = liveSet.done
-                    changed = true
-                }
+                todayExercises[ei].sets[si].weight = liveSet.weight
+                todayExercises[ei].sets[si].reps = liveSet.reps
+                todayExercises[ei].sets[si].done = liveSet.done
             }
         }
 
@@ -120,7 +110,6 @@ extension AppState {
 
         // Persist so lock-screen navigation (Next/Prev) and set edits both survive,
         // and re-sync the activity (coalesced, so a no-op change costs nothing).
-        _ = changed
-        persistAfterReconcile()
+        persistDraft()
     }
 }

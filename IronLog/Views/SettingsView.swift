@@ -239,14 +239,7 @@ struct SettingsView: View {
             action()
         } label: {
             Label(title, systemImage: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .foregroundStyle(tint)
-                .background(Theme.surface2)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
         }
-        .buttonStyle(TactileButtonStyle())
+        .buttonStyle(SecondaryButtonStyle(tint: tint))
     }
 }

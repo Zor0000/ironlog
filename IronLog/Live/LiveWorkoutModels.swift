@@ -49,7 +49,6 @@ struct LiveWorkoutState: Codable, Hashable {
     var restSeconds: Int
     /// Weight increment used by the lock-screen stepper, in the user's unit.
     var weightStep: Double
-    /// Whether the workout has been fully logged (all sets done).
 
     init(
         title: String,
@@ -114,7 +113,7 @@ enum LiveWorkoutReducer {
     static let defaultReps = "8"
 
     /// Nudge the current set's weight by `weightStep` (only for weighted moves).
-    static func adjustWeight(_ state: LiveWorkoutState, by direction: Int, at now: Date = .now) -> LiveWorkoutState {
+    static func adjustWeight(_ state: LiveWorkoutState, by direction: Int) -> LiveWorkoutState {
         var state = state
         guard let ei = currentEditableIndices(state) else { return state }
         let exercise = state.exercises[ei.exercise]
@@ -216,20 +215,7 @@ extension LiveWorkoutReducer {
     /// Renders a weight without a trailing ".0" so the stepper reads "60" not
     /// "60.0", but keeps a half-plate as "62.5".
     static func formatWeight(_ value: Double) -> String {
-        if value == value.rounded() {
-            return String(Int(value))
-        }
-        return String(format: "%.2f", value).trimmingTrailingZeros()
-    }
-}
-
-private extension String {
-    func trimmingTrailingZeros() -> String {
-        guard contains(".") else { return self }
-        var result = self
-        while result.hasSuffix("0") { result.removeLast() }
-        if result.hasSuffix(".") { result.removeLast() }
-        return result
+        String(format: "%g", value)
     }
 }
 

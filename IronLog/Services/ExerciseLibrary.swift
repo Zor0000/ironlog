@@ -14,8 +14,7 @@ struct ExerciseLibrary: Codable {
     var splitDays: [String: [SplitDay]]
     var workouts: [String: [String: [ExerciseTemplate]]]
     /// Full, split-independent exercise catalog keyed by muscle id. Powers the
-    /// "Add Exercise" library. Falls back to a deduped view of `workouts` when
-    /// the bundled data predates the catalog.
+    /// "Add Exercise" library.
     var library: [String: [ExerciseTemplate]]
 
     enum CodingKeys: String, CodingKey {
@@ -37,17 +36,7 @@ struct ExerciseLibrary: Codable {
         self.muscles = muscles
         self.splitDays = splitDays
         self.workouts = workouts
-        self.library = library.isEmpty ? Self.derivedCatalog(from: workouts) : library
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        splits = try container.decode([String].self, forKey: .splits)
-        muscles = try container.decode([Muscle].self, forKey: .muscles)
-        splitDays = try container.decode([String: [SplitDay]].self, forKey: .splitDays)
-        workouts = try container.decode([String: [String: [ExerciseTemplate]]].self, forKey: .workouts)
-        let decoded = try container.decodeIfPresent([String: [ExerciseTemplate]].self, forKey: .library) ?? [:]
-        library = decoded.isEmpty ? Self.derivedCatalog(from: workouts) : decoded
+        self.library = library
     }
 
     static let bundled: ExerciseLibrary = {
@@ -66,21 +55,6 @@ struct ExerciseLibrary: Codable {
 
     /// Preferred display order for catalog muscle filters.
     private static let catalogOrder = ["chest", "back", "legs", "shoulders", "biceps", "triceps", "arms", "core"]
-
-    private static func derivedCatalog(from workouts: [String: [String: [ExerciseTemplate]]]) -> [String: [ExerciseTemplate]] {
-        var result: [String: [ExerciseTemplate]] = [:]
-        for byMuscle in workouts.values {
-            for (muscleID, templates) in byMuscle {
-                var seen = Set(result[muscleID]?.map(\.name) ?? [])
-                var merged = result[muscleID] ?? []
-                for template in templates where seen.insert(template.name).inserted {
-                    merged.append(template)
-                }
-                result[muscleID] = merged
-            }
-        }
-        return result
-    }
 
     /// Muscle groups that have catalog entries, in display order.
     var catalogMuscles: [Muscle] {
