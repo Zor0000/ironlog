@@ -39,7 +39,7 @@ final class SupabaseService {
             var password: String
             var data: [String: String]
         }
-        let _: SignUpResponse = try await authRequest(path: "/auth/v1/signup", body: SignUpBody(email: email, password: password, data: ["full_name": name]))
+        let _: EmptyResponse = try await authRequest(path: "/auth/v1/signup", body: SignUpBody(email: email, password: password, data: ["full_name": name]))
     }
 
     func signOut() {
@@ -303,8 +303,6 @@ struct AuthUser: Codable {
 struct UserMetadata: Codable {
     var fullName: String?
 }
-
-struct SignUpResponse: Codable {}
 
 struct RemoteExercise: Codable {
     var id: String

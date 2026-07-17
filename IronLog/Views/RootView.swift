@@ -114,15 +114,8 @@ struct OnboardingView: View {
                         app.finishOnboarding(createAccount: false)
                     } label: {
                         Text("Continue locally — no account needed")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 13)
-                            .foregroundStyle(Theme.text)
-                            .background(Theme.surface2)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
                     }
-                    .buttonStyle(TactileButtonStyle())
+                    .buttonStyle(SecondaryButtonStyle())
                     .accessibilityIdentifier("onboarding-continue-locally-button")
                 }
             }
@@ -208,15 +201,8 @@ struct AuthView: View {
                     app.continueLocally()
                 } label: {
                     Text("Continue locally")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .foregroundStyle(Theme.text)
-                        .background(Theme.surface2)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
                 }
-                .buttonStyle(TactileButtonStyle())
+                .buttonStyle(SecondaryButtonStyle())
             }
             .cardStyle(radius: 18)
             .padding(.horizontal, 28)

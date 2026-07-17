@@ -136,6 +136,26 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+/// Full-width outlined button on the dark surface — the "not the primary
+/// action" counterpart to `PrimaryButtonStyle` (Continue locally, modal cancel,
+/// settings rows). `tint` colors the label; pass `Theme.danger` for destructive.
+struct SecondaryButtonStyle: ButtonStyle {
+    var tint: Color = Theme.text
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .foregroundStyle(tint)
+            .background(Theme.surface2)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(AppMotion.tap, value: configuration.isPressed)
+    }
+}
+
 struct TactileButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -147,17 +167,23 @@ struct TactileButtonStyle: ButtonStyle {
 
 struct Pill: View {
     let text: String
+    var icon: String? = nil
     var isActive = false
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 12, weight: isActive ? .bold : .medium))
-            .foregroundStyle(isActive ? .black : Theme.text)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(isActive ? Theme.accent : Theme.surface2)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(isActive ? Theme.accent : Theme.border))
-            .animation(AppMotion.quick, value: isActive)
+        HStack(spacing: 5) {
+            if let icon {
+                Image(systemName: icon).font(.system(size: 11, weight: .semibold))
+            }
+            Text(text)
+        }
+        .font(.system(size: 12, weight: isActive ? .bold : .medium))
+        .foregroundStyle(isActive ? .black : Theme.text)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(isActive ? Theme.accent : Theme.surface2)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(isActive ? Theme.accent : Theme.border))
+        .animation(AppMotion.quick, value: isActive)
     }
 }

@@ -57,15 +57,8 @@ struct ConfirmActionModal: View {
                         cancel()
                     } label: {
                         Text(cancelTitle)
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 13)
-                            .foregroundStyle(Theme.text)
-                            .background(Theme.surface2)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
                     }
-                    .buttonStyle(TactileButtonStyle())
+                    .buttonStyle(SecondaryButtonStyle())
                 }
             }
             .padding(18)

@@ -3,6 +3,12 @@ import AppIntents
 import WidgetKit
 import SwiftUI
 
+/// A stepper value never shows blank — an empty field reads as "0".
+private func nonEmpty(_ value: String?) -> String {
+    let value = value ?? ""
+    return value.isEmpty ? "0" : value
+}
+
 struct WorkoutLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
@@ -135,11 +141,6 @@ private struct LockScreenView: View {
         }
     }
 
-    private func nonEmpty(_ value: String?) -> String {
-        let value = value ?? ""
-        return value.isEmpty ? "0" : value
-    }
-
     @ViewBuilder private var actions: some View {
         let hasOpenSet = state.currentExercise?.sets.contains { !$0.done } ?? false
         let showNav = state.exercises.count > 1
@@ -256,18 +257,14 @@ private struct ProgressPips: View {
 
 private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
     /// Two calibrated size classes: `large` for the roomy lock-screen card and
-    /// `regular` for the tighter Dynamic Island expanded view.
+    /// `regular` for the tighter Dynamic Island expanded view. Only the knobs
+    /// that actually differ between them live here; the rest are fixed inline.
     enum Size {
         case regular, large
 
-        var value: CGFloat { self == .large ? 22 : 22 }
-        var label: CGFloat { self == .large ? 10 : 10 }
         var button: CGFloat { self == .large ? 32 : 30 }
-        var buttonIcon: CGFloat { self == .large ? 13 : 13 }
-        var buttonCorner: CGFloat { self == .large ? 9 : 9 }
         var vPadding: CGFloat { self == .large ? 5 : 10 }
         var hPadding: CGFloat { self == .large ? 9 : 10 }
-        var corner: CGFloat { self == .large ? 12 : 12 }
         var rowSpacing: CGFloat { self == .large ? 3 : 5 }
     }
 
@@ -280,7 +277,7 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
     var body: some View {
         VStack(spacing: size.rowSpacing) {
             Text(label)
-                .font(.system(size: size.label, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .tracking(0.6)
                 .foregroundStyle(WidgetPalette.muted)
             HStack(spacing: 0) {
@@ -288,7 +285,7 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
                     .buttonStyle(.plain)
                 Spacer(minLength: 4)
                 Text(value)
-                    .font(.system(size: size.value, weight: .bold))
+                    .font(.system(size: 22, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(WidgetPalette.text)
                     .lineLimit(1)
@@ -301,16 +298,16 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
         .padding(.vertical, size.vPadding)
         .padding(.horizontal, size.hPadding)
         .frame(maxWidth: .infinity)
-        .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: size.corner, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: size.corner, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
+        .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
     }
 
     private func stepIcon(_ name: String) -> some View {
         Image(systemName: name)
-            .font(.system(size: size.buttonIcon, weight: .bold))
+            .font(.system(size: 13, weight: .bold))
             .foregroundStyle(WidgetPalette.text)
             .frame(width: size.button, height: size.button)
-            .background(WidgetPalette.stepButton, in: RoundedRectangle(cornerRadius: size.buttonCorner, style: .continuous))
+            .background(WidgetPalette.stepButton, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }
 
@@ -430,10 +427,5 @@ private struct ExpandedControls: View {
             }
             .padding(.top, 2)
         }
-    }
-
-    private func nonEmpty(_ value: String?) -> String {
-        let value = value ?? ""
-        return value.isEmpty ? "0" : value
     }
 }

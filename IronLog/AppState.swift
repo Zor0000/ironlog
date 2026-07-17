@@ -778,7 +778,9 @@ final class AppState: ObservableObject {
         persistAll()
     }
 
-    private func persistDraft() {
+    /// Internal (not private) so the Live Activity bridge in another file can
+    /// persist after folding in Lock-Screen edits.
+    func persistDraft() {
         persistAll(draft: currentDraft)
     }
 
@@ -798,12 +800,6 @@ final class AppState: ObservableObject {
             await localStore.save(snapshot)
         }
         updateLiveActivity(clearedDraft: clearDraft)
-    }
-
-    /// Internal entry point for the Live Activity bridge, which lives in another
-    /// file and therefore can't reach the private persistence helpers.
-    func persistAfterReconcile() {
-        persistDraft()
     }
 
     private var currentDraft: WorkoutDraft? {

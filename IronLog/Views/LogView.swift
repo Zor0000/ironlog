@@ -265,11 +265,7 @@ struct LogView: View {
             NativeFeedback.selection()
             withAnimation(AppMotion.quick) { catalogFilter = id }
         } label: {
-            HStack(spacing: 5) {
-                if let icon { Image(systemName: icon).font(.system(size: 11, weight: .semibold)) }
-                Text(title)
-            }
-            .modifier(ChipStyle(isActive: catalogFilter == id))
+            Pill(text: title, icon: icon, isActive: catalogFilter == id)
         }
         .buttonStyle(TactileButtonStyle())
         .accessibilityLabel("\(title) exercises")
@@ -446,22 +442,6 @@ struct LogView: View {
         if catalogFilter == nil, let muscle = app.selectedMuscle, app.library.library[muscle] != nil {
             catalogFilter = muscle
         }
-    }
-}
-
-/// Compact pill styling for the muscle filter row.
-private struct ChipStyle: ViewModifier {
-    let isActive: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .font(.system(size: 12, weight: isActive ? .bold : .medium))
-            .foregroundStyle(isActive ? .black : Theme.text)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 7)
-            .background(isActive ? Theme.accent : Theme.surface2)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(isActive ? Theme.accent : Theme.border))
     }
 }
 
