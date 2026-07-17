@@ -46,14 +46,24 @@ struct HistoryView: View {
         .background(Color.clear)
         .scrollIndicators(.hidden)
         .animation(AppMotion.quick, value: app.sessions)
-        .confirmationDialog("Delete this workout session?", isPresented: Binding(
-            get: { deleteTarget != nil },
-            set: { if !$0 { deleteTarget = nil } }
-        )) {
-            Button("Delete Session", role: .destructive) {
-                NativeFeedback.light()
-                if let deleteTarget {
-                    Task { await app.deleteSession(deleteTarget.id) }
+        .animation(AppMotion.quick, value: deleteTarget)
+        .overlay {
+            if let target = deleteTarget {
+                ConfirmActionModal(
+                    title: "Delete this session?",
+                    message: "\(target.createdAt.displayDay) will be permanently removed from your history\(target.cloudID != nil ? " and the cloud" : ""). This can't be undone.",
+                    confirmTitle: "Delete Session",
+                    cancelTitle: "Keep It",
+                    systemImage: "trash"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        deleteTarget = nil
+                    }
+                    Task { await app.deleteSession(target.id) }
+                } cancel: {
+                    withAnimation(AppMotion.quick) {
+                        deleteTarget = nil
+                    }
                 }
             }
         }
