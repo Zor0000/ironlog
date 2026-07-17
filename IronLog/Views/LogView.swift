@@ -672,7 +672,9 @@ struct LogExerciseCard: View {
                     .frame(width: 20, height: 34, alignment: .bottom)
 
                 if !exercise.bodyweight && !exercise.timed {
-                    SmallInput(label: "KG", value: set.weight, placeholder: hasRefWeight ? clean(refSet!.weight!) : "0", keyboard: .decimalPad, identifier: "set-weight-input") { value in
+                    // Label + reference placeholder follow the display unit;
+                    // typed input converts back to kg at the save boundary.
+                    SmallInput(label: currentWeightUnit.fieldLabel, value: set.weight, placeholder: hasRefWeight ? formatWeightValue(refSet!.weight!) : "0", keyboard: .decimalPad, identifier: "set-weight-input") { value in
                         app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                     }
                 }

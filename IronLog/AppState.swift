@@ -24,6 +24,8 @@ final class AppState: ObservableObject {
     @Published var waterByDay: [String: Int] = [:]
     @Published var syncMessage: String = "Local first"
     @Published var showingAuth = false
+    @Published var showingOnboarding = false
+    @Published var unitPreference: WeightUnit = .kg
 
     @Published var timerSecs = 90
     @Published var timerMax = 90
@@ -31,6 +33,12 @@ final class AppState: ObservableObject {
 
     private let localStore = LocalStore()
     private let supabase = SupabaseService()
+    /// Internal (not private) so tests can swap in a spy.
+    var notifier = RestTimerNotifier()
+    private var hasOnboarded = false
+    /// Wall-clock end of the running rest timer, so the countdown stays
+    /// correct across backgrounding (the tick task is suspended while inactive).
+    private var timerEndsAt: Date?
     private var timerTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
     /// Serializes disk writes. `persistAll` can fire many times in quick
@@ -113,10 +121,12 @@ final class AppState: ObservableObject {
     }
 
     func boot() async {
+        var suppressOnboarding = false
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") {
             await localStore.clear()
             supabase.signOut()
+            suppressOnboarding = true // existing UI tests expect a clean slate, not intro cards
         }
         #endif
 
@@ -124,6 +134,12 @@ final class AppState: ObservableObject {
         sessions = snapshot.sessions.sorted { $0.createdAt > $1.createdAt }
         personalRecords = Dictionary(uniqueKeysWithValues: snapshot.personalRecords.map { ($0.exerciseName, $0) })
         waterByDay = snapshot.waterByDay
+        unitPreference = snapshot.unitPreference ?? .kg
+        currentWeightUnit = unitPreference
+        timerMax = snapshot.timerPreset ?? 90
+        timerSecs = timerMax
+        hasOnboarded = snapshot.hasOnboarded ?? false
+        showingOnboarding = !hasOnboarded && !suppressOnboarding
         if let draft = snapshot.draft {
             todayExercises = draft.exercises
             selectedMuscle = draft.muscle
@@ -198,6 +214,72 @@ final class AppState: ObservableObject {
     func showAuth() {
         showingAuth = true
         authMessage = nil
+    }
+
+    /// App Store account deletion: remove the user's cloud rows, wipe local
+    /// state, sign out and land on the auth/local choice screen. Returns false
+    /// when the cloud delete fails — local data is left untouched in that case.
+    @discardableResult
+    func deleteAccount() async -> Bool {
+        isBusy = true
+        defer { isBusy = false }
+        if supabase.isAuthenticated {
+            do {
+                try await supabase.deleteAccount()
+            } catch {
+                showToast("Couldn't delete cloud data. Check your connection and try again.")
+                return false
+            }
+        }
+        sessions = []
+        personalRecords = [:]
+        waterByDay = [:]
+        resetActiveWorkout()
+        hasOnboarded = false
+        updateLiveActivity(clearedDraft: true)
+        // Chain the wipe onto the save queue so an in-flight persistAll can't
+        // re-write the snapshot after it is cleared.
+        let previous = saveTask
+        saveTask = Task { [localStore] in
+            await previous?.value
+            await localStore.clear()
+        }
+        await saveTask?.value
+        supabase.signOut()
+        user = nil
+        showingAuth = true
+        authMessage = nil
+        syncMessage = "Local first"
+        selectedTab = .workouts
+        return true
+    }
+
+    func finishOnboarding(createAccount: Bool) {
+        hasOnboarded = true
+        showingOnboarding = false
+        createAccount ? showAuth() : continueLocally()
+        persistAll()
+    }
+
+    /// Switch the display unit. Weight stays canonical KG in storage; only the
+    /// strings the user is currently typing live in the display unit, so
+    /// convert them in place — "60" kg must become "132.5" lb, not stay "60".
+    func setUnitPreference(_ unit: WeightUnit) {
+        guard unit != unitPreference else { return }
+        let oldUnit = unitPreference
+        unitPreference = unit
+        currentWeightUnit = unit
+        for ei in todayExercises.indices {
+            for si in todayExercises[ei].sets.indices {
+                guard let value = Double(todayExercises[ei].sets[si].weight), value > 0 else { continue }
+                let kg = displayWeightToKg(value, in: oldUnit)
+                todayExercises[ei].sets[si].weight = clean(displayWeight(kg, in: unit))
+            }
+        }
+        // The Live Activity's unit label is fixed in its attributes; end it and
+        // let persistAll's sync re-create it with the new label.
+        LiveWorkoutEngine.shared.end()
+        persistAll()
     }
 
     func selectSplit(_ split: String) {
@@ -458,6 +540,40 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Save an edited past session. Sets pass through the same `loggedSet`
+    /// validation as a live workout, PRs are recomputed (an edit can raise or
+    /// lower one), and the session re-enters the existing pending-sync queue.
+    func updateSession(id: WorkoutSession.ID, exercises: [ActiveExercise], note: String) async {
+        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        let logged = exercises.compactMap { exercise -> LoggedExercise? in
+            let sets = exercise.sets.compactMap { loggedSet(for: exercise, set: $0) }
+            guard !sets.isEmpty else { return nil }
+            return LoggedExercise(name: exercise.name, bodyweight: exercise.bodyweight, timed: exercise.timed, sets: sets)
+        }
+        guard !logged.isEmpty else {
+            showToast("Keep at least one valid set")
+            return
+        }
+        var session = sessions[index]
+        let oldCloudID = session.cloudID
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.exercises = logged
+        session.note = trimmedNote.isEmpty ? nil : trimmedNote
+        session.cloudID = nil
+        session.syncState = supabase.isAuthenticated ? .pending : .localOnly
+        sessions[index] = session
+        recalculateRecords()
+        persistAll()
+        showToast("Session updated")
+        // Replace-in-cloud = delete the old row, let the pending queue re-insert.
+        // ponytail: if the delete fails offline the stale copy can resurface on
+        // the next pull (same ceiling as deleteSession); a tombstone queue fixes both.
+        if let oldCloudID {
+            try? await supabase.deleteCloudSession(oldCloudID)
+        }
+        await syncPending()
+    }
+
     func setWater(index: Int) {
         let next = index < waterToday ? index : index + 1
         waterByDay[Date().dayKey] = next
@@ -467,12 +583,12 @@ final class AppState: ObservableObject {
     func setTimerPreset(_ seconds: Int) {
         timerMax = seconds
         resetTimer()
+        persistAll()
     }
 
     func startTimer() {
         guard !timerRunning else { return }
-        timerRunning = true
-        runTimerLoop()
+        resumeTimer(until: Date().addingTimeInterval(TimeInterval(timerSecs)))
     }
 
     /// Restarts the rest timer from the full preset. Called when a set is
@@ -480,7 +596,19 @@ final class AppState: ObservableObject {
     /// resuming the previous (or paused) value.
     func restartTimer() {
         timerSecs = timerMax
+        resumeTimer(until: Date().addingTimeInterval(TimeInterval(timerMax)))
+    }
+
+    /// Run the countdown to an absolute wall-clock end. Also the entry point
+    /// for the Live Activity reconcile, which carries its own end date.
+    func resumeTimer(until endsAt: Date) {
+        timerEndsAt = endsAt
+        timerSecs = max(0, Int(endsAt.timeIntervalSinceNow.rounded()))
         timerRunning = true
+        // Background safety net: the tick task freezes when the app is
+        // suspended, so a local notification announces "rest over" instead.
+        // Same identifier every time — rescheduling replaces, never stacks.
+        notifier.schedule(at: endsAt)
         runTimerLoop()
     }
 
@@ -490,12 +618,15 @@ final class AppState: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 await MainActor.run {
-                    guard let self, self.timerRunning else { return }
-                    if self.timerSecs <= 0 {
+                    guard let self, self.timerRunning, let endsAt = self.timerEndsAt else { return }
+                    // Recompute from the wall clock (not -= 1) so the display
+                    // snaps back to the truth after backgrounding.
+                    let remaining = Int(endsAt.timeIntervalSinceNow.rounded())
+                    if remaining <= 0 {
                         self.resetTimer()
                         self.showToast("Rest over. Next set.")
                     } else {
-                        self.timerSecs -= 1
+                        self.timerSecs = remaining
                     }
                 }
             }
@@ -509,12 +640,16 @@ final class AppState: ObservableObject {
     func pauseTimer() {
         timerTask?.cancel()
         timerRunning = false
+        timerEndsAt = nil
+        notifier.cancel()
     }
 
     func resetTimer() {
         timerTask?.cancel()
         timerRunning = false
+        timerEndsAt = nil
         timerSecs = timerMax
+        notifier.cancel()
     }
 
     func syncPending() async {
@@ -609,18 +744,20 @@ final class AppState: ObservableObject {
 
     private func isNewPR(exercise: ActiveExercise, set: WorkoutSet) -> Bool {
         guard let reps = Int(set.reps) else { return false }
-        let weight = (exercise.bodyweight || exercise.timed) ? 0 : (Double(set.weight) ?? 0)
+        let weight = (exercise.bodyweight || exercise.timed) ? 0 : displayWeightToKg(Double(set.weight) ?? 0)
         guard let pr = personalRecords[exercise.name] else { return reps > 0 }
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
     }
 
+    /// Input→storage boundary: typed weight strings are in the display unit;
+    /// convert to canonical KG here, the one place drafts become LoggedSets.
     private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
         guard set.done, let reps = Int(set.reps), reps > 0 else { return nil }
         if exercise.bodyweight || exercise.timed {
             return LoggedSet(weight: nil, reps: reps)
         }
         guard let weight = Double(set.weight), weight >= 0 else { return nil }
-        return LoggedSet(weight: weight, reps: reps)
+        return LoggedSet(weight: displayWeightToKg(weight), reps: reps)
     }
 
     private func validationMessage(for exercise: ActiveExercise) -> String {
@@ -650,7 +787,10 @@ final class AppState: ObservableObject {
             sessions: sessions,
             personalRecords: Array(personalRecords.values),
             waterByDay: waterByDay,
-            draft: clearDraft ? nil : (draft ?? currentDraft)
+            draft: clearDraft ? nil : (draft ?? currentDraft),
+            unitPreference: unitPreference,
+            hasOnboarded: hasOnboarded,
+            timerPreset: timerMax
         )
         let previous = saveTask
         saveTask = Task { [localStore] in
@@ -738,6 +878,7 @@ extension AppState {
         // Clear any stale draft the local store may have restored, so every
         // non-active screen (Workouts / History / Stats) starts clean.
         resetActiveWorkout()
+        showingOnboarding = false
 
         // A cloud-signed-in athlete reads better than "Local Athlete" for marketing.
         user = UserProfile(id: "demo", email: "alex@ironlog.app", fullName: "Alex Carter")

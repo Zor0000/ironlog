@@ -62,7 +62,8 @@ extension AppState {
         if !exercise.bodyweight, !exercise.timed,
            state.exercises[exerciseIndex].sets[setIndex].weight.isEmpty,
            let pr = personalRecords[exercise.name], pr.weight > 0 {
-            state.exercises[exerciseIndex].sets[setIndex].weight = LiveWorkoutReducer.formatWeight(pr.weight)
+            // PR is stored in kg; the stepper string lives in the display unit.
+            state.exercises[exerciseIndex].sets[setIndex].weight = formatWeightValue(pr.weight)
         }
     }
 
@@ -72,7 +73,7 @@ extension AppState {
         if clearedDraft || !hasActiveWorkout {
             LiveWorkoutEngine.shared.end()
         } else {
-            LiveWorkoutEngine.shared.sync(buildLiveState())
+            LiveWorkoutEngine.shared.sync(buildLiveState(), weightUnit: unitPreference.fieldLabel)
         }
     }
 
@@ -109,11 +110,12 @@ extension AppState {
             }
         }
 
-        // Resume the in-app rest countdown from where the lock screen left it.
+        // Resume the in-app rest countdown from where the lock screen left it —
+        // an absolute end date, so a lock-screen-restarted rest replaces any
+        // stale in-app countdown (and its notification) exactly.
         if let endsAt = live.restEndsAt, endsAt > Date() {
             timerMax = live.restSeconds
-            timerSecs = max(0, Int(endsAt.timeIntervalSinceNow.rounded()))
-            if !timerRunning { startTimer() }
+            resumeTimer(until: endsAt)
         }
 
         // Persist so lock-screen navigation (Next/Prev) and set edits both survive,
