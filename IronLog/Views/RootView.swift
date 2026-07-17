@@ -6,7 +6,10 @@ struct RootView: View {
     var body: some View {
         ZStack {
             NativeBackground()
-            if app.showingAuth {
+            if app.showingOnboarding {
+                OnboardingView()
+                    .transition(.opacity.combined(with: .scale(scale: 0.985)))
+            } else if app.showingAuth {
                 AuthView()
                     .transition(.opacity.combined(with: .scale(scale: 0.985)))
             } else {
@@ -34,6 +37,99 @@ struct RootView: View {
         .sensoryFeedback(.success, trigger: app.toast)
         .animation(AppMotion.smooth, value: app.toast)
         .animation(AppMotion.screen, value: app.showingAuth)
+        .animation(AppMotion.screen, value: app.showingOnboarding)
+    }
+}
+
+/// First-run intro: three swipeable cards ending in the cloud-vs-local choice.
+/// Shown once (gated on `hasOnboarded` in the snapshot), always skippable.
+struct OnboardingView: View {
+    @EnvironmentObject private var app: AppState
+    @State private var page = 0
+
+    private let cards: [(icon: String, title: String, text: String)] = [
+        ("dumbbell.fill", "Log sets in seconds",
+         "Pick a split, tap through your exercises, check off sets as you lift. No clutter, no subscription."),
+        ("timer", "Rest runs itself",
+         "Finishing a set starts your rest timer. Log the next set right from the Lock Screen — and get pinged when rest is over."),
+        ("chart.line.uptrend.xyaxis", "Watch the bar go up",
+         "PRs are detected automatically and every exercise gets a progress graph. Your data stays yours."),
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button("Skip") {
+                    NativeFeedback.selection()
+                    app.finishOnboarding(createAccount: false)
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.muted2)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .accessibilityIdentifier("onboarding-skip-button")
+            }
+
+            TabView(selection: $page) {
+                ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
+                    VStack(spacing: 18) {
+                        Image(systemName: card.icon)
+                            .font(.system(size: 56))
+                            .foregroundStyle(Theme.accent)
+                        Text(card.title)
+                            .font(.system(size: 30, weight: .black))
+                            .fontWidth(.condensed)
+                        Text(card.text)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.muted2)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+
+            VStack(spacing: 9) {
+                if page < cards.count - 1 {
+                    Button {
+                        NativeFeedback.light()
+                        withAnimation(AppMotion.smooth) { page += 1 }
+                    } label: {
+                        Label("Next", systemImage: "arrow.right")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                } else {
+                    Button {
+                        NativeFeedback.light()
+                        app.finishOnboarding(createAccount: true)
+                    } label: {
+                        Label("Create Account — Sync Everywhere", systemImage: "icloud")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    Button {
+                        NativeFeedback.selection()
+                        app.finishOnboarding(createAccount: false)
+                    } label: {
+                        Text("Continue locally — no account needed")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .foregroundStyle(Theme.text)
+                            .background(Theme.surface2)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                    .accessibilityIdentifier("onboarding-continue-locally-button")
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 26)
+            .animation(AppMotion.quick, value: page)
+        }
     }
 }
 
@@ -134,6 +230,7 @@ struct AuthView: View {
 struct AppShellView: View {
     @EnvironmentObject private var app: AppState
     @Namespace private var tabSelection
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -186,15 +283,22 @@ struct AppShellView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.muted2)
             }
-            Button(app.user?.isLocal == true ? "Sync" : "Sign out") {
+            Button {
                 NativeFeedback.selection()
-                app.user?.isLocal == true ? app.showAuth() : app.signOut()
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.muted2)
+                    .frame(width: 32, height: 32)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
             }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Theme.muted2)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
+            .buttonStyle(TactileButtonStyle())
+            .accessibilityLabel("Settings")
+            .accessibilityIdentifier("settings-button")
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)

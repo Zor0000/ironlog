@@ -376,7 +376,7 @@ struct ExerciseSuggestionCard: View {
         var parts = ["\(exercise.sets) sets x \(exercise.reps) \(exercise.timed ? "sec" : "reps")"]
         if exercise.bodyweight || exercise.timed { parts.append(exercise.timed ? "Timed" : "Bodyweight") }
         if let record {
-            parts.append(record.weight > 0 ? "Best: \(clean(record.weight))kg x \(record.reps)" : "Best: BW x \(record.reps)")
+            parts.append(record.weight > 0 ? "Best: \(formatWeight(record.weight)) x \(record.reps)" : "Best: BW x \(record.reps)")
         }
         return parts.joined(separator: " · ")
     }

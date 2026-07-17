@@ -1,7 +1,9 @@
 import SwiftUI
+import Charts
 
 struct StatsView: View {
     @EnvironmentObject private var app: AppState
+    @State private var chartExercise: String?
 
     var body: some View {
         ScrollView {
@@ -14,15 +16,17 @@ struct StatsView: View {
                         .entrance(1)
                     StatCard(value: "\(app.stats.sets)", label: "Total Sets")
                         .entrance(2)
-                    StatCard(value: volumeText, label: "Volume (kg)")
+                    StatCard(value: volumeText, label: "Volume (\(currentWeightUnit.label))")
                         .entrance(3)
                 }
-                weekCard
+                progressCard
                     .entrance(4)
-                waterCard
+                weekCard
                     .entrance(5)
-                recordsCard
+                waterCard
                     .entrance(6)
+                recordsCard
+                    .entrance(7)
             }
             .padding(18)
         }
@@ -33,7 +37,108 @@ struct StatsView: View {
     }
 
     private var volumeText: String {
-        app.stats.volume >= 1000 ? String(format: "%.1fk", app.stats.volume / 1000) : "\(Int(app.stats.volume.rounded()))"
+        let volume = displayWeight(app.stats.volume)
+        return volume >= 1000 ? String(format: "%.1fk", volume / 1000) : "\(Int(volume.rounded()))"
+    }
+
+    // MARK: Per-exercise progress chart
+    // Plots top-set weight (not est. 1RM): it's what the user actually lifted,
+    // needs no formula caveats, and matches the numbers they see in History.
+
+    private var progressCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Progress")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                Spacer()
+                if !chartableExercises.isEmpty {
+                    Menu {
+                        ForEach(chartableExercises, id: \.self) { name in
+                            Button(name) {
+                                NativeFeedback.selection()
+                                chartExercise = name
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(selectedExercise ?? "")
+                                .font(.system(size: 12, weight: .semibold))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundStyle(Theme.text)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Theme.surface2)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Theme.border))
+                    }
+                    .accessibilityLabel("Choose exercise")
+                }
+            }
+
+            let points = chartPoints
+            if points.count >= 2 {
+                Chart(points, id: \.date) { point in
+                    LineMark(x: .value("Date", point.date), y: .value("Top set", point.weight))
+                        .foregroundStyle(Theme.accent)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    PointMark(x: .value("Date", point.date), y: .value("Top set", point.weight))
+                        .foregroundStyle(Theme.accent)
+                }
+                .chartYAxisLabel("Top set (\(currentWeightUnit.label))", alignment: .trailing)
+                .chartYScale(domain: .automatic(includesZero: false))
+                .frame(height: 180)
+            } else {
+                Text(points.count == 1
+                     ? "One session logged — one more and the trend line appears."
+                     : "Log weighted sets to see progress over time.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.muted2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+            }
+        }
+        .cardStyle()
+    }
+
+    /// Exercises that have at least one weighted set in history, most recent first.
+    private var chartableExercises: [String] {
+        var seen = Set<String>()
+        var names: [String] = []
+        for session in app.sessions {
+            for exercise in session.exercises where exercise.sets.contains(where: { ($0.weight ?? 0) > 0 }) {
+                if seen.insert(exercise.name).inserted {
+                    names.append(exercise.name)
+                }
+            }
+        }
+        return names
+    }
+
+    private var selectedExercise: String? {
+        if let chartExercise, chartableExercises.contains(chartExercise) {
+            return chartExercise
+        }
+        return chartableExercises.first
+    }
+
+    /// (date, top-set weight in the display unit) per session, oldest first.
+    private var chartPoints: [(date: Date, weight: Double)] {
+        guard let name = selectedExercise else { return [] }
+        return app.sessions.reversed().compactMap { session in
+            let top = session.exercises
+                .filter { $0.name == name }
+                .flatMap(\.sets)
+                .compactMap(\.weight)
+                .max()
+            guard let top, top > 0 else { return nil }
+            return (session.createdAt, displayWeight(top))
+        }
     }
 
     private var weekCard: some View {
@@ -127,7 +232,7 @@ struct StatsView: View {
                         Text(record.exerciseName)
                             .font(.system(size: 12, weight: .medium))
                         Spacer()
-                        Text(record.weight > 0 ? "\(clean(record.weight))kg x \(record.reps) reps" : "BW x \(record.reps)")
+                        Text(record.weight > 0 ? "\(formatWeight(record.weight)) x \(record.reps) reps" : "BW x \(record.reps)")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                     }

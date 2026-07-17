@@ -109,6 +109,24 @@ final class SupabaseService {
         try await restDelete(path: "/rest/v1/sessions", query: [URLQueryItem(name: "id", value: "eq.\(cloudID)")])
     }
 
+    /// Deletes every row the user owns (App Store account-deletion rule).
+    /// `session_sets` has no user_id column, so those go first via the
+    /// session ids; RLS scopes everything to the signed-in user anyway.
+    func deleteAccount() async throws {
+        guard let user = currentUser else { throw SupabaseError.notAuthenticated }
+        let userFilter = URLQueryItem(name: "user_id", value: "eq.\(user.id)")
+        let sessions: [RemoteSessionInsertResult] = try await restGet(
+            path: "/rest/v1/sessions",
+            query: [URLQueryItem(name: "select", value: "id"), userFilter]
+        )
+        if !sessions.isEmpty {
+            let ids = sessions.map(\.id).joined(separator: ",")
+            try await restDelete(path: "/rest/v1/session_sets", query: [URLQueryItem(name: "session_id", value: "in.(\(ids))")])
+        }
+        try await restDelete(path: "/rest/v1/sessions", query: [userFilter])
+        try await restDelete(path: "/rest/v1/personal_records", query: [userFilter])
+    }
+
     private func insertSession(_ session: WorkoutSession, userID: String) async throws -> RemoteSessionInsertResult {
         let body = RemoteSessionInsert(userID: userID, muscleGroup: session.muscle, splitType: session.split, note: session.note)
         let rows: [RemoteSessionInsertResult] = try await restPost(path: "/rest/v1/sessions", query: [], body: body, prefer: "return=representation")

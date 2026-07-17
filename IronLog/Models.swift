@@ -144,19 +144,56 @@ struct AppSnapshot: Codable {
     var personalRecords: [PersonalRecord] = []
     var waterByDay: [String: Int] = [:]
     var draft: WorkoutDraft?
+    // Optional so snapshots written before these fields existed still decode
+    // (a failed decode falls back to an empty snapshot and wipes history).
+    var unitPreference: WeightUnit?
+    var hasOnboarded: Bool?
+    var timerPreset: Int?
 }
 
 // ─────────────────────────────────────────────────────────────
 //  WEIGHT / PERFORMANCE HELPERS  (shared logic — see CLAUDE design rules)
-//  Weight is stored canonically in KG everywhere. `formatWeight` is the single
-//  chokepoint that turns a KG value into a display string, so a future kg/lb
-//  toggle is a one-function flip. Unit is fixed to kg for now.
+//  Weight is stored canonically in KG everywhere — in sessions, PRs and
+//  Supabase. The user's unit is a display/input concern only:
+//  `formatWeight`/`displayWeight` convert kg → the chosen unit for display,
+//  and `displayWeightToKg` converts typed input back to kg for storage.
 // ─────────────────────────────────────────────────────────────
 
-/// Display string for a KG weight, e.g. "60 kg" / "62.5 kg".
+enum WeightUnit: String, Codable {
+    case kg, lb
+
+    var label: String { self == .kg ? "kg" : "lb" }
+    /// Uppercase form for input-field labels ("KG"/"LB") and the Live Activity.
+    var fieldLabel: String { label.uppercased() }
+}
+
+/// The active display unit. Mirrored from `AppState.unitPreference` (the
+/// persisted source of truth) so `formatWeight` stays a zero-context chokepoint
+/// callable from any view helper.
+var currentWeightUnit: WeightUnit = .kg
+
+private let kgPerLb = 0.45359237
+
+/// A KG value converted to the display unit. Pounds round to the nearest
+/// 0.5 lb — finer than any plate, coarse enough to hide float noise.
+func displayWeight(_ kg: Double, in unit: WeightUnit = currentWeightUnit) -> Double {
+    unit == .kg ? kg : (kg / kgPerLb * 2).rounded() / 2
+}
+
+/// Typed input in the display unit, converted back to canonical KG.
+func displayWeightToKg(_ value: Double, in unit: WeightUnit = currentWeightUnit) -> Double {
+    unit == .kg ? value : value * kgPerLb
+}
+
+/// Number-only display string for a KG weight (for placeholders/inputs).
+func formatWeightValue(_ kg: Double) -> String {
+    clean(displayWeight(kg))
+}
+
+/// Display string for a KG weight, e.g. "60 kg" / "137.5 lb".
 /// Reuses `clean(_:)` so the number matches everywhere it is shown.
 func formatWeight(_ kg: Double) -> String {
-    "\(clean(kg)) kg"
+    "\(formatWeightValue(kg)) \(currentWeightUnit.label)"
 }
 
 extension Date {

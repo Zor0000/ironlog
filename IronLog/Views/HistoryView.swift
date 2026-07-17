@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoryView: View {
     @EnvironmentObject private var app: AppState
     @State private var deleteTarget: WorkoutSession?
+    @State private var editTarget: WorkoutSession?
 
     var body: some View {
         ScrollView {
@@ -34,6 +35,8 @@ struct HistoryView: View {
                 } else {
                     ForEach(Array(app.sessions.enumerated()), id: \.element.id) { index, session in
                         HistoryCard(session: session, deleteTarget: $deleteTarget)
+                            .contentShape(Rectangle())
+                            .onTapGesture { editTarget = session }
                             .entrance(index)
                     }
                 }
@@ -53,6 +56,9 @@ struct HistoryView: View {
                     Task { await app.deleteSession(deleteTarget.id) }
                 }
             }
+        }
+        .sheet(item: $editTarget) { session in
+            EditSessionSheet(session: session)
         }
     }
 
@@ -157,8 +163,165 @@ struct HistoryCard: View {
 
     private func setLabel(_ set: LoggedSet) -> String {
         if let weight = set.weight, weight > 0 {
-            return "\(clean(weight))kg x \(set.reps)"
+            return "\(formatWeight(weight)) x \(set.reps)"
         }
         return "BW x \(set.reps)"
+    }
+}
+
+/// Edit a saved session: weight/reps per set, add/remove sets, note. Edits in
+/// the same String-field model the live log uses (weights in the display
+/// unit); saving routes through `AppState.updateSession`, which re-validates,
+/// converts back to kg, recomputes PRs and re-enters the pending-sync queue.
+struct EditSessionSheet: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    private let sessionID: WorkoutSession.ID
+    private let title: String
+    @State private var exercises: [ActiveExercise]
+    @State private var note: String
+
+    init(session: WorkoutSession) {
+        sessionID = session.id
+        title = session.createdAt.displayDay
+        _exercises = State(initialValue: session.exercises.map { exercise in
+            ActiveExercise(
+                name: exercise.name,
+                bodyweight: exercise.bodyweight,
+                timed: exercise.timed,
+                sets: exercise.sets.map { set in
+                    WorkoutSet(
+                        weight: set.weight.map { formatWeightValue($0) } ?? "",
+                        reps: String(set.reps),
+                        done: true
+                    )
+                }
+            )
+        })
+        _note = State(initialValue: session.note ?? "")
+    }
+
+    var body: some View {
+        ZStack {
+            NativeBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top) {
+                        TitleBlock(title: "Edit Session", subtitle: title)
+                        Spacer()
+                        Button {
+                            NativeFeedback.selection()
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .frame(width: 30, height: 30)
+                                .foregroundStyle(Theme.muted2)
+                                .background(Theme.surface2)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Theme.border))
+                        }
+                        .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Close editor")
+                    }
+
+                    ForEach($exercises) { $exercise in
+                        exerciseCard($exercise)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Session Note")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.5)
+                            .textCase(.uppercase)
+                            .foregroundStyle(Theme.muted)
+                        TextEditor(text: $note)
+                            .frame(minHeight: 72)
+                            .scrollContentBackground(.hidden)
+                            .padding(8)
+                            .background(Theme.surface2)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
+                    }
+                    .cardStyle()
+
+                    Button {
+                        NativeFeedback.success()
+                        Task {
+                            await app.updateSession(id: sessionID, exercises: exercises, note: note)
+                            dismiss()
+                        }
+                    } label: {
+                        Label("Save Changes", systemImage: "checkmark")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .accessibilityIdentifier("save-session-edits-button")
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .foregroundStyle(Theme.text)
+    }
+
+    private func exerciseCard(_ exercise: Binding<ActiveExercise>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(exercise.wrappedValue.name)
+                    .font(.system(size: 13, weight: .semibold))
+                if exercise.wrappedValue.bodyweight { SmallBadge("Bodyweight") }
+                if exercise.wrappedValue.timed { SmallBadge("Timed") }
+                Spacer()
+            }
+            ForEach(Array(exercise.wrappedValue.sets.enumerated()), id: \.element.id) { index, set in
+                HStack(alignment: .bottom, spacing: 8) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 20, height: 34, alignment: .bottom)
+                    if !exercise.wrappedValue.bodyweight && !exercise.wrappedValue.timed {
+                        SmallInput(label: currentWeightUnit.fieldLabel, value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
+                            exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
+                        }
+                    }
+                    SmallInput(label: exercise.wrappedValue.timed ? "SECS" : "REPS", value: set.reps, identifier: "edit-reps-input") { value in
+                        exercise.wrappedValue.sets[index].reps = value.filter(\.isNumber)
+                    }
+                    Button {
+                        NativeFeedback.selection()
+                        withAnimation(AppMotion.quick) {
+                            exercise.wrappedValue.sets.remove(at: index)
+                            // Removing the last set removes the exercise.
+                            if exercise.wrappedValue.sets.isEmpty {
+                                exercises.removeAll { $0.id == exercise.wrappedValue.id }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 30, height: 34)
+                            .foregroundStyle(Theme.muted2)
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                    .accessibilityLabel("Remove set")
+                }
+            }
+            Button {
+                NativeFeedback.light()
+                withAnimation(AppMotion.quick) {
+                    // New sets start done — everything in a saved session is logged.
+                    exercise.wrappedValue.sets.append(WorkoutSet(done: true))
+                }
+            } label: {
+                Label("Add Set", systemImage: "plus")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .foregroundStyle(Theme.muted2)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [5])))
+            }
+            .buttonStyle(TactileButtonStyle())
+        }
+        .cardStyle()
     }
 }

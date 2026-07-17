@@ -1,5 +1,36 @@
 import Foundation
 import ActivityKit
+import UserNotifications
+
+/// Schedules the "rest over" local notification — the background safety net
+/// for the in-app countdown (the Live Activity counts down visually but never
+/// alerts). One fixed identifier, so rescheduling replaces instead of stacking
+/// and the app + lock-screen paths can never double-fire.
+/// A class so tests can subclass a spy; stateless otherwise.
+class RestTimerNotifier {
+    static let id = "ironlog.restTimer"
+
+    func schedule(at endsAt: Date) {
+        let center = UNUserNotificationCenter.current()
+        // Lazy permission: the first schedule triggers the system prompt;
+        // once decided, this resolves immediately on every later call.
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let remaining = endsAt.timeIntervalSinceNow
+            guard remaining > 1 else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Rest over"
+            content.body = "Time for your next set."
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: remaining, repeats: false)
+            center.add(UNNotificationRequest(identifier: Self.id, content: content, trigger: trigger))
+        }
+    }
+
+    func cancel() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.id])
+    }
+}
 
 /// Owns the IronLog Live Activity and the shared snapshot that backs it.
 ///
@@ -120,6 +151,16 @@ final class LiveWorkoutEngine {
         guard let state = currentState else { return }
         let next = transform(state)
         persist(next)
+        // Lock-screen taps restart or clear the rest period while the app is
+        // suspended; keep the "rest over" notification in step. (In-app set
+        // logging schedules through AppState — same identifier, so no stacking.)
+        if next.restEndsAt != state.restEndsAt {
+            if let endsAt = next.restEndsAt, endsAt > Date() {
+                RestTimerNotifier().schedule(at: endsAt)
+            } else {
+                RestTimerNotifier().cancel()
+            }
+        }
         guard let activity else { return }
         await activity.update(content(for: next))
         lastPushed = next

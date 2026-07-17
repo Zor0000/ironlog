@@ -268,4 +268,153 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(reference?.sets.first?.weight, 65)
         XCTAssertNil(app.lastPerformance(exerciseName: "Deadlift"))
     }
+
+    // MARK: - Units (kg / lb)
+
+    func testWeightUnitConversionRoundTripsWithinEpsilon() {
+        currentWeightUnit = .lb
+        defer { currentWeightUnit = .kg }
+
+        let kg = 100.0
+        let lb = displayWeight(kg)             // 220.5 (nearest 0.5 lb)
+        XCTAssertEqual(lb, 220.5)
+        XCTAssertEqual(displayWeightToKg(lb), kg, accuracy: 0.05)
+        XCTAssertEqual(formatWeight(kg), "220.5 lb")
+    }
+
+    func testTypedPoundsAreStoredAsKg() async {
+        let app = AppState()
+        app.setUnitPreference(.lb)
+        defer { app.setUnitPreference(.kg) }
+
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "225", reps: "5")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        // 225 lb → 102.06 kg canonical storage.
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].weight ?? 0, 102.06, accuracy: 0.05)
+    }
+
+    func testSwitchingUnitsConvertsInFlightDraftWeights() {
+        let app = AppState()
+        app.setUnitPreference(.kg)
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Squat")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100")
+
+        app.setUnitPreference(.lb)
+        defer { app.setUnitPreference(.kg) }
+
+        XCTAssertEqual(Double(app.todayExercises[0].sets[0].weight) ?? 0, 220.5, accuracy: 0.01)
+    }
+
+    func testOldSnapshotWithoutNewFieldsStillDecodes() throws {
+        let json = #"{"sessions":[],"personalRecords":[],"waterByDay":{}}"#
+        let snapshot = try JSONDecoder().decode(AppSnapshot.self, from: Data(json.utf8))
+        XCTAssertNil(snapshot.unitPreference)
+        XCTAssertNil(snapshot.hasOnboarded)
+        XCTAssertNil(snapshot.timerPreset)
+    }
+
+    // MARK: - Account deletion
+
+    func testDeleteAccountWipesLocalStateAndReturnsToAuthChoice() async {
+        let app = AppState()
+        app.continueLocally()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "60", reps: "8")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "keep?")
+        XCTAssertEqual(app.sessions.count, 1)
+        XCTAssertFalse(app.personalRecords.isEmpty)
+
+        let deleted = await app.deleteAccount()
+
+        XCTAssertTrue(deleted)
+        XCTAssertTrue(app.sessions.isEmpty)
+        XCTAssertTrue(app.personalRecords.isEmpty)
+        XCTAssertTrue(app.waterByDay.isEmpty)
+        XCTAssertFalse(app.hasActiveWorkout)
+        XCTAssertTrue(app.showingAuth)
+    }
+
+    // MARK: - Rest notification
+
+    final class SpyNotifier: RestTimerNotifier {
+        var scheduledAt: Date?
+        override func schedule(at endsAt: Date) { scheduledAt = endsAt }
+        override func cancel() { scheduledAt = nil }
+    }
+
+    func testTimerStartSchedulesRestNotificationAndResetCancelsIt() {
+        let app = AppState()
+        let spy = SpyNotifier()
+        app.notifier = spy
+        app.setTimerPreset(120)
+
+        app.startTimer()
+        XCTAssertNotNil(spy.scheduledAt)
+        XCTAssertEqual(
+            spy.scheduledAt!.timeIntervalSinceNow, 120, accuracy: 2,
+            "notification should fire when the rest period ends"
+        )
+
+        app.resetTimer()
+        XCTAssertNil(spy.scheduledAt)
+        XCTAssertFalse(app.timerRunning)
+    }
+
+    // MARK: - Edit past session
+
+    func testEditingSessionUpdatesVolumeAndPRAndReentersSyncQueue() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Squat")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100", reps: "5")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+        XCTAssertEqual(app.stats.volume, 500)
+        XCTAssertEqual(app.personalRecords["Squat"]?.weight, 100)
+
+        let edited = [ActiveExercise(name: "Squat", bodyweight: false, timed: false,
+                                     sets: [WorkoutSet(weight: "110", reps: "5", done: true)])]
+        await app.updateSession(id: app.sessions[0].id, exercises: edited, note: "corrected")
+
+        XCTAssertEqual(app.stats.volume, 550)
+        XCTAssertEqual(app.personalRecords["Squat"]?.weight, 110)
+        XCTAssertEqual(app.sessions[0].note, "corrected")
+        XCTAssertNotEqual(app.sessions[0].syncState, .synced)
+    }
+
+    // MARK: - Onboarding
+
+    func testFinishOnboardingHidesIntroAndRoutesTheChoice() {
+        let app = AppState()
+        app.showingOnboarding = true
+        app.finishOnboarding(createAccount: false)
+        XCTAssertFalse(app.showingOnboarding)
+        XCTAssertEqual(app.user?.isLocal, true)
+
+        let app2 = AppState()
+        app2.showingOnboarding = true
+        app2.finishOnboarding(createAccount: true)
+        XCTAssertFalse(app2.showingOnboarding)
+        XCTAssertTrue(app2.showingAuth)
+    }
+
 }

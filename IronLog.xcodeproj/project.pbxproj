@@ -19,6 +19,7 @@
 		68389DABBF5C51C093D30A71 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BC36223073AEFE8DA47054 /* Theme.swift */; };
 		89AD41ECC9F5BCC5598FDC3B /* ExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */; };
 		99A3889906271127485BDEF4 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */; };
+		99A3889906271127485BDE01 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8CE2AF611F38E9FC8BED501 /* SettingsView.swift */; };
 		AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32F525BCBC44EAA20594F626 /* IronLogApp.swift */; };
 		BFAC9AD4ADD2C0450067503A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F11C8514ADE4D2439119EAE /* AppState.swift */; };
 		C74A51E43D9CFC111A2F057B /* workouts.json in Resources */ = {isa = PBXBuildFile; fileRef = 291F4F340219B29BC3D35562 /* workouts.json */; };
@@ -111,6 +112,7 @@
 		DC4D54847F3760FF9E68C832 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
 		E4C4FD635EC34C0285006A34 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		E8CE2AF611F38E9FC8BED501 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		ECDB41C749882B25E25C00AA /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		F0F95D0163F544A5A4F756C8 /* ConfirmActionModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmActionModal.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -173,6 +175,7 @@
 				E4C4FD635EC34C0285006A34 /* HistoryView.swift */,
 				47BD2BA9DE192DFF44B03330 /* LogView.swift */,
 				B15884452B261DC7C80276FD /* RootView.swift */,
+				E8CE2AF611F38E9FC8BED501 /* SettingsView.swift */,
 				E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */,
 				C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */,
 			);
@@ -383,6 +386,7 @@
 				AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */,
 				291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */,
 				155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */,
+				99A3889906271127485BDE01 /* SettingsView.swift in Sources */,
 				4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */,
 				3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */,
 				99A3889906271127485BDEF4 /* StatsView.swift in Sources */,
