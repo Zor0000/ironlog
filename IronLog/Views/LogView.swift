@@ -7,6 +7,7 @@ struct LogView: View {
     @State private var catalogFilter: String?
     @State private var didPrimeCatalogFilter = false
     @State private var showDiscardConfirmation = false
+    @State private var pendingDelete: ActiveExercise?
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -26,6 +27,25 @@ struct LogView: View {
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
         .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
+        .overlay {
+            if let pendingDelete {
+                ConfirmActionModal(
+                    title: "Remove exercise?",
+                    message: "\(pendingDelete.name) and its logged sets will be removed from this workout.",
+                    confirmTitle: "Remove Exercise",
+                    cancelTitle: "Keep It",
+                    systemImage: "trash"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        app.removeExercise(pendingDelete.id)
+                        self.pendingDelete = nil
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) { self.pendingDelete = nil }
+                }
+            }
+        }
+        .animation(AppMotion.quick, value: pendingDelete)
     }
 
     private var emptyState: some View {
@@ -58,7 +78,7 @@ struct LogView: View {
             progressCard
 
             ForEach(Array(app.todayExercises.enumerated()), id: \.element.id) { index, exercise in
-                LogExerciseCard(exercise: exercise)
+                LogExerciseCard(exercise: exercise, onConfirmDelete: { pendingDelete = exercise })
                     .entrance(index)
             }
 
@@ -532,6 +552,8 @@ struct TimerCard: View {
 struct LogExerciseCard: View {
     @EnvironmentObject private var app: AppState
     let exercise: ActiveExercise
+    /// Called instead of deleting outright when the exercise already has logged work.
+    var onConfirmDelete: () -> Void = {}
 
     var body: some View {
         // Previous-set reference for this exercise (most recent prior session).
@@ -573,17 +595,19 @@ struct LogExerciseCard: View {
 
                 Button {
                     NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) {
-                        app.removeExercise(exercise.id)
+                    if exercise.hasLoggedData {
+                        onConfirmDelete()
+                    } else {
+                        withAnimation(AppMotion.quick) {
+                            app.removeExercise(exercise.id)
+                        }
                     }
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 34, height: 34)
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.muted2)
-                        .background(Theme.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.border))
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Remove \(exercise.name)")

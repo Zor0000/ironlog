@@ -88,6 +88,12 @@ struct ActiveExercise: Identifiable, Codable, Hashable {
     var custom: Bool = false
     var expanded: Bool = true
     var sets: [WorkoutSet]
+
+    /// True once any set has been checked off or has a typed weight/reps — i.e. deleting would
+    /// throw away logged work, so it's worth a confirmation.
+    var hasLoggedData: Bool {
+        sets.contains { $0.done || !$0.reps.isEmpty || !$0.weight.isEmpty }
+    }
 }
 
 struct WorkoutDraft: Codable, Equatable {

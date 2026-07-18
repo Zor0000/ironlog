@@ -320,6 +320,8 @@ final class AppState: ObservableObject {
                 name: template.name,
                 bodyweight: template.bodyweight,
                 timed: template.timed,
+                // Split starts collapsed so the list isn't overwhelming — user opens each exercise as they reach it.
+                expanded: false,
                 sets: (0..<max(template.sets, 1)).map { _ in WorkoutSet() }
             )
         }
