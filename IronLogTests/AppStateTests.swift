@@ -189,6 +189,50 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.selectedTab, .log)
     }
 
+    func testEachSplitRoutesToItsCorrectWizardStep() {
+        // Every split is day-based except Full Body (whole body in one session);
+        // none reach the muscle-grid step anymore.
+        let cases: [(split: String, step: WorkoutStep)] = [
+            ("Full Body", .workout),
+            ("PPL", .day),
+            ("Upper/Lower", .day),
+            ("Single Muscle", .day)    // one muscle per named day
+        ]
+        for c in cases {
+            let app = AppState()
+            app.selectSplit(c.split)
+            XCTAssertEqual(app.workoutStep, c.step, c.split)
+        }
+    }
+
+    func testSingleMuscleDayLoadsOneMuscleSession() {
+        let app = AppState()
+        app.selectSplit("Single Muscle")
+        app.selectDay("Chest")
+
+        XCTAssertEqual(app.workoutStep, .workout)
+        XCTAssertEqual(app.selectedWorkoutMuscleIDs, ["chest"])
+        XCTAssertEqual(app.singleTargetMuscle, "chest")   // history chip / catalog filter
+        XCTAssertFalse(app.activeExerciseTemplates.isEmpty)
+    }
+
+    func testFullBodySkipsMuscleStepAndLoadsWholeBody() {
+        let app = AppState()
+        app.selectSplit("Full Body")
+
+        // No single-muscle step — straight to the multi-muscle workout.
+        XCTAssertEqual(app.workoutStep, .workout)
+        XCTAssertEqual(app.singleTargetMuscle, nil)   // whole body has no single target
+        XCTAssertEqual(app.selectedWorkoutMuscleIDs, ExerciseLibrary.fullBodyMuscleIDs)
+        XCTAssertEqual(app.selectedWorkoutMuscleLabel, "Full Body")
+
+        app.startWorkout()
+
+        let muscles = Set(ExerciseLibrary.fullBodyMuscleIDs.compactMap { app.library.muscle($0) })
+        XCTAssertGreaterThan(muscles.count, 1)
+        XCTAssertFalse(app.todayExercises.isEmpty)
+    }
+
     func testTemplateExerciseCanBeAddedToActiveWorkout() {
         let app = AppState()
         app.selectSplit("Upper/Lower")
@@ -216,7 +260,6 @@ final class AppStateTests: XCTestCase {
                     sets: [WorkoutSet(weight: "120", reps: "5", done: true)]
                 )
             ],
-            muscle: "legs",
             split: "PPL",
             day: "Legs",
             step: .workout,
@@ -229,7 +272,6 @@ final class AppStateTests: XCTestCase {
         let decoded = try JSONDecoder().decode(WorkoutDraft.self, from: data)
 
         XCTAssertEqual(decoded.exercises.count, 1)
-        XCTAssertEqual(decoded.muscle, "legs")
         XCTAssertEqual(decoded.split, "PPL")
         XCTAssertEqual(decoded.day, "Legs")
         XCTAssertEqual(decoded.step, .workout)

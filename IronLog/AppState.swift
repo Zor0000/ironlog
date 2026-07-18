@@ -12,7 +12,6 @@ final class AppState: ObservableObject {
 
     @Published var selectedSplit: String?
     @Published var selectedDay: String?
-    @Published var selectedMuscle: String?
     @Published var workoutStep: WorkoutStep = .split
     @Published var todayExercises: [ActiveExercise] = []
     @Published var showAddExerciseForm = false
@@ -57,10 +56,21 @@ final class AppState: ObservableObject {
     }
 
     var selectedWorkoutMuscleIDs: [String] {
-        library.muscleIDs(split: selectedSplit, day: selectedDay, selectedMuscle: selectedMuscle)
+        library.muscleIDs(split: selectedSplit, day: selectedDay)
+    }
+
+    /// The single muscle a session targets (single-muscle days), else nil for
+    /// whole-body / multi-muscle days. Feeds the history chip and the
+    /// add-exercise catalog filter.
+    var singleTargetMuscle: String? {
+        let ids = selectedWorkoutMuscleIDs
+        return ids.count == 1 ? ids.first : nil
     }
 
     var selectedWorkoutMuscleLabel: String {
+        if selectedDay == nil, selectedSplit == ExerciseLibrary.fullBodySplit {
+            return ExerciseLibrary.fullBodySplit
+        }
         let labels = selectedWorkoutMuscleIDs.compactMap { library.muscle($0)?.label }
         if labels.isEmpty { return selectedSplit ?? "Workout" }
         if labels.count == 1 { return labels[0] }
@@ -68,7 +78,7 @@ final class AppState: ObservableObject {
     }
 
     var activeExerciseTemplates: [ExerciseTemplate] {
-        library.exercises(split: selectedSplit, day: selectedDay, selectedMuscle: selectedMuscle)
+        library.exercises(split: selectedSplit, day: selectedDay)
     }
 
     var completedSetCount: Int {
@@ -142,7 +152,6 @@ final class AppState: ObservableObject {
         showingOnboarding = !hasOnboarded && !suppressOnboarding
         if let draft = snapshot.draft {
             todayExercises = draft.exercises
-            selectedMuscle = draft.muscle
             selectedSplit = draft.split
             selectedDay = draft.day
             workoutStep = draft.step ?? (draft.exercises.isEmpty ? .split : .workout)
@@ -285,18 +294,13 @@ final class AppState: ObservableObject {
     func selectSplit(_ split: String) {
         selectedSplit = split
         selectedDay = nil
-        selectedMuscle = nil
-        workoutStep = library.splitDays[split] == nil ? .muscle : .day
+        // Day-based splits pick a day next; day-less Full Body drops straight into
+        // its whole-body session.
+        workoutStep = library.splitDays[split] != nil ? .day : .workout
     }
 
     func selectDay(_ day: String) {
         selectedDay = day
-        selectedMuscle = nil
-        workoutStep = .workout
-    }
-
-    func selectMuscle(_ muscle: String) {
-        selectedMuscle = muscle
         workoutStep = .workout
     }
 
@@ -332,7 +336,6 @@ final class AppState: ObservableObject {
         }
         selectedSplit = "Free Workout"
         selectedDay = nil
-        selectedMuscle = nil
         workoutStep = .split
         todayExercises = []
         showAddExerciseForm = true
@@ -500,7 +503,7 @@ final class AppState: ObservableObject {
         var session = WorkoutSession(
             userID: user?.id,
             createdAt: Date(),
-            muscle: selectedMuscle,
+            muscle: singleTargetMuscle,
             split: selectedSplit,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note,
             exercises: logged,
@@ -810,7 +813,6 @@ final class AppState: ObservableObject {
         guard hasActiveWorkout else { return nil }
         return WorkoutDraft(
             exercises: todayExercises,
-            muscle: selectedMuscle,
             split: selectedSplit,
             day: selectedDay,
             step: workoutStep,
@@ -825,7 +827,6 @@ final class AppState: ObservableObject {
         showAddExerciseForm = false
         addExerciseWeighted = false
         workoutNote = ""
-        selectedMuscle = nil
         selectedDay = nil
         selectedSplit = nil
         workoutStep = .split
@@ -932,7 +933,7 @@ extension AppState {
                 exercise("Goblet Squat", [(40, 12), (40, 12), (40, 11)]),
                 exercise("Leg Press (Machine)", [(200, 15), (210, 12), (210, 12)]),
             ]),
-            session(8, muscle: "shoulders", split: "Bro Split", note: "Delts on fire.", [
+            session(8, muscle: "shoulders", split: "Single Muscle", note: "Delts on fire.", [
                 exercise("Barbell Overhead Press", [(50, 8), (50, 7), (47.5, 8)]),
                 exercise("Dumbbell Lateral Raise", [(12, 18), (12, 16), (10, 18)]),
                 exercise("Arnold Press", [(20, 12), (20, 11), (20, 10)]),
@@ -946,7 +947,6 @@ extension AppState {
         if defaults.bool(forKey: "seedActive") {
             selectedSplit = "PPL"
             selectedDay = "Push"
-            selectedMuscle = nil
             workoutStep = .workout
             todayExercises = [
                 ActiveExercise(name: "Barbell Bench Press", bodyweight: false, timed: false, sets: [

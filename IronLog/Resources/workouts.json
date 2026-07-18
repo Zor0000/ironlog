@@ -3,7 +3,6 @@
     "Full Body",
     "PPL",
     "Upper/Lower",
-    "Bro Split",
     "Single Muscle"
   ],
   "MUSCLES": [
@@ -87,6 +86,44 @@
         "day": "Lower",
         "muscles": [
           "legs",
+          "core"
+        ]
+      }
+    ],
+    "Single Muscle": [
+      {
+        "day": "Chest",
+        "muscles": [
+          "chest"
+        ]
+      },
+      {
+        "day": "Back",
+        "muscles": [
+          "back"
+        ]
+      },
+      {
+        "day": "Shoulders",
+        "muscles": [
+          "shoulders"
+        ]
+      },
+      {
+        "day": "Legs",
+        "muscles": [
+          "legs"
+        ]
+      },
+      {
+        "day": "Arms",
+        "muscles": [
+          "arms"
+        ]
+      },
+      {
+        "day": "Core",
+        "muscles": [
           "core"
         ]
       }
@@ -696,263 +733,6 @@
         }
       ]
     },
-    "Bro Split": {
-      "chest": [
-        {
-          "name": "Barbell Bench Press",
-          "sets": 4,
-          "reps": "6–10",
-          "tip": "Primary mass builder. Vary grip width (wide hits outer chest, closer hits inner). Own the bench press."
-        },
-        {
-          "name": "Incline Dumbbell Press",
-          "sets": 4,
-          "reps": "10–12",
-          "tip": "Upper chest often lags — prioritize this. 30–45° angle. Dumbbells allow deeper stretch."
-        },
-        {
-          "name": "Decline Barbell Press",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Slight decline (15–30°). Hits the lower chest for full chest development. Often skipped but very effective."
-        },
-        {
-          "name": "Cable Chest Fly",
-          "sets": 3,
-          "reps": "12–15",
-          "tip": "High cables. Squeeze hard at the center. Constant tension throughout the motion. Great isolation."
-        },
-        {
-          "name": "Dumbbell Flat Fly",
-          "sets": 3,
-          "reps": "12–15",
-          "tip": "Deep stretch at the bottom. Go light — form first. Feel the chest open up on every rep."
-        },
-        {
-          "name": "Push-Ups",
-          "sets": 3,
-          "reps": "To failure",
-          "tip": "Burnout finisher after heavy pressing. Elevate feet for upper chest. Elbows at 45°.",
-          "bodyweight": true
-        }
-      ],
-      "back": [
-        {
-          "name": "Deadlift",
-          "sets": 3,
-          "reps": "4–6",
-          "tip": "Heaviest compound. Drive the floor away. Don't jerk the bar. Biggest overall strength builder."
-        },
-        {
-          "name": "Barbell Row",
-          "sets": 4,
-          "reps": "8–10",
-          "tip": "Overhand grip. Pull to navel. Squeeze shoulder blades at top. Heaviest back exercise after deadlift."
-        },
-        {
-          "name": "Lat Pulldown",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Wide grip for width. Feel each lat pull down independently. Don't use momentum."
-        },
-        {
-          "name": "Single-Arm Dumbbell Row",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Heavy. Row elbow past your torso level. Full range of motion. Back flat."
-        },
-        {
-          "name": "Pull-Up / Assisted Pull-Up",
-          "sets": 3,
-          "reps": "8–12",
-          "tip": "Add a weight belt as you get stronger. Ultimate lat exercise. Full hang to chin over bar.",
-          "bodyweight": true
-        },
-        {
-          "name": "Straight-Arm Pulldown",
-          "sets": 3,
-          "reps": "15",
-          "tip": "Arms stay straight. Pull the bar to your thighs. Pure lat isolation. Great mind-muscle connection."
-        },
-        {
-          "name": "Face Pulls",
-          "sets": 3,
-          "reps": "20",
-          "tip": "Never skip these. External rotation and rear delt work. Pull to ears with elbows high and wide."
-        }
-      ],
-      "legs": [
-        {
-          "name": "Barbell Back Squat",
-          "sets": 4,
-          "reps": "6–10",
-          "tip": "King of exercises. Proper form over heavy weight. Knees track toes. Hip crease below parallel."
-        },
-        {
-          "name": "Leg Press (Machine)",
-          "sets": 4,
-          "reps": "12–15",
-          "tip": "High foot placement hits glutes/hamstrings. Low foot placement hits quads. Vary each session."
-        },
-        {
-          "name": "Romanian Deadlift",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Slow, controlled hip hinge. Feel every inch of hamstring stretch. 3-second eccentric."
-        },
-        {
-          "name": "Leg Curl (Machine)",
-          "sets": 3,
-          "reps": "12–15",
-          "tip": "3-second eccentric. Don't let hips lift. Complete hamstring isolation."
-        },
-        {
-          "name": "Leg Extension (Machine)",
-          "sets": 3,
-          "reps": "15–20",
-          "tip": "Pause and squeeze quad at the top every rep. Great isolation finisher after squats."
-        },
-        {
-          "name": "Walking Lunges",
-          "sets": 3,
-          "reps": "12 each",
-          "tip": "Big step. Front shin stays vertical. Glute stretch at bottom. Functional and highly effective.",
-          "bodyweight": true
-        },
-        {
-          "name": "Standing Calf Raises",
-          "sets": 5,
-          "reps": "15–20",
-          "tip": "Calves are stubborn — they need high frequency and FULL ROM. Pause at top, stretch at bottom."
-        }
-      ],
-      "shoulders": [
-        {
-          "name": "Barbell Overhead Press",
-          "sets": 4,
-          "reps": "6–8",
-          "tip": "Strict press, no leg drive. The shoulder strength and size builder. Keep core and glutes tight."
-        },
-        {
-          "name": "Dumbbell Shoulder Press",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Greater range of motion than barbell. Let dumbbells come down beside your ears at the bottom."
-        },
-        {
-          "name": "Lateral Raises",
-          "sets": 4,
-          "reps": "15–20",
-          "tip": "Bro Split gets high lateral delt volume. Cables + dumbbells in same session gives constant tension variety."
-        },
-        {
-          "name": "Rear Delt Fly",
-          "sets": 4,
-          "reps": "15–20",
-          "tip": "Bent-over or on incline bench. High reps. Rear delts severely underworked in most programs."
-        },
-        {
-          "name": "Upright Row",
-          "sets": 3,
-          "reps": "12",
-          "tip": "EZ-bar or cable. Pull to chin level. Elbows flare wide and high. Works traps and lateral delts."
-        },
-        {
-          "name": "Face Pulls",
-          "sets": 3,
-          "reps": "20",
-          "tip": "Always include for shoulder health. External rotation under load keeps rotator cuffs healthy."
-        }
-      ],
-      "arms": [
-        {
-          "name": "Barbell Curl",
-          "sets": 4,
-          "reps": "8–10",
-          "tip": "Heavy and strict. The primary bicep mass builder. Supinate wrist fully at the top."
-        },
-        {
-          "name": "Incline Dumbbell Curl",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Full stretch at the bottom. Supinate at the top. Great for bicep peak development."
-        },
-        {
-          "name": "Hammer Curl",
-          "sets": 3,
-          "reps": "10–12",
-          "tip": "Neutral grip. Brachialis and forearm thickness. Alternate arms, controlled movement."
-        },
-        {
-          "name": "Preacher Curl (EZ Bar)",
-          "sets": 3,
-          "reps": "12",
-          "tip": "Bench enforces strict form. No cheating possible. Full range on the pad for peak isolation."
-        },
-        {
-          "name": "Tricep Pushdown (Cable)",
-          "sets": 4,
-          "reps": "12–15",
-          "tip": "Lock elbows at sides — they don't move. Full extension on every rep. Rope or straight bar."
-        },
-        {
-          "name": "Overhead Tricep Extension",
-          "sets": 3,
-          "reps": "12",
-          "tip": "Long head of tricep. Dumbbell or EZ-bar. Control the eccentric. Best tricep stretch."
-        },
-        {
-          "name": "Tricep Dips",
-          "sets": 3,
-          "reps": "10–15",
-          "tip": "Stay upright to target triceps (lean forward = chest). Can add weight with a dipping belt.",
-          "bodyweight": true
-        }
-      ],
-      "core": [
-        {
-          "name": "Hanging Leg Raise",
-          "sets": 4,
-          "reps": "15–20",
-          "tip": "Dead hang. Posterior pelvic tilt. Raise legs above parallel. Weighted if you can do 20 easily.",
-          "bodyweight": true
-        },
-        {
-          "name": "Cable Crunch",
-          "sets": 3,
-          "reps": "15–20",
-          "tip": "Heavy cable crunch builds ab thickness. Round your back. Ribs to hips every rep."
-        },
-        {
-          "name": "Plank",
-          "sets": 3,
-          "reps": "60",
-          "tip": "Add a weight plate on your back for Bro Split level. Maximum full-body tension.",
-          "timed": true
-        },
-        {
-          "name": "Ab Wheel Rollout",
-          "sets": 3,
-          "reps": "10–15",
-          "tip": "Best overall ab exercise. Works entire core. Control both directions. Advance to standing rollout.",
-          "bodyweight": true
-        },
-        {
-          "name": "Russian Twist",
-          "sets": 3,
-          "reps": "20 total",
-          "tip": "Hold a weight plate or medicine ball. Rotate from torso. Oblique focus.",
-          "bodyweight": true
-        },
-        {
-          "name": "Decline Sit-Up",
-          "sets": 3,
-          "reps": "15–20",
-          "tip": "Full range. Hold a weight plate at chest for progression. Classic ab builder.",
-          "bodyweight": true
-        }
-      ]
-    },
     "Single Muscle": {
       "chest": [
         {
@@ -1100,7 +880,7 @@
           "name": "Lateral Raises",
           "sets": 4,
           "reps": "15–20",
-          "tip": "Bro Split gets high lateral delt volume. Cables + dumbbells in same session gives constant tension variety."
+          "tip": "High lateral delt volume. Cables + dumbbells in same session gives constant tension variety."
         },
         {
           "name": "Rear Delt Fly",
@@ -1184,7 +964,7 @@
           "name": "Plank",
           "sets": 3,
           "reps": "60",
-          "tip": "Add a weight plate on your back for Bro Split level. Maximum full-body tension.",
+          "tip": "Add a weight plate on your back to progress. Maximum core tension.",
           "timed": true
         },
         {

@@ -9,6 +9,11 @@ struct CatalogExercise: Identifiable, Hashable {
 }
 
 struct ExerciseLibrary: Codable {
+    /// Day-less split that trains the whole body in one session, resolving to
+    /// every muscle group at once (every other split is day-based).
+    static let fullBodySplit = "Full Body"
+    static let fullBodyMuscleIDs = ["chest", "back", "legs", "shoulders", "arms", "core"]
+
     var splits: [String]
     var muscles: [Muscle]
     var splitDays: [String: [SplitDay]]
@@ -110,34 +115,25 @@ struct ExerciseLibrary: Codable {
         return muscles.first { $0.id == id }
     }
 
-    func visibleMuscles(split: String?, day: String?) -> [Muscle] {
-        guard let split else { return [] }
-        if let days = splitDays[split], let day {
-            let ids = days.first { $0.day == day }?.muscles ?? []
-            return ids.compactMap { id in muscles.first { $0.id == id } }
-        }
-        let ids = ["chest", "back", "legs", "shoulders", "arms", "core"]
-        return ids.compactMap { id in muscles.first { $0.id == id } }
-    }
-
     func exercises(split: String?, muscle: String?) -> [ExerciseTemplate] {
         guard let split, let muscle else { return [] }
         return workouts[split]?[muscle] ?? []
     }
 
-    func muscleIDs(split: String?, day: String?, selectedMuscle: String?) -> [String] {
+    /// Muscle groups trained by a split's selection. A picked day resolves to its
+    /// muscles; the day-less Full Body resolves to the whole body.
+    func muscleIDs(split: String?, day: String?) -> [String] {
         guard let split else { return [] }
         if let day, let ids = splitDays[split]?.first(where: { $0.day == day })?.muscles {
             return ids
         }
-        if let selectedMuscle {
-            return [selectedMuscle]
+        if split == Self.fullBodySplit {
+            return Self.fullBodyMuscleIDs
         }
         return []
     }
 
-    func exercises(split: String?, day: String?, selectedMuscle: String?) -> [ExerciseTemplate] {
-        let ids = muscleIDs(split: split, day: day, selectedMuscle: selectedMuscle)
-        return ids.flatMap { exercises(split: split, muscle: $0) }
+    func exercises(split: String?, day: String?) -> [ExerciseTemplate] {
+        muscleIDs(split: split, day: day).flatMap { exercises(split: split, muscle: $0) }
     }
 }
