@@ -164,20 +164,23 @@ struct AuthView: View {
                 }
 
                 if mode == .signUp {
-                    TextField("Your name", text: $name)
+                    TextField("", text: $name)
                         .textContentType(.name)
                         .fieldStyle()
+                        .placeholderText("Your name", visible: name.isEmpty)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                TextField("Email address", text: $email)
+                TextField("", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .fieldStyle()
-                SecureField("Password (min 6 chars)", text: $password)
+                    .placeholderText("Email address", visible: email.isEmpty)
+                SecureField("", text: $password)
                     .textContentType(mode == .signIn ? .password : .newPassword)
                     .fieldStyle()
+                    .placeholderText("Password (min 6 chars)", visible: password.isEmpty)
 
                 Button(mode == .signIn ? "Sign In" : "Create Account") {
                     NativeFeedback.light()
@@ -343,5 +346,19 @@ extension View {
             .background(Theme.surface2)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
+    }
+
+    /// Legible placeholder overlay — the system placeholder is nearly invisible on the dark
+    /// surface. Pass "" to the field itself and drive `visible` off its emptiness. Apply after
+    /// `fieldStyle()` so the 13pt inset lines up with the field's text.
+    func placeholderText(_ text: String, visible: Bool) -> some View {
+        overlay(alignment: .leading) {
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.muted2)
+                .padding(.horizontal, 13)
+                .allowsHitTesting(false)
+                .opacity(visible ? 1 : 0)
+        }
     }
 }
