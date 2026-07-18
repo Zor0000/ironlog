@@ -439,7 +439,7 @@ struct LogView: View {
     private func primeCatalogFilter() {
         guard !didPrimeCatalogFilter else { return }
         didPrimeCatalogFilter = true
-        if catalogFilter == nil, let muscle = app.selectedMuscle, app.library.library[muscle] != nil {
+        if catalogFilter == nil, let muscle = app.singleTargetMuscle, app.library.library[muscle] != nil {
             catalogFilter = muscle
         }
     }

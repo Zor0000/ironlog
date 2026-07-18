@@ -17,8 +17,6 @@ struct WorkoutsView: View {
                         splitStep
                     case .day:
                         dayStep
-                    case .muscle:
-                        muscleStep
                     case .workout:
                         workoutStep
                     }
@@ -162,49 +160,6 @@ struct WorkoutsView: View {
         }
     }
 
-    private var muscleStep: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            BackButton(label: app.selectedDay.map { "\($0) · \(app.selectedSplit ?? "")" } ?? (app.selectedSplit ?? "Split")) {
-                NativeFeedback.selection()
-                withAnimation(AppMotion.quick) {
-                    if app.selectedDay != nil {
-                        app.workoutStep = .day
-                        app.selectedDay = nil
-                    } else {
-                        app.workoutStep = .split
-                        app.selectedSplit = nil
-                    }
-                }
-            }
-            TitleBlock(title: "Muscle Group", subtitle: "Select today's focus")
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 9), count: 3), spacing: 9) {
-                ForEach(Array(app.library.visibleMuscles(split: app.selectedSplit, day: app.selectedDay).enumerated()), id: \.element.id) { index, muscle in
-                    Button {
-                        NativeFeedback.selection()
-                        withAnimation(AppMotion.quick) {
-                            app.selectMuscle(muscle.id)
-                        }
-                    } label: {
-                        VStack(spacing: 7) {
-                            Image(systemName: muscle.systemImage)
-                                .font(.system(size: 26, weight: .medium))
-                                .frame(height: 28)
-                            Text(muscle.label)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 76)
-                        .background(Theme.surface2)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
-                    }
-                    .foregroundStyle(Theme.text)
-                    .buttonStyle(TactileButtonStyle())
-                    .entrance(index, offset: 12)
-                }
-            }
-        }
-    }
-
     private var workoutStep: some View {
         let muscles = app.selectedWorkoutMuscleIDs.compactMap { app.library.muscle($0) }
         // Split only — the day already shows in the back button and Start button.
@@ -217,8 +172,8 @@ struct WorkoutsView: View {
                         app.workoutStep = .day
                         app.selectedDay = nil
                     } else {
-                        app.workoutStep = .muscle
-                        app.selectedMuscle = nil
+                        app.workoutStep = .split   // Full Body: back to the split list
+                        app.selectedSplit = nil
                     }
                 }
             }
@@ -244,15 +199,6 @@ struct WorkoutsView: View {
                             .entrance(index)
                     }
                 }
-            }
-
-            if muscles.isEmpty, let muscle = app.library.muscle(app.selectedMuscle) {
-                HStack(spacing: 6) {
-                    Image(systemName: muscle.systemImage)
-                    Text(muscle.label)
-                }
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.muted2)
             }
 
             Button {

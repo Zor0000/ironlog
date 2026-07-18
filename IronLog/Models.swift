@@ -10,7 +10,7 @@ enum AuthMode {
 }
 
 enum WorkoutStep: String, Codable {
-    case split, day, muscle, workout
+    case split, day, workout
 }
 
 struct UserProfile: Codable, Equatable {
@@ -92,7 +92,6 @@ struct ActiveExercise: Identifiable, Codable, Hashable {
 
 struct WorkoutDraft: Codable, Equatable {
     var exercises: [ActiveExercise]
-    var muscle: String?
     var split: String?
     var day: String?
     var step: WorkoutStep?
