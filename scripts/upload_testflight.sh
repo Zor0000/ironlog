@@ -36,7 +36,7 @@ if command -v asc >/dev/null 2>&1 && [[ -n "$APP_ID" ]]; then
       --name ironlog \
       --key-id "$ASC_API_KEY_ID" \
       --issuer-id "$ASC_API_ISSUER_ID" \
-      --private-key-path "$ASC_API_PRIVATE_KEY_PATH"
+      --private-key "$ASC_API_PRIVATE_KEY_PATH"
   fi
 
   asc builds upload \
