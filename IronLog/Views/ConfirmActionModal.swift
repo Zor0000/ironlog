@@ -31,7 +31,7 @@ struct ConfirmActionModal: View {
                         .fontWidth(.condensed)
                         .foregroundStyle(Theme.text)
                     Text(message)
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundStyle(Theme.muted2)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)

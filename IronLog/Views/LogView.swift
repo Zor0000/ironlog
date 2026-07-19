@@ -54,7 +54,7 @@ struct LogView: View {
                 .font(.system(size: 46))
                 .foregroundStyle(Theme.muted)
             Text("No workout started yet.\nGo to Workouts and pick your muscles.")
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Theme.muted2)
             Button {
@@ -86,10 +86,7 @@ struct LogView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Session Note (optional)")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.muted)
+                    .cardLabel()
                 TextEditor(text: Binding(
                     get: { app.workoutNote },
                     set: { app.updateWorkoutNote($0) }
@@ -154,7 +151,7 @@ struct LogView: View {
                     .fontWidth(.condensed)
                     .foregroundStyle(Theme.accent)
                 Text("valid sets ready to save")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundStyle(Theme.muted2)
             }
             Spacer()
@@ -164,7 +161,7 @@ struct LogView: View {
                     .fontWidth(.condensed)
                     .foregroundStyle(Theme.text)
                 Text("exercises")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundStyle(Theme.muted2)
             }
         }
@@ -202,10 +199,7 @@ struct LogView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Add Exercise")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.muted)
+                    .cardLabel()
                 Spacer()
                 Button {
                     NativeFeedback.selection()
@@ -313,17 +307,17 @@ struct LogView: View {
             if results.isEmpty {
                 VStack(spacing: 4) {
                     Text("No matching exercises")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.text)
                     Text("Add it as a custom exercise below.")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
             } else if results.count > catalogResultLimit {
                 Text("+\(results.count - catalogResultLimit) more — keep typing to narrow")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 2)
@@ -345,11 +339,11 @@ struct LogView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(template.name)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.text)
                     if catalogFilter == nil {
                         Text(item.muscle.label)
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Theme.muted2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -359,7 +353,7 @@ struct LogView: View {
                     }
                 }
                 Text(catalogMeta(template))
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.muted2)
             }
             Spacer(minLength: 6)
@@ -379,7 +373,7 @@ struct LogView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Theme.accent)
             Text("Search or tap a muscle group to browse the full exercise library.")
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundStyle(Theme.muted2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -393,7 +387,7 @@ struct LogView: View {
             HStack(spacing: 8) {
                 Rectangle().fill(Theme.border).frame(height: 1)
                 Text("Or add your own")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .tracking(1)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted)
@@ -476,7 +470,7 @@ struct TimerCard: View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Rest Timer")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .tracking(1)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted2)
@@ -570,7 +564,7 @@ struct LogExerciseCard: View {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
                                 Text(exercise.name)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 15, weight: .semibold))
                                 if exercise.bodyweight {
                                     SmallBadge("Bodyweight")
                                 }
@@ -579,7 +573,7 @@ struct LogExerciseCard: View {
                                 }
                             }
                             Text("\(exercise.sets.filter(\.done).count)/\(exercise.sets.count) \(exercise.sets.count == 1 ? "set" : "sets") done")
-                                .font(.system(size: 11))
+                                .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted2)
                         }
                         Spacer()
@@ -705,7 +699,7 @@ struct LogExerciseCard: View {
 
             if let refText = referenceLabel(refSet) {
                 Text(refText)
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(Theme.muted)
                     .padding(.leading, 28)
                     .accessibilityIdentifier("set-reference")
@@ -735,7 +729,7 @@ struct SmallInput: View {
             // Empty label = no header row; callers show it on the first set only.
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(Theme.muted2)
             }
             TextField(placeholder, text: Binding(get: { value }, set: onChange))
@@ -761,7 +755,7 @@ struct SmallBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 9, weight: .semibold))
+            .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(Theme.blue)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)

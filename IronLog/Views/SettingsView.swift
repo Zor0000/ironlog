@@ -81,9 +81,9 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(isCloudUser ? (app.user?.email ?? "") : "Local — saved on this iPhone")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                     Text(app.syncMessage)
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
             }
@@ -125,7 +125,7 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             Text("Weights are stored in kg and converted for display, so switching is always safe.")
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.muted2)
         }
         .cardStyle()
@@ -162,7 +162,7 @@ struct SettingsView: View {
                     .fill(notificationStatus == .denied ? Theme.danger : Theme.success)
                     .frame(width: 8, height: 8)
                 Text(notificationStatusText)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundStyle(Theme.muted2)
             }
             if notificationStatus == .denied {
@@ -191,10 +191,10 @@ struct SettingsView: View {
             sectionLabel("About")
             HStack {
                 Text("Version")
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                 Spacer()
                 Text(appVersion)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.muted2)
             }
             Link(destination: URL(string: "https://zor0000.github.io/ironlog/privacy.html")!) {
@@ -214,7 +214,7 @@ struct SettingsView: View {
     private func aboutRow(_ title: String, systemImage: String) -> some View {
         HStack {
             Label(title, systemImage: systemImage)
-                .font(.system(size: 13))
+                .font(.system(size: 14))
             Spacer()
             Image(systemName: "arrow.up.right")
                 .font(.system(size: 11, weight: .semibold))
@@ -226,11 +226,7 @@ struct SettingsView: View {
     // MARK: Shared bits
 
     private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(1.5)
-            .textCase(.uppercase)
-            .foregroundStyle(Theme.muted)
+        Text(text).cardLabel()
     }
 
     private func settingsButton(_ title: String, systemImage: String, tint: Color = Theme.text, action: @escaping () -> Void) -> some View {
