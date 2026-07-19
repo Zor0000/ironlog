@@ -34,6 +34,8 @@ jobs:
           swift --version
 
       - name: Install asc CLI
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
         run: brew install asc
 
       - name: Prepare App Store Connect authentication
