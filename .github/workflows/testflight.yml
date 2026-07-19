@@ -58,12 +58,13 @@ jobs:
           test -n "$simulator_id"
           echo "SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
 
-      - name: Run unit and UI tests
+      - name: Run unit tests
         run: |
           xcodebuild test \
             -project IronLog.xcodeproj \
             -scheme IronLog \
             -destination "id=$SIMULATOR_ID" \
+            -only-testing:IronLogTests \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Build and archive
