@@ -22,6 +22,7 @@ jobs:
       ASC_APP_ID: "6771258872"
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      DEVELOPMENT_TEAM: "75LRT8TRQY"
 
     steps:
       - name: Check out main

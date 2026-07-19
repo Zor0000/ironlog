@@ -13,6 +13,9 @@ build_settings=()
 if [[ -n "$BUILD_NUMBER" ]]; then
   build_settings+=("CURRENT_PROJECT_VERSION=$BUILD_NUMBER")
 fi
+if [[ -n "${DEVELOPMENT_TEAM:-}" ]]; then
+  build_settings+=("DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM")
+fi
 
 authentication_args=()
 if [[ -n "${ASC_API_PRIVATE_KEY_PATH:-}" || -n "${ASC_API_KEY_ID:-}" || -n "${ASC_API_ISSUER_ID:-}" ]]; then
