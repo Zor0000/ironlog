@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build-and-upload:
     name: Build and upload to TestFlight
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       ASC_APP_ID: "6771258872"
