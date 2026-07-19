@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IPA_PATH="${IPA_PATH:-$ROOT_DIR/build/export/IronLog.ipa}"
 APP_ID="${ASC_APP_ID:-}"
+TESTFLIGHT_GROUP_ID="${TESTFLIGHT_GROUP_ID:-}"
 
 if [[ ! -f "$IPA_PATH" ]]; then
   echo "Missing IPA at $IPA_PATH"
@@ -46,6 +47,15 @@ if command -v asc >/dev/null 2>&1 && [[ -n "$APP_ID" ]]; then
     --build-number "$build_number" \
     --platform IOS \
     --wait
+
+  if [[ -n "$TESTFLIGHT_GROUP_ID" ]]; then
+    asc builds add-groups \
+      --app "$APP_ID" \
+      --build-number "$build_number" \
+      --version "$version" \
+      --platform IOS \
+      --group "$TESTFLIGHT_GROUP_ID"
+  fi
 elif [[ -n "${ASC_API_KEY_ID:-}" && -n "${ASC_API_ISSUER_ID:-}" ]]; then
   xcrun altool --upload-package "$IPA_PATH" \
     --api-key "$ASC_API_KEY_ID" \

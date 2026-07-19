@@ -22,6 +22,7 @@ jobs:
       ASC_APP_ID: "6771258872"
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      TESTFLIGHT_GROUP_ID: "6497c060-a90c-4255-ace4-7ce105aff763"
       DEVELOPMENT_TEAM: "75LRT8TRQY"
 
     steps:
