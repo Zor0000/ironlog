@@ -50,10 +50,7 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Progress")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.muted)
+                    .cardLabel()
                 Spacer()
                 if !chartableExercises.isEmpty {
                     Menu {
@@ -98,7 +95,7 @@ struct StatsView: View {
                 Text(points.count == 1
                      ? "One session logged — one more and the trend line appears."
                      : "Log weighted sets to see progress over time.")
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundStyle(Theme.muted2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 12)
@@ -145,10 +142,7 @@ struct StatsView: View {
     private var weekCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("This Week")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.5)
-                .textCase(.uppercase)
-                .foregroundStyle(Theme.muted)
+                .cardLabel()
             HStack(spacing: 5) {
                 ForEach(Array(weekDates.enumerated()), id: \.element) { index, date in
                     let completed = app.sessions.contains { $0.createdAt.dayKey == date.dayKey }
@@ -163,7 +157,7 @@ struct StatsView: View {
             HStack {
                 ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { label in
                     Text(label)
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
                 }
@@ -175,10 +169,7 @@ struct StatsView: View {
     private var waterCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Water Intake Today")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.5)
-                .textCase(.uppercase)
-                .foregroundStyle(Theme.muted)
+                .cardLabel()
             HStack {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 5), count: 8), spacing: 5) {
                     ForEach(0..<8, id: \.self) { index in
@@ -205,7 +196,7 @@ struct StatsView: View {
                 }
                 Spacer()
                 Text("\(app.waterToday)/8 glasses")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.muted2)
             }
         }
@@ -218,14 +209,11 @@ struct StatsView: View {
                 Text("Personal Records")
                 Image(systemName: "trophy")
             }
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(1.5)
-            .textCase(.uppercase)
-            .foregroundStyle(Theme.muted)
+            .cardLabel()
 
             if app.personalRecords.isEmpty {
                 Text("Complete workouts to see your PRs.")
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundStyle(Theme.muted2)
             } else {
                 let sorted = app.personalRecords.values.sorted { $0.exerciseName < $1.exerciseName }
@@ -233,10 +221,10 @@ struct StatsView: View {
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, record in
                     HStack {
                         Text(record.exerciseName)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                         Spacer()
                         Text(record.weight > 0 ? "\(formatWeight(record.weight)) x \(record.reps) reps" : "BW x \(record.reps)")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                     }
                     .padding(.vertical, 7)
@@ -285,7 +273,7 @@ struct StatCard: View {
                 .foregroundStyle(Theme.accent)
                 .contentTransition(.numericText())
             Text(label)
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .tracking(0.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted2)

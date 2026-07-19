@@ -269,7 +269,7 @@ struct AppShellView: View {
                 Text(Date().formatted(.dateTime.weekday(.wide)))
                     .font(.system(size: 13, weight: .bold))
                 Text(Date().formatted(.dateTime.month(.abbreviated).day().year()))
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.muted2)
             }
             Button {
@@ -319,7 +319,7 @@ struct AppShellView: View {
                     .scaleEffect(isActive ? 1.08 : 1)
                     .symbolEffect(.bounce, value: isActive)
                 Text(label)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 54)

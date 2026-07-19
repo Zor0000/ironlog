@@ -100,12 +100,12 @@ struct WorkoutsView: View {
                     .frame(width: 40, height: 40)
                     .background(Theme.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Free Workout")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Theme.text)
                     Text("Start empty — add any exercise on the fly")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
                 Spacer()
@@ -146,9 +146,9 @@ struct WorkoutsView: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Theme.muted2)
                     }
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 15)
                     .background(Theme.surface2)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
@@ -164,7 +164,7 @@ struct WorkoutsView: View {
         let muscles = app.selectedWorkoutMuscleIDs.compactMap { app.library.muscle($0) }
         // Split only — the day already shows in the back button and Start button.
         let context = app.selectedSplit ?? ""
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 14) {
             BackButton(label: app.selectedDay ?? app.selectedWorkoutMuscleLabel) {
                 NativeFeedback.selection()
                 withAnimation(AppMotion.quick) {
@@ -185,13 +185,16 @@ struct WorkoutsView: View {
                 }
             }
             ForEach(muscles) { muscle in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 7) {
                         Image(systemName: muscle.systemImage)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
                         Text(muscle.label)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Theme.text)
                     }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.muted2)
+                    .padding(.top, 4)
 
                     ForEach(Array(app.library.exercises(split: app.selectedSplit, muscle: muscle.id).enumerated()), id: \.element.id) { index, exercise in
                         ExerciseSuggestionCard(exercise: exercise, record: app.personalRecords[exercise.name])
@@ -228,9 +231,9 @@ struct CurrentWorkoutBanner: View {
                     .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Workout in progress")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                     Text(summary)
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
                 Spacer()
@@ -290,17 +293,17 @@ struct ExerciseSuggestionCard: View {
         } label: {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(exercise.name)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                         Text(meta)
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                             .foregroundStyle(Theme.muted2)
                     }
                     Spacer()
                     if record != nil {
                         Label("PR", systemImage: "trophy")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 10, weight: .bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .foregroundStyle(.black)
@@ -310,7 +313,7 @@ struct ExerciseSuggestionCard: View {
                 }
                 if showTip {
                     Text(exercise.tip)
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.accent)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -341,10 +344,10 @@ struct TitleBlock: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(title).sectionTitle()
             Text(subtitle)
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.muted2)
         }
     }

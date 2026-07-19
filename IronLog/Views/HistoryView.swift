@@ -11,7 +11,7 @@ struct HistoryView: View {
                 TitleBlock(title: "History", subtitle: "All your past sessions")
                 HStack(spacing: 10) {
                     Text(app.syncMessage)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.muted2)
                     Spacer()
                     Button {
@@ -102,11 +102,11 @@ struct HistoryCard: View {
                     }
                 } label: {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(session.createdAt.displayDay)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                             Text("\(setCount) \(setCount == 1 ? "set" : "sets") · \(session.split ?? "Workout") · \(syncText)")
-                                .font(.system(size: 10))
+                                .font(.system(size: 11))
                                 .foregroundStyle(Theme.muted2)
                         }
                         Spacer()
@@ -161,10 +161,10 @@ struct HistoryCard: View {
                     ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, exercise in
                         HStack(alignment: .top) {
                             Text(exercise.name)
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 13, weight: .medium))
                             Spacer()
                             Text(exercise.sets.map(setLabel).joined(separator: ", "))
-                                .font(.system(size: 11))
+                                .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted2)
                                 .multilineTextAlignment(.trailing)
                         }
@@ -179,7 +179,7 @@ struct HistoryCard: View {
                             Image(systemName: "note.text")
                             Text(note)
                         }
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -280,10 +280,7 @@ struct EditSessionSheet: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Session Note")
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.5)
-                            .textCase(.uppercase)
-                            .foregroundStyle(Theme.muted)
+                            .cardLabel()
                         TextEditor(text: $note)
                             .frame(minHeight: 72)
                             .scrollContentBackground(.hidden)
@@ -317,7 +314,7 @@ struct EditSessionSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(exercise.wrappedValue.name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 if exercise.wrappedValue.bodyweight { SmallBadge("Bodyweight") }
                 if exercise.wrappedValue.timed { SmallBadge("Timed") }
                 Spacer()

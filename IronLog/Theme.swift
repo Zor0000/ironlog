@@ -9,8 +9,9 @@ enum Theme {
     static let accent = Color(red: 0.831, green: 1.0, blue: 0.29)
     static let accentDim = Color(red: 0.831, green: 1.0, blue: 0.29).opacity(0.12)
     static let text = Color(red: 0.937, green: 0.937, blue: 0.937)
-    static let muted = Color(red: 0.353, green: 0.353, blue: 0.353)
-    static let muted2 = Color(red: 0.533, green: 0.533, blue: 0.533)
+    // Kept above ~4.5:1 contrast on bg/surface2 — don't darken below this.
+    static let muted = Color(red: 0.48, green: 0.48, blue: 0.48)
+    static let muted2 = Color(red: 0.64, green: 0.64, blue: 0.64)
     static let success = Color(red: 0.29, green: 0.87, blue: 0.50)
     static let danger = Color(red: 1.0, green: 0.267, blue: 0.267)
     static let blue = Color(red: 0.29, green: 0.62, blue: 1.0)
@@ -86,11 +87,19 @@ extension View {
     }
 
     func sectionTitle() -> some View {
-        font(.system(size: 21, weight: .black))
+        font(.system(size: 22, weight: .black))
             .fontWidth(.condensed)
             .textCase(.uppercase)
             .tracking(1)
             .foregroundStyle(Theme.text)
+    }
+
+    /// Small uppercase label heading a card section ("Weight Unit", "Session Note").
+    func cardLabel() -> some View {
+        font(.system(size: 11, weight: .semibold))
+            .tracking(1.5)
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.muted)
     }
 
     func entrance(_ index: Int = 0, offset: CGFloat = 16) -> some View {
@@ -177,7 +186,7 @@ struct Pill: View {
             }
             Text(text)
         }
-        .font(.system(size: 12, weight: isActive ? .bold : .medium))
+        .font(.system(size: 13, weight: isActive ? .bold : .medium))
         .foregroundStyle(isActive ? .black : Theme.text)
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
