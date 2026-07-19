@@ -53,12 +53,8 @@ jobs:
       - name: Select an installed iPhone simulator
         run: |
           set -euo pipefail
-          simulator_id="$(xcodebuild -showdestinations \
-            -project IronLog.xcodeproj \
-            -scheme IronLog \
-            2>&1 \
-            | sed -n 's/.*platform:iOS Simulator.*id:\([^,]*\).*name:iPhone.*/\1/p' \
-            | sed -n '1p')"
+          simulator_id="$(xcrun simctl list devices available \
+            | awk -F'[()]' '/iPhone/ { print $2; exit }')"
           test -n "$simulator_id"
           echo "SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
 
