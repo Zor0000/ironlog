@@ -56,7 +56,7 @@ jobs:
           simulator_id="$(xcodebuild -showdestinations \
             -project IronLog.xcodeproj \
             -scheme IronLog \
-            2>/dev/null \
+            2>&1 \
             | sed -n 's/.*platform:iOS Simulator.*id:\([^,]*\).*name:iPhone.*/\1/p' \
             | sed -n '1p')"
           test -n "$simulator_id"
