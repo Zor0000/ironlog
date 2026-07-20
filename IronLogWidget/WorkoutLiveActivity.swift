@@ -12,8 +12,9 @@ private func nonEmpty(_ value: String?) -> String {
 struct WorkoutLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
+            // No `activityBackgroundTint` on purpose: iOS then draws its native
+            // translucent material card, so the wallpaper blurs through.
             LockScreenView(state: context.state.workout, unit: context.attributes.weightUnit)
-                .activityBackgroundTint(WidgetPalette.surfaceDeep)
                 .activitySystemActionForegroundColor(WidgetPalette.accent)
         } dynamicIsland: { context in
             let workout = context.state.workout
@@ -52,6 +53,20 @@ struct WorkoutLiveActivity: Widget {
     }
 }
 
+private extension View {
+    /// Hairline top-lit rim that makes a translucent fill read as glass rather
+    /// than as a flat wash. Skipped on opaque fills (the accent button), which
+    /// have their own edge.
+    func glassEdge(radius: CGFloat, visible: Bool = true) -> some View {
+        overlay {
+            if visible {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(WidgetPalette.stepStroke, lineWidth: 1)
+            }
+        }
+    }
+}
+
 // MARK: - Lock Screen
 
 /// Full-size lock-screen card. Larger, more tappable controls than a stock
@@ -84,7 +99,7 @@ private struct LockScreenView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 9) {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(WidgetPalette.accent)
+                .fill(WidgetPalette.accent.opacity(0.9))
                 .frame(width: 32, height: 32)
                 .overlay {
                     Image(systemName: "dumbbell.fill")
@@ -191,7 +206,8 @@ private struct LockScreenView: View {
         .foregroundStyle(tint)
         .frame(maxWidth: .infinity)
         .frame(height: 36)
-        .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassEdge(radius: 14, visible: background != WidgetPalette.accent)
     }
 
     private func navIcon(_ systemImage: String) -> some View {
@@ -199,7 +215,8 @@ private struct LockScreenView: View {
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(WidgetPalette.text)
             .frame(width: 36, height: 36)
-            .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassEdge(radius: 14)
     }
 
     private var completeBanner: some View {
@@ -298,8 +315,8 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
         .padding(.vertical, size.vPadding)
         .padding(.horizontal, size.hPadding)
         .frame(maxWidth: .infinity)
-        .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
+        .background(WidgetPalette.tile, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(WidgetPalette.tileStroke, lineWidth: 1))
     }
 
     private func stepIcon(_ name: String) -> some View {
@@ -307,7 +324,8 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(WidgetPalette.text)
             .frame(width: size.button, height: size.button)
-            .background(WidgetPalette.stepButton, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(WidgetPalette.stepButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .glassEdge(radius: 12)
     }
 }
 
@@ -347,8 +365,8 @@ private struct RestBadge: View {
         .foregroundStyle(tint)
         .padding(.horizontal, 11)
         .padding(.vertical, 6)
-        .background(tint.opacity(0.14), in: Capsule())
-        .overlay(Capsule().stroke(tint.opacity(0.22), lineWidth: 1))
+        .background(WidgetPalette.secondaryButton, in: Capsule())
+        .overlay(Capsule().stroke(tint.opacity(0.30), lineWidth: 1))
     }
 }
 
