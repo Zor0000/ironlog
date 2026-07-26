@@ -644,6 +644,10 @@ struct LogExerciseCard: View {
         // Same set index from last time, falling back to that session's last set.
         let refSet = reference.map { $0.sets.indices.contains(index) ? $0.sets[index] : $0.sets.last } ?? nil
         let hasRefWeight = (refSet?.weight ?? 0) > 0
+        // Bodyweight moves hint "BW" — blank keeps the set unloaded, a number loads it.
+        let weightPlaceholder = hasRefWeight
+            ? formatWeightValue(refSet!.weight!)
+            : (exercise.bodyweight ? "BW" : "0")
 
         return VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .bottom, spacing: 8) {
@@ -652,10 +656,12 @@ struct LogExerciseCard: View {
                     .foregroundStyle(Theme.muted)
                     .frame(width: 20, height: 34, alignment: .bottom)
 
-                if !exercise.bodyweight && !exercise.timed {
+                if !exercise.timed {
                     // Label + reference placeholder follow the display unit;
                     // typed input converts back to kg at the save boundary.
-                    SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, placeholder: hasRefWeight ? formatWeightValue(refSet!.weight!) : "0", keyboard: .decimalPad, identifier: "set-weight-input") { value in
+                    // Bodyweight exercises get the field too — walking lunges,
+                    // pull-ups and dips are routinely loaded.
+                    SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, placeholder: weightPlaceholder, keyboard: .decimalPad, identifier: "set-weight-input") { value in
                         app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                     }
                 }
@@ -711,8 +717,10 @@ struct LogExerciseCard: View {
     private func referenceLabel(_ refSet: LoggedSet?) -> String? {
         guard let refSet else { return nil }
         if exercise.timed { return "Last: \(refSet.reps)s" }
-        if exercise.bodyweight || (refSet.weight ?? 0) <= 0 { return "Last: \(refSet.reps) reps" }
-        return "Last: \(formatWeight(refSet.weight ?? 0)) × \(refSet.reps)"
+        // Weight presence decides, not the bodyweight flag — a loaded lunge
+        // logs its weight and should show it back.
+        guard let weight = refSet.weight, weight > 0 else { return "Last: \(refSet.reps) reps" }
+        return "Last: \(formatWeight(weight)) × \(refSet.reps)"
     }
 }
 

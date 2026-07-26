@@ -117,7 +117,7 @@ enum LiveWorkoutReducer {
         var state = state
         guard let ei = currentEditableIndices(state) else { return state }
         let exercise = state.exercises[ei.exercise]
-        guard !exercise.bodyweight, !exercise.timed else { return state }
+        guard !exercise.timed else { return state }
         let current = parseDouble(state.exercises[ei.exercise].sets[ei.set].weight)
         let next = max(0, current + Double(direction) * state.weightStep)
         state.exercises[ei.exercise].sets[ei.set].weight = formatWeight(next)

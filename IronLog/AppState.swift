@@ -749,20 +749,32 @@ final class AppState: ObservableObject {
 
     private func isNewPR(exercise: ActiveExercise, set: WorkoutSet) -> Bool {
         guard let reps = Int(set.reps) else { return false }
-        let weight = (exercise.bodyweight || exercise.timed) ? 0 : displayWeightToKg(Double(set.weight) ?? 0)
+        let weight = exercise.timed ? 0 : (typedWeightKg(set) ?? 0)
         guard let pr = personalRecords[exercise.name] else { return reps > 0 }
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
     }
 
     /// Input→storage boundary: typed weight strings are in the display unit;
     /// convert to canonical KG here, the one place drafts become LoggedSets.
+    ///
+    /// `bodyweight` means weight is *optional*, not forbidden — loaded lunges,
+    /// weighted pull-ups and dips log a weight; leaving the field blank keeps
+    /// the set bodyweight. Timed sets have no weight field at all.
     private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
         guard set.done, let reps = Int(set.reps), reps > 0 else { return nil }
-        if exercise.bodyweight || exercise.timed {
+        if exercise.timed {
             return LoggedSet(weight: nil, reps: reps)
         }
+        guard let weight = typedWeightKg(set) else {
+            return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps) : nil
+        }
+        return LoggedSet(weight: weight, reps: reps)
+    }
+
+    /// Typed weight in canonical KG, or nil when the field is blank/invalid.
+    private func typedWeightKg(_ set: WorkoutSet) -> Double? {
         guard let weight = Double(set.weight), weight >= 0 else { return nil }
-        return LoggedSet(weight: displayWeightToKg(weight), reps: reps)
+        return displayWeightToKg(weight)
     }
 
     private func validationMessage(for exercise: ActiveExercise) -> String {

@@ -59,7 +59,9 @@ extension AppState {
         if state.exercises[exerciseIndex].sets[setIndex].reps.isEmpty {
             state.exercises[exerciseIndex].sets[setIndex].reps = LiveWorkoutReducer.defaultReps
         }
-        if !exercise.bodyweight, !exercise.timed,
+        // `pr.weight > 0` already excludes never-loaded moves, so bodyweight
+        // exercises seed only once they've actually been loaded.
+        if !exercise.timed,
            state.exercises[exerciseIndex].sets[setIndex].weight.isEmpty,
            let pr = personalRecords[exercise.name], pr.weight > 0 {
             // PR is stored in kg; the stepper string lives in the display unit.

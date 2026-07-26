@@ -325,7 +325,7 @@ struct EditSessionSheet: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.muted)
                         .frame(width: 20, height: 34, alignment: .bottom)
-                    if !exercise.wrappedValue.bodyweight && !exercise.wrappedValue.timed {
+                    if !exercise.wrappedValue.timed {
                         SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
                             exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
                         }

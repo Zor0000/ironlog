@@ -135,7 +135,8 @@ private struct LockScreenView: View {
 
     @ViewBuilder private var steppers: some View {
         let exercise = state.currentExercise
-        let showWeight = !(exercise?.bodyweight ?? false) && !(exercise?.timed ?? false)
+        // Bodyweight moves keep the weight tile — loaded lunges/pull-ups are common.
+        let showWeight = !(exercise?.timed ?? false)
         HStack(spacing: 8) {
             if showWeight {
                 StepperTile(
@@ -418,7 +419,8 @@ private struct ExpandedControls: View {
                 .frame(maxWidth: .infinity)
         } else {
             let exercise = state.currentExercise
-            let showWeight = !(exercise?.bodyweight ?? false) && !(exercise?.timed ?? false)
+            // Bodyweight moves keep the weight tile — loaded lunges/pull-ups are common.
+        let showWeight = !(exercise?.timed ?? false)
             HStack(spacing: 8) {
                 if showWeight {
                     StepperTile(

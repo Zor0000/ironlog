@@ -116,6 +116,52 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.selectedTab, .history)
     }
 
+    /// Loaded calisthenics: weight is optional on a bodyweight move, not
+    /// forbidden — a weighted walking lunge must keep its load through save.
+    func testBodyweightExerciseKeepsTypedWeight() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        let lunge = app.library
+            .catalogExercises(muscleID: "legs", query: "walking lunges")
+            .first { $0.template.name == "Walking Lunges" }!
+        app.addExercise(template: lunge.template)
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        XCTAssertTrue(app.todayExercises[0].bodyweight)
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "20")
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "12")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        XCTAssertTrue(app.todayExercises[0].sets[0].done)
+
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].weight, 20)
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 12)
+        // Loaded work counts toward volume and sets a real PR.
+        XCTAssertEqual(app.stats.volume, 240)
+        XCTAssertEqual(app.personalRecords["Walking Lunges"]?.weight, 20)
+    }
+
+    /// The unloaded case must still work: blank weight stays bodyweight rather
+    /// than blocking the set the way a weighted exercise would.
+    func testBodyweightExerciseStillLogsWithoutWeight() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(name: "Pull Ups")
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "10")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+
+        await app.finishWorkout(note: "")
+
+        XCTAssertNil(app.sessions[0].exercises[0].sets[0].weight)
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 10)
+    }
+
     func testCompletingSetRestartsRestTimerFromPreset() {
         let app = AppState()
         app.setTimerPreset(120)
