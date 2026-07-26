@@ -70,18 +70,42 @@ struct ExerciseLibrary: Codable {
 
     /// Catalog exercises filtered by an optional muscle and a free-text query.
     func catalogExercises(muscleID: String?, query: String) -> [CatalogExercise] {
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let tokens = Self.searchTokens(query)
         let muscleIDs = muscleID.map { [$0] } ?? catalogMuscles.map(\.id)
         var results: [CatalogExercise] = []
         for id in muscleIDs {
             guard let muscle = muscle(id), let templates = library[id] else { continue }
-            for template in templates where needle.isEmpty
-                || template.name.lowercased().contains(needle)
-                || template.tip.lowercased().contains(needle) {
+            for template in templates {
+                // Stem the catalog side too, so both sides speak one vocabulary.
+                let haystack = Self.searchTokens("\(template.name) \(template.tip)")
+                    .joined(separator: " ")
+                guard tokens.allSatisfy({ haystack.contains($0) }) else { continue }
                 results.append(CatalogExercise(template: template, muscle: muscle))
             }
         }
         return results
+    }
+
+    /// A query split into lowercase stems. Every stem must appear in the name or
+    /// tip, so word order and filler punctuation stop mattering — "dumbbell
+    /// shoulder press" reaches "Seated DB Shoulder Press". A trailing "s" is
+    /// dropped so "lunges"/"raises"/"dips" match singular catalog names.
+    /// An empty query yields no tokens, which matches everything.
+    static func searchTokens(_ query: String) -> [String] {
+        query.lowercased()
+            .split { !$0.isLetter && !$0.isNumber }
+            .map { stem(String($0)) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Gym shorthand folded to one spelling. The catalog itself mixes the two
+    /// ("Seated DB Shoulder Press" next to "Dumbbell Bench Press"), so this runs
+    /// on both the query and the catalog rather than normalising the JSON.
+    private static let synonyms = ["db": "dumbbell", "bb": "barbell"]
+
+    private static func stem(_ word: String) -> String {
+        let base = word.hasSuffix("s") ? String(word.dropLast()) : word
+        return synonyms[base] ?? base
     }
 
     func muscle(_ id: String?) -> Muscle? {

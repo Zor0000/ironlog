@@ -162,6 +162,26 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 10)
     }
 
+    func testCatalogSearchIgnoresWordOrderPluralsAndGymShorthand() {
+        let library = ExerciseLibrary.bundled
+        func names(_ query: String) -> [String] {
+            library.catalogExercises(muscleID: nil, query: query).map(\.template.name)
+        }
+
+        // "DB" in the catalog, "dumbbell" in the query — and vice versa.
+        XCTAssertTrue(names("dumbbell shoulder press").contains("Seated DB Shoulder Press"))
+        XCTAssertTrue(names("db row").contains("Single-Arm Dumbbell Row"))
+        // Plural query against a singular catalog name.
+        XCTAssertTrue(names("lateral raises").contains("Dumbbell Lateral Raise"))
+        // Word order and punctuation must not matter.
+        XCTAssertTrue(names("press shoulder").contains("Seated DB Shoulder Press"))
+        XCTAssertTrue(names("leg press").contains("Leg Press (Machine)"))
+        // An empty query still returns the whole catalog; nonsense returns none.
+        XCTAssertEqual(names("").count, names(" ").count)
+        XCTAssertFalse(names("").isEmpty)
+        XCTAssertTrue(names("zercher").isEmpty)
+    }
+
     func testCompletingSetRestartsRestTimerFromPreset() {
         let app = AppState()
         app.setTimerPreset(120)
