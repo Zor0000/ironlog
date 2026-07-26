@@ -3,12 +3,8 @@ import SwiftUI
 struct LogView: View {
     @EnvironmentObject private var app: AppState
     @State private var newExerciseName = ""
-    @State private var exerciseSearch = ""
-    @State private var catalogFilter: String?
-    @State private var didPrimeCatalogFilter = false
     @State private var showDiscardConfirmation = false
     @State private var pendingDelete: ActiveExercise?
-    @FocusState private var searchFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -176,7 +172,6 @@ struct LogView: View {
                     // Fade in place — see LogExerciseCard: translating a
                     // collapsing card drags its content across its neighbours.
                     .transition(.opacity)
-                    .onAppear(perform: primeCatalogFilter)
             } else {
                 Button {
                     NativeFeedback.selection()
@@ -219,169 +214,15 @@ struct LogView: View {
                 .accessibilityLabel("Close add exercise")
             }
 
-            searchField
-            muscleFilterChips
-
-            if showCatalogResults {
-                catalogResultsList
-            } else {
-                catalogHint
+            ExerciseCatalogPicker(
+                library: app.library,
+                initialMuscle: app.singleTargetMuscle
+            ) { template in
+                withAnimation(AppMotion.quick) { app.addExercise(template: template) }
             }
 
             customExerciseSection
         }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.muted2)
-            TextField("Search exercises — e.g. walking lunges", text: $exerciseSearch)
-                .font(.system(size: 14))
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .focused($searchFocused)
-            if !exerciseSearch.isEmpty {
-                Button {
-                    NativeFeedback.selection()
-                    exerciseSearch = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.muted)
-                }
-                .buttonStyle(TactileButtonStyle())
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 12)
-        .background(Theme.surface2)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(searchFocused ? Theme.accent.opacity(0.5) : Theme.border))
-        .accessibilityIdentifier("exercise-template-search-field")
-    }
-
-    private var muscleFilterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                filterChip(title: "All", id: nil)
-                ForEach(app.library.catalogMuscles) { muscle in
-                    filterChip(title: muscle.label, id: muscle.id, icon: muscle.systemImage)
-                }
-            }
-            .padding(.vertical, 1)
-        }
-    }
-
-    private func filterChip(title: String, id: String?, icon: String? = nil) -> some View {
-        Button {
-            NativeFeedback.selection()
-            withAnimation(AppMotion.quick) { catalogFilter = id }
-        } label: {
-            Pill(text: title, icon: icon, isActive: catalogFilter == id)
-        }
-        .buttonStyle(TactileButtonStyle())
-        .accessibilityLabel("\(title) exercises")
-        .accessibilityAddTraits(catalogFilter == id ? .isSelected : [])
-    }
-
-    private var catalogResultsList: some View {
-        let results = catalogResults
-        return VStack(spacing: 7) {
-            ForEach(results.prefix(catalogResultLimit)) { item in
-                Button {
-                    NativeFeedback.light()
-                    withAnimation(AppMotion.quick) {
-                        app.addExercise(template: item.template)
-                        exerciseSearch = ""
-                        searchFocused = false
-                    }
-                } label: {
-                    catalogRow(item)
-                }
-                .buttonStyle(TactileButtonStyle())
-                .accessibilityIdentifier("exercise-template-\(item.template.name)")
-            }
-
-            if results.isEmpty {
-                VStack(spacing: 4) {
-                    Text("No matching exercises")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.text)
-                    Text("Add it as a custom exercise below.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted2)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-            } else if results.count > catalogResultLimit {
-                Text("+\(results.count - catalogResultLimit) more — keep typing to narrow")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 2)
-            }
-        }
-        .transition(.opacity)
-    }
-
-    private func catalogRow(_ item: CatalogExercise) -> some View {
-        let template = item.template
-        let icon = template.timed ? "timer" : (template.bodyweight ? "figure.strengthtraining.functional" : "dumbbell")
-        return HStack(spacing: 11) {
-            ZStack {
-                Circle().fill(Theme.accentDim).frame(width: 34, height: 34)
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(template.name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.text)
-                    if catalogFilter == nil {
-                        Text(item.muscle.label)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Theme.muted2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Theme.bg.opacity(0.5))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Theme.border))
-                    }
-                }
-                Text(catalogMeta(template))
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.muted2)
-            }
-            Spacer(minLength: 6)
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(Theme.accent)
-        }
-        .padding(11)
-        .background(Theme.surface2)
-        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Theme.border.opacity(0.8)))
-    }
-
-    private var catalogHint: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sparkle.magnifyingglass")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.accent)
-            Text("Search or tap a muscle group to browse the full exercise library.")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.muted2)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var customExerciseSection: some View {
@@ -431,32 +272,6 @@ struct LogView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .accessibilityIdentifier("confirm-add-exercise-button")
-        }
-    }
-
-    private var catalogResultLimit: Int { 24 }
-
-    private var showCatalogResults: Bool {
-        !exerciseSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || catalogFilter != nil
-    }
-
-    private var catalogResults: [CatalogExercise] {
-        app.library.catalogExercises(muscleID: catalogFilter, query: exerciseSearch)
-    }
-
-    private func catalogMeta(_ template: ExerciseTemplate) -> String {
-        var parts = ["\(template.sets)×\(template.reps) \(template.timed ? "sec" : "reps")"]
-        if template.bodyweight || template.timed {
-            parts.append(template.timed ? "Timed" : "Bodyweight")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private func primeCatalogFilter() {
-        guard !didPrimeCatalogFilter else { return }
-        didPrimeCatalogFilter = true
-        if catalogFilter == nil, let muscle = app.singleTargetMuscle, app.library.library[muscle] != nil {
-            catalogFilter = muscle
         }
     }
 }
@@ -755,6 +570,212 @@ struct SmallInput: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 .accessibilityIdentifier(identifier ?? "\(label.lowercased())-input")
+        }
+    }
+}
+
+/// Catalog browser shared by the live log and the session editor: search field,
+/// muscle chips and result rows. Owns its own query state and hands the chosen
+/// template back — the caller decides where the exercise lands.
+struct ExerciseCatalogPicker: View {
+    let library: ExerciseLibrary
+    /// Muscle chip pre-selected on first appearance (the workout's target), if
+    /// that muscle has catalog entries.
+    var initialMuscle: String?
+    let onSelect: (ExerciseTemplate) -> Void
+
+    @State private var search = ""
+    @State private var filter: String?
+    @State private var didPrime = false
+    @FocusState private var searchFocused: Bool
+
+    private let resultLimit = 24
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            searchField
+            muscleFilterChips
+            if showResults {
+                resultsList
+            } else {
+                hint
+            }
+        }
+        .onAppear(perform: prime)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.muted2)
+            TextField("Search exercises — e.g. walking lunges", text: $search)
+                .font(.system(size: 14))
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($searchFocused)
+            if !search.isEmpty {
+                Button {
+                    NativeFeedback.selection()
+                    search = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.muted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
+        .background(Theme.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(searchFocused ? Theme.accent.opacity(0.5) : Theme.border))
+        .accessibilityIdentifier("exercise-template-search-field")
+    }
+
+    private var muscleFilterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                filterChip(title: "All", id: nil)
+                ForEach(library.catalogMuscles) { muscle in
+                    filterChip(title: muscle.label, id: muscle.id, icon: muscle.systemImage)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    private func filterChip(title: String, id: String?, icon: String? = nil) -> some View {
+        Button {
+            NativeFeedback.selection()
+            withAnimation(AppMotion.quick) { filter = id }
+        } label: {
+            Pill(text: title, icon: icon, isActive: filter == id)
+        }
+        .buttonStyle(TactileButtonStyle())
+        .accessibilityLabel("\(title) exercises")
+        .accessibilityAddTraits(filter == id ? .isSelected : [])
+    }
+
+    private var resultsList: some View {
+        let results = self.results
+        return VStack(spacing: 7) {
+            ForEach(results.prefix(resultLimit)) { item in
+                Button {
+                    NativeFeedback.light()
+                    onSelect(item.template)
+                    search = ""
+                    searchFocused = false
+                } label: {
+                    row(item)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityIdentifier("exercise-template-\(item.template.name)")
+            }
+
+            if results.isEmpty {
+                VStack(spacing: 4) {
+                    Text("No matching exercises")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                    Text("Try fewer words — search covers the whole library.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted2)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+            } else if results.count > resultLimit {
+                Text("+\(results.count - resultLimit) more — keep typing to narrow")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 2)
+            }
+        }
+        .transition(.opacity)
+    }
+
+    private func row(_ item: CatalogExercise) -> some View {
+        let template = item.template
+        let icon = template.timed ? "timer" : (template.bodyweight ? "figure.strengthtraining.functional" : "dumbbell")
+        return HStack(spacing: 11) {
+            ZStack {
+                Circle().fill(Theme.accentDim).frame(width: 34, height: 34)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(template.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                    if filter == nil {
+                        Text(item.muscle.label)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.bg.opacity(0.5))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Theme.border))
+                    }
+                }
+                Text(meta(template))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted2)
+            }
+            Spacer(minLength: 6)
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(Theme.accent)
+        }
+        .padding(11)
+        .background(Theme.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 11).stroke(Theme.border.opacity(0.8)))
+    }
+
+    private var hint: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkle.magnifyingglass")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+            Text("Search or tap a muscle group to browse the full exercise library.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.muted2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var showResults: Bool {
+        !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || filter != nil
+    }
+
+    private var results: [CatalogExercise] {
+        library.catalogExercises(muscleID: filter, query: search)
+    }
+
+    private func meta(_ template: ExerciseTemplate) -> String {
+        var parts = ["\(template.sets)×\(template.reps) \(template.timed ? "sec" : "reps")"]
+        if template.bodyweight || template.timed {
+            parts.append(template.timed ? "Timed" : "Bodyweight")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func prime() {
+        guard !didPrime else { return }
+        didPrime = true
+        if filter == nil, let muscle = initialMuscle, library.library[muscle] != nil {
+            filter = muscle
         }
     }
 }

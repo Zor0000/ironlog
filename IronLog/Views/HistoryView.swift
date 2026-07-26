@@ -229,6 +229,7 @@ struct EditSessionSheet: View {
     private let title: String
     @State private var exercises: [ActiveExercise]
     @State private var note: String
+    @State private var showAddExercise = false
 
     init(session: WorkoutSession) {
         sessionID = session.id
@@ -278,6 +279,8 @@ struct EditSessionSheet: View {
                         exerciseCard($exercise)
                     }
 
+                    addExerciseBlock
+
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Session Note")
                             .cardLabel()
@@ -308,6 +311,63 @@ struct EditSessionSheet: View {
             .scrollIndicators(.hidden)
         }
         .foregroundStyle(Theme.text)
+    }
+
+    /// Add a forgotten exercise to an already-saved session. Mirrors the live
+    /// log's add flow, but new sets start `done` like the rest of a saved
+    /// session — `updateSession` still drops any left without valid reps.
+    @ViewBuilder private var addExerciseBlock: some View {
+        if showAddExercise {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Add Exercise").cardLabel()
+                    Spacer()
+                    Button {
+                        NativeFeedback.selection()
+                        withAnimation(AppMotion.quick) { showAddExercise = false }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(width: 30, height: 30)
+                            .foregroundStyle(Theme.muted2)
+                            .background(Theme.surface2)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Theme.border))
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                    .accessibilityLabel("Close add exercise")
+                }
+
+                ExerciseCatalogPicker(library: app.library) { template in
+                    NativeFeedback.light()
+                    withAnimation(AppMotion.quick) {
+                        exercises.append(ActiveExercise(
+                            name: template.name,
+                            bodyweight: template.bodyweight,
+                            timed: template.timed,
+                            sets: [WorkoutSet(done: true)]
+                        ))
+                        showAddExercise = false
+                    }
+                }
+            }
+            .cardStyle()
+            .transition(.opacity)
+        } else {
+            Button {
+                NativeFeedback.selection()
+                withAnimation(AppMotion.quick) { showAddExercise = true }
+            } label: {
+                Label("Add Exercise", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .foregroundStyle(Theme.muted2)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [5])))
+            }
+            .buttonStyle(TactileButtonStyle())
+            .accessibilityIdentifier("edit-show-add-exercise-button")
+        }
     }
 
     private func exerciseCard(_ exercise: Binding<ActiveExercise>) -> some View {
