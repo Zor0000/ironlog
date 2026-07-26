@@ -88,7 +88,9 @@ final class SupabaseService {
                     RemoteSetInsert(
                         sessionID: remoteSession.id,
                         exerciseID: exerciseIDs[exercise.name] ?? "",
-                        weightKg: (exercise.bodyweight || exercise.timed) ? nil : set.weight,
+                        // set.weight is already nil for timed/unloaded sets — see
+                        // AppState.loggedSet, the one place that decision is made.
+                        weightKg: set.weight,
                         reps: set.reps
                     )
                 }
