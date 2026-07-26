@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LogView: View {
     @EnvironmentObject private var app: AppState
-    @State private var newExerciseName = ""
     @State private var showDiscardConfirmation = false
     @State private var pendingDelete: ActiveExercise?
 
@@ -225,53 +224,16 @@ struct LogView: View {
         }
     }
 
+    /// The weighted choice stays in the draft, so it survives a relaunch
+    /// mid-workout — hence the binding through `setAddExerciseWeighted`.
     private var customExerciseSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Rectangle().fill(Theme.border).frame(height: 1)
-                Text("Or add your own")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize()
-                Rectangle().fill(Theme.border).frame(height: 1)
-            }
-
-            TextField("Custom exercise name", text: $newExerciseName)
-                .fieldStyle()
-                .submitLabel(.done)
-                .accessibilityIdentifier("new-exercise-name-field")
-
-            HStack(spacing: 8) {
-                Button {
-                    NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) { app.setAddExerciseWeighted(false) }
-                } label: {
-                    Pill(text: "Reps only", isActive: !app.addExerciseWeighted)
-                }
-                .buttonStyle(TactileButtonStyle())
-                Button {
-                    NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) { app.setAddExerciseWeighted(true) }
-                } label: {
-                    Pill(text: "Weight + Reps", isActive: app.addExerciseWeighted)
-                }
-                .buttonStyle(TactileButtonStyle())
-                Spacer(minLength: 0)
-            }
-
-            Button {
-                NativeFeedback.light()
-                withAnimation(AppMotion.quick) {
-                    app.addExercise(name: newExerciseName)
-                    newExerciseName = ""
-                }
-            } label: {
-                Label("Add Custom Exercise", systemImage: "plus")
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .accessibilityIdentifier("confirm-add-exercise-button")
+        CustomExerciseField(
+            weighted: Binding(
+                get: { app.addExerciseWeighted },
+                set: { app.setAddExerciseWeighted($0) }
+            )
+        ) { name in
+            app.addExercise(name: name)
         }
     }
 }
@@ -570,6 +532,77 @@ struct SmallInput: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 .accessibilityIdentifier(identifier ?? "\(label.lowercased())-input")
+        }
+    }
+}
+
+/// "Or add your own" — free-text name plus a reps-only / weight+reps choice,
+/// shared by the live log and the session editor. The caller owns where the
+/// exercise lands and how the weighted choice is persisted (the live log routes
+/// it through the workout draft; the editor keeps it in view state).
+struct CustomExerciseField: View {
+    @Binding var weighted: Bool
+    let onAdd: (String) -> Void
+
+    @State private var name = ""
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Rectangle().fill(Theme.border).frame(height: 1)
+                Text("Or add your own")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize()
+                Rectangle().fill(Theme.border).frame(height: 1)
+            }
+
+            TextField("Custom exercise name", text: $name)
+                .fieldStyle()
+                .submitLabel(.done)
+                .accessibilityIdentifier("new-exercise-name-field")
+
+            HStack(spacing: 8) {
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) { weighted = false }
+                } label: {
+                    Pill(text: "Reps only", isActive: !weighted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) { weighted = true }
+                } label: {
+                    Pill(text: "Weight + Reps", isActive: weighted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                NativeFeedback.light()
+                withAnimation(AppMotion.quick) {
+                    onAdd(trimmedName)
+                    name = ""
+                }
+            } label: {
+                Label("Add Custom Exercise", systemImage: "plus")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            // PrimaryButtonStyle has no disabled look, so dim it here — and the
+            // editor's sheet covers the toast layer, so a blocked tap there
+            // would otherwise give no feedback at all.
+            .opacity(trimmedName.isEmpty ? 0.45 : 1)
+            .disabled(trimmedName.isEmpty)
+            .animation(AppMotion.quick, value: trimmedName.isEmpty)
+            .accessibilityIdentifier("confirm-add-exercise-button")
         }
     }
 }
