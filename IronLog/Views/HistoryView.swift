@@ -230,6 +230,8 @@ struct EditSessionSheet: View {
     @State private var exercises: [ActiveExercise]
     @State private var note: String
     @State private var showAddExercise = false
+    /// View-only, unlike the live log's copy — a saved session has no draft.
+    @State private var customWeighted = false
 
     init(session: WorkoutSession) {
         sessionID = session.id
@@ -341,14 +343,16 @@ struct EditSessionSheet: View {
                 ExerciseCatalogPicker(library: app.library) { template in
                     NativeFeedback.light()
                     withAnimation(AppMotion.quick) {
-                        exercises.append(ActiveExercise(
+                        append(
                             name: template.name,
                             bodyweight: template.bodyweight,
-                            timed: template.timed,
-                            sets: [WorkoutSet(done: true)]
-                        ))
-                        showAddExercise = false
+                            timed: template.timed
+                        )
                     }
+                }
+
+                CustomExerciseField(weighted: $customWeighted) { name in
+                    append(name: name, bodyweight: !customWeighted, timed: false, custom: true)
                 }
             }
             .cardStyle()
@@ -368,6 +372,19 @@ struct EditSessionSheet: View {
             .buttonStyle(TactileButtonStyle())
             .accessibilityIdentifier("edit-show-add-exercise-button")
         }
+    }
+
+    /// New sets start `done` like the rest of a saved session; `updateSession`
+    /// still drops any left without valid reps.
+    private func append(name: String, bodyweight: Bool, timed: Bool, custom: Bool = false) {
+        exercises.append(ActiveExercise(
+            name: name,
+            bodyweight: bodyweight,
+            timed: timed,
+            custom: custom,
+            sets: [WorkoutSet(done: true)]
+        ))
+        showAddExercise = false
     }
 
     private func exerciseCard(_ exercise: Binding<ActiveExercise>) -> some View {
