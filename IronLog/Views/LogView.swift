@@ -173,7 +173,9 @@ struct LogView: View {
             if app.showAddExerciseForm {
                 addExerciseForm
                     .cardStyle()
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    // Fade in place — see LogExerciseCard: translating a
+                    // collapsing card drags its content across its neighbours.
+                    .transition(.opacity)
                     .onAppear(perform: primeCatalogFilter)
             } else {
                 Button {
@@ -630,7 +632,10 @@ struct LogExerciseCard: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 13)
-                .transition(.move(edge: .top).combined(with: .opacity))
+                // Fade in place — the card's own height change does the
+                // collapsing. Translating the rows (e.g. .move(edge: .top))
+                // slides them through the header text mid-animation.
+                .transition(.opacity)
             }
         }
         .background(Theme.surface2)
