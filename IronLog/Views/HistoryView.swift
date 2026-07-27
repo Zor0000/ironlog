@@ -232,6 +232,7 @@ struct EditSessionSheet: View {
     @State private var showAddExercise = false
     /// View-only, unlike the live log's copy — a saved session has no draft.
     @State private var customWeighted = false
+    @FocusState private var noteFocused: Bool
 
     init(session: WorkoutSession) {
         sessionID = session.id
@@ -256,6 +257,7 @@ struct EditSessionSheet: View {
     var body: some View {
         ZStack {
             NativeBackground()
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .top) {
@@ -287,6 +289,7 @@ struct EditSessionSheet: View {
                         Text("Session Note")
                             .cardLabel()
                         TextEditor(text: $note)
+                            .focused($noteFocused)
                             .frame(minHeight: 72)
                             .scrollContentBackground(.hidden)
                             .padding(8)
@@ -295,6 +298,7 @@ struct EditSessionSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
                     }
                     .cardStyle()
+                    .id(sessionNoteAnchor)
 
                     Button {
                         NativeFeedback.success()
@@ -311,6 +315,8 @@ struct EditSessionSheet: View {
                 .padding(18)
             }
             .scrollIndicators(.hidden)
+            .keepsNoteVisible(proxy, focused: noteFocused, text: note)
+            }
         }
         .foregroundStyle(Theme.text)
     }

@@ -4,8 +4,10 @@ struct LogView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
     @State private var pendingDelete: ActiveExercise?
+    @FocusState private var noteFocused: Bool
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 TimerCard()
@@ -19,6 +21,7 @@ struct LogView: View {
         }
         .background(Color.clear)
         .scrollIndicators(.hidden)
+        .keepsNoteVisible(proxy, focused: noteFocused, text: app.workoutNote)
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
         .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
@@ -41,6 +44,7 @@ struct LogView: View {
             }
         }
         .animation(AppMotion.quick, value: pendingDelete)
+        }
     }
 
     private var emptyState: some View {
@@ -86,6 +90,7 @@ struct LogView: View {
                     get: { app.workoutNote },
                     set: { app.updateWorkoutNote($0) }
                 ))
+                    .focused($noteFocused)
                     .frame(minHeight: 72)
                     .scrollContentBackground(.hidden)
                     .padding(8)
@@ -94,6 +99,7 @@ struct LogView: View {
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
             }
             .cardStyle()
+            .id(sessionNoteAnchor)
 
             Button {
                 NativeFeedback.success()

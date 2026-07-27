@@ -66,7 +66,30 @@ struct NativeBackground: View {
     }
 }
 
+/// The session-note editors sit at the bottom of a ScrollView where SwiftUI's keyboard
+/// avoidance doesn't scroll them clear of the keyboard — the live log is inside a paged
+/// TabView above the tab bar, the session editor inside a sheet — so you can't see what
+/// you're typing. Tag the note card with `.id(sessionNoteAnchor)` and pin it to the visible
+/// bottom ourselves, on focus and as the text grows.
+let sessionNoteAnchor = "session-note"
+
 extension View {
+    func keepsNoteVisible(_ proxy: ScrollViewProxy, focused: Bool, text: String) -> some View {
+        onChange(of: focused) { _, isFocused in
+            guard isFocused else { return }
+            // ponytail: fixed delay waits out the keyboard inset; a keyboard-frame observer
+            // if this ever feels off on slower devices.
+            Task {
+                try? await Task.sleep(for: .milliseconds(350))
+                withAnimation(AppMotion.smooth) { proxy.scrollTo(sessionNoteAnchor, anchor: .bottom) }
+            }
+        }
+        .onChange(of: text) { _, _ in
+            guard focused else { return }
+            proxy.scrollTo(sessionNoteAnchor, anchor: .bottom)
+        }
+    }
+
     func cardStyle(radius: CGFloat = 14) -> some View {
         padding(16)
             .background {
