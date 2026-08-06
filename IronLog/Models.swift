@@ -2,15 +2,18 @@
 import Foundation
 
 enum WorkoutTab: Hashable {
-    case workouts, log, history, stats
+    case workouts, log, run, history, stats
 }
 
 enum AuthMode {
     case signIn, signUp
 }
 
-enum WorkoutStep: String, Codable {
+enum WorkoutStep: String, Codable, CaseIterable {
     case split, day, workout
+
+    /// Position in the wizard, so a step change can tell forward from back.
+    var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 }
 
 struct UserProfile: Codable, Equatable {
@@ -48,18 +51,23 @@ struct ExerciseTemplate: Identifiable, Codable, Hashable {
     var tip: String
     var bodyweight: Bool
     var timed: Bool
+    /// A `timed` move whose duration is entered in whole minutes rather than
+    /// seconds — steady-state cardio machines, where "1200 seconds" is nobody's
+    /// mental model. Storage stays canonical seconds either way.
+    var minutes: Bool
 
     enum CodingKeys: String, CodingKey {
-        case name, sets, reps, tip, bodyweight, timed
+        case name, sets, reps, tip, bodyweight, timed, minutes
     }
 
-    init(name: String, sets: Int, reps: String, tip: String, bodyweight: Bool = false, timed: Bool = false) {
+    init(name: String, sets: Int, reps: String, tip: String, bodyweight: Bool = false, timed: Bool = false, minutes: Bool = false) {
         self.name = name
         self.sets = sets
         self.reps = reps
         self.tip = tip
         self.bodyweight = bodyweight
         self.timed = timed
+        self.minutes = minutes
     }
 
     init(from decoder: Decoder) throws {
@@ -70,6 +78,7 @@ struct ExerciseTemplate: Identifiable, Codable, Hashable {
         tip = try container.decode(String.self, forKey: .tip)
         bodyweight = try container.decodeIfPresent(Bool.self, forKey: .bodyweight) ?? false
         timed = try container.decodeIfPresent(Bool.self, forKey: .timed) ?? false
+        minutes = try container.decodeIfPresent(Bool.self, forKey: .minutes) ?? false
     }
 }
 
@@ -85,6 +94,11 @@ struct ActiveExercise: Identifiable, Codable, Hashable {
     var name: String
     var bodyweight: Bool
     var timed: Bool
+    /// See `ExerciseTemplate.minutes` — duration typed in minutes, stored in
+    /// seconds. Optional (not `Bool = false`): synthesized `Decodable` has no
+    /// default-value fallback, so a plain Bool would fail to decode drafts
+    /// written before cardio existed.
+    var minutes: Bool?
     var custom: Bool = false
     var expanded: Bool = true
     var sets: [WorkoutSet]
@@ -94,6 +108,10 @@ struct ActiveExercise: Identifiable, Codable, Hashable {
     var hasLoggedData: Bool {
         sets.contains { $0.done || !$0.reps.isEmpty || !$0.weight.isEmpty }
     }
+
+    /// Duration entered in whole minutes rather than seconds. Only ever true for
+    /// a `timed` move, so it is safe to pass straight to the duration helpers.
+    var usesMinutes: Bool { minutes == true }
 }
 
 struct WorkoutDraft: Codable, Equatable {
@@ -117,7 +135,14 @@ struct LoggedExercise: Identifiable, Codable, Hashable {
     var name: String
     var bodyweight: Bool
     var timed: Bool
+    /// Display-only: `sets[].reps` is always seconds for a timed move. Optional
+    /// because a missing key must decode, not throw — `LocalStore.load` turns any
+    /// decode failure into an empty snapshot, which would wipe saved history.
+    var minutes: Bool?
     var sets: [LoggedSet]
+
+    /// See `ActiveExercise.usesMinutes`.
+    var usesMinutes: Bool { minutes == true }
 }
 
 struct WorkoutSession: Identifiable, Codable, Hashable {
@@ -130,6 +155,129 @@ struct WorkoutSession: Identifiable, Codable, Hashable {
     var note: String?
     var exercises: [LoggedExercise]
     var syncState: SyncState = .pending
+    /// Set for a tracked run/walk, which has no exercises. Optional so sessions
+    /// saved before the Run tab existed still decode — see `LocalStore.load`.
+    var activity: CardioActivity?
+
+    var isCardio: Bool { activity != nil }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  TRACKED CARDIO  (Run tab)
+// ─────────────────────────────────────────────────────────────
+
+enum CardioKind: String, Codable, Hashable, CaseIterable {
+    case run, walk, cycle
+
+    var label: String {
+        switch self {
+        case .run: "Run"
+        case .walk: "Walk"
+        case .cycle: "Cycle"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .run: "figure.run"
+        case .walk: "figure.walk"
+        case .cycle: "figure.outdoor.cycle"
+        }
+    }
+
+    var blurb: String {
+        switch self {
+        case .run: "Pace, distance and your route"
+        case .walk: "Easy miles still count"
+        case .cycle: "Longer rides, faster speeds"
+        }
+    }
+
+    /// Upper bound on a believable speed, in metres per second.
+    ///
+    /// This gate exists to throw away GPS teleports, not to police performance,
+    /// so every value is deliberately generous — set it too tight and real
+    /// distance is silently discarded with nothing in the UI to show for it.
+    /// A cyclist genuinely moves several times faster than a runner, which is
+    /// why this cannot be one shared constant.
+    var maxSpeed: Double {
+        switch self {
+        case .walk: 5     // 18 km/h — covers breaking into a jog mid-walk
+        case .run: 12     // 43 km/h — quicker than the 100m world record pace
+        case .cycle: 30   // 108 km/h — covers a fast descent
+        }
+    }
+}
+
+/// One GPS fix kept for the route line. Deliberately just two doubles: an hour
+/// run is a few thousand points and the whole snapshot is re-encoded on save.
+struct RoutePoint: Codable, Hashable {
+    var lat: Double
+    var lon: Double
+}
+
+struct CardioActivity: Codable, Hashable {
+    var kind: CardioKind
+    /// Moving time in seconds — time spent paused is not counted.
+    var duration: Int
+    /// Metres, accumulated from accuracy-filtered fixes.
+    var distance: Double
+    var route: [RoutePoint]
+}
+
+/// An in-progress run checkpointed to disk, so a crash, a force-quit or an OS
+/// eviction two hours into a ride does not throw the whole thing away.
+struct RunDraft: Codable, Equatable {
+    var kind: CardioKind
+    var distance: Double
+    /// Moving seconds at the moment this checkpoint was written. A restored run
+    /// always comes back **paused** and this is its entire elapsed time: the app
+    /// was not running, so it cannot honestly claim the user kept moving.
+    var elapsed: Int
+    var route: [RoutePoint]
+    var startedAt: Date
+}
+
+// ─────────────────────────────────────────────────────────────
+//  DISTANCE / PACE HELPERS
+//  Distance is stored canonically in METRES, like weight in kg and duration in
+//  seconds. The display unit follows the weight preference rather than adding a
+//  second setting — nobody logs pounds and kilometres.
+// ─────────────────────────────────────────────────────────────
+
+enum DistanceUnit {
+    case km, mi
+
+    var label: String { self == .km ? "km" : "mi" }
+    var metres: Double { self == .km ? 1000 : 1609.344 }
+}
+
+var currentDistanceUnit: DistanceUnit { currentWeightUnit == .kg ? .km : .mi }
+
+/// Number-only distance in the display unit, e.g. "5.42".
+func formatDistance(_ metres: Double) -> String {
+    String(format: "%.2f", metres / currentDistanceUnit.metres)
+}
+
+/// Pace as "m:ss" per km/mi — the number runners actually read. Returns
+/// "--:--" until there is enough distance for the figure to mean anything.
+func formatPace(seconds: Int, metres: Double) -> String {
+    guard seconds > 0, metres > 20 else { return "--:--" }
+    let perUnit = Double(seconds) / (metres / currentDistanceUnit.metres)
+    guard perUnit.isFinite, perUnit < 3600 else { return "--:--" }
+    let total = Int(perUnit.rounded())
+    return "\(total / 60):\(String(format: "%02d", total % 60))"
+}
+
+/// Elapsed clock for a run — "24:10", or "1:04:22" once past the hour.
+/// (`formatDuration` is the rest-timer's m:ss and never needs hours.)
+func formatElapsed(_ seconds: Int) -> String {
+    let hours = seconds / 3600
+    let minutes = (seconds % 3600) / 60
+    let secs = seconds % 60
+    return hours > 0
+        ? "\(hours):\(String(format: "%02d:%02d", minutes, secs))"
+        : "\(minutes):\(String(format: "%02d", secs))"
 }
 
 enum SyncState: String, Codable, Hashable {
@@ -154,6 +302,7 @@ struct AppSnapshot: Codable {
     var unitPreference: WeightUnit?
     var hasOnboarded: Bool?
     var timerPreset: Int?
+    var runDraft: RunDraft?
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -199,6 +348,32 @@ func formatWeightValue(_ kg: Double) -> String {
 /// Reuses `clean(_:)` so the number matches everywhere it is shown.
 func formatWeight(_ kg: Double) -> String {
     "\(formatWeightValue(kg)) \(currentWeightUnit.label)"
+}
+
+// ─────────────────────────────────────────────────────────────
+//  DURATION HELPERS  (timed exercises)
+//  Duration is stored canonically in SECONDS everywhere — in sets, drafts and
+//  Supabase — exactly like weight is stored in kg. `minutes` is a display/input
+//  concern only: cardio machines are logged in whole minutes, holds and
+//  intervals in seconds. These four are the only places that conversion lives.
+// ─────────────────────────────────────────────────────────────
+
+// `durationFieldLabel` lives in `LiveWorkoutModels.swift` instead — the widget
+// target needs it too, and this file is not compiled into the extension.
+
+/// Canonical seconds converted to the value shown in the input field.
+func displayDuration(_ seconds: Int, minutes: Bool) -> Int {
+    minutes ? seconds / 60 : seconds
+}
+
+/// Typed input in the display unit, converted back to canonical seconds.
+func displayDurationToSeconds(_ value: Int, minutes: Bool) -> Int {
+    minutes ? value * 60 : value
+}
+
+/// Display string for a stored duration, e.g. "20 min" / "45s".
+func formatLoggedDuration(_ seconds: Int, minutes: Bool) -> String {
+    minutes ? "\(seconds / 60) min" : "\(seconds)s"
 }
 
 /// Rest-timer default durations (seconds) offered in the Log and Settings tabs.

@@ -5,5 +5,6 @@ import SwiftUI
 struct IronLogWidgetBundle: WidgetBundle {
     var body: some Widget {
         WorkoutLiveActivity()
+        RunLiveActivity()
     }
 }

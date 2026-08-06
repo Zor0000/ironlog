@@ -227,6 +227,7 @@ struct AppShellView: View {
             TabView(selection: $app.selectedTab) {
                 WorkoutsView().tag(WorkoutTab.workouts)
                 LogView().tag(WorkoutTab.log)
+                RunView().tag(WorkoutTab.run)
                 HistoryView().tag(WorkoutTab.history)
                 StatsView().tag(WorkoutTab.stats)
             }
@@ -236,10 +237,11 @@ struct AppShellView: View {
             HStack {
                 navButton(.workouts, "Workouts", "list.bullet")
                 navButton(.log, "Today", "timer")
+                navButton(.run, "Run", "figure.run")
                 navButton(.history, "History", "calendar")
                 navButton(.stats, "Stats", "chart.bar")
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
             .padding(.top, 9)
             .padding(.bottom, 10)
             .background {

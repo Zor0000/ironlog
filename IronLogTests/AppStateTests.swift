@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import IronLog
 
 @MainActor
@@ -142,6 +143,57 @@ final class AppStateTests: XCTestCase {
         // Loaded work counts toward volume and sets a real PR.
         XCTAssertEqual(app.stats.volume, 240)
         XCTAssertEqual(app.personalRecords["Walking Lunges"]?.weight, 20)
+    }
+
+    /// Cardio machines are typed in whole minutes but stored in canonical
+    /// seconds, and stay out of the PR table — "BW x 1200" reads as nonsense.
+    func testCardioMinutesStoreAsSecondsAndSkipRecords() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        let bike = app.library
+            .catalogExercises(muscleID: "cardio", query: "stationary bike")
+            .first { $0.template.name == "Stationary Bike" }!
+        XCTAssertTrue(bike.template.timed)
+        XCTAssertTrue(bike.template.minutes)
+        app.addExercise(template: bike.template)
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "20")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        XCTAssertTrue(app.todayExercises[0].sets[0].done)
+
+        await app.finishWorkout(note: "")
+
+        let logged = app.sessions[0].exercises[0]
+        XCTAssertTrue(logged.usesMinutes)
+        XCTAssertEqual(logged.sets[0].reps, 1200)
+        XCTAssertNil(logged.sets[0].weight)
+        // No weight means no volume, and timed work earns no personal record.
+        XCTAssertEqual(app.stats.volume, 0)
+        XCTAssertNil(app.personalRecords["Stationary Bike"])
+    }
+
+    /// The seconds-based timed moves (holds, rope intervals) must be untouched
+    /// by the minutes conversion.
+    func testSecondsBasedTimedExerciseStoresRawSeconds() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        let plank = app.library
+            .catalogExercises(muscleID: "core", query: "plank")
+            .first { $0.template.name == "Plank" }!
+        XCTAssertFalse(plank.template.minutes)
+        app.addExercise(template: plank.template)
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "45")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 45)
+        XCTAssertFalse(app.sessions[0].exercises[0].usesMinutes)
     }
 
     /// The unloaded case must still work: blank weight stays bodyweight rather
@@ -525,4 +577,254 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(app2.showingAuth)
     }
 
+    /// A finished bodyweight set legitimately has no weight. Seeding the stepper
+    /// used to target the last *completed* set on a finished exercise, writing a
+    /// PR weight into it — and `reconcileFromLiveActivity` folded that invented
+    /// load back into the session on the next foreground.
+    func testFinishedBodyweightSetIsNotSeededWithAPersonalRecord() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(name: "Pull Ups")
+        app.personalRecords["Pull Ups"] = PersonalRecord(
+            exerciseName: "Pull Ups", weight: 20, reps: 6, achievedAt: Date()
+        )
+
+        // Log every set unloaded, so the exercise is finished and weight-free.
+        let exerciseID = app.todayExercises[0].id
+        for set in app.todayExercises[0].sets {
+            app.updateSet(exerciseID: exerciseID, setID: set.id, reps: "10")
+            app.toggleDone(exerciseID: exerciseID, setID: set.id)
+        }
+        XCTAssertTrue(app.todayExercises[0].sets.allSatisfy(\.done))
+
+        let live = app.buildLiveState()
+
+        XCTAssertTrue(live.exercises[0].sets.allSatisfy { $0.weight.isEmpty },
+                      "A completed bodyweight set must not gain a weight it was never performed with")
+    }
+
+    /// Undo and Next/Prev both clear rest on the lock screen and cancel its
+    /// notification. Reconcile only ever *resumed* a countdown, never stopped
+    /// one, so the in-app timer kept counting against a rest that no longer
+    /// existed — and would never alert, the notification having already gone.
+    func testReconcileStopsAnInAppRestTheLockScreenCleared() async {
+        let app = AppState()
+        let spy = SpyNotifier()
+        app.notifier = spy
+        app.startFreeWorkout()
+        app.addExercise(name: "Squat")
+        app.startTimer()
+        XCTAssertTrue(app.timerRunning)
+        XCTAssertNotNil(spy.scheduledAt)
+
+        var live = app.buildLiveState()
+        live.restEndsAt = nil // what Undo / navigating exercises leaves behind
+        LiveWorkoutEngine.shared.sync(live)
+        await LiveWorkoutEngine.shared.waitForPendingOperations()
+
+        app.reconcileFromLiveActivity()
+
+        XCTAssertFalse(app.timerRunning, "the in-app countdown must not outlive the rest the lock screen cleared")
+        XCTAssertNil(spy.scheduledAt, "and it must not be left waiting on a notification nobody will send")
+
+        LiveWorkoutEngine.shared.end()
+        await LiveWorkoutEngine.shared.waitForPendingOperations()
+    }
+
+    /// The wizard transition pushes left-to-right or right-to-left off this
+    /// flag. It used to be hardcoded forward, so tapping Back slid the previous
+    /// screen in from the wrong side and read as another step forward.
+    func testWizardStepDirectionTracksForwardAndBack() {
+        let app = AppState()
+        XCTAssertFalse(app.steppingBack)
+
+        app.selectSplit("PPL")
+        XCTAssertEqual(app.workoutStep, .day)
+        XCTAssertFalse(app.steppingBack, "split → day is forward")
+
+        app.selectDay("Push")
+        XCTAssertFalse(app.steppingBack, "day → workout is forward")
+
+        // What the Back button does — it assigns the step directly.
+        app.workoutStep = .day
+        XCTAssertTrue(app.steppingBack, "workout → day is back")
+
+        app.workoutStep = .split
+        XCTAssertTrue(app.steppingBack, "day → split is back")
+
+        // Full Body skips the day step; a two-step jump is still forward.
+        app.workoutStep = .workout
+        XCTAssertFalse(app.steppingBack, "split → workout skips a step but is forward")
+    }
+
+    // MARK: - Run tracking
+
+    /// Metres north of a base point, as a fix the tracker will accept.
+    private func fix(metresNorth: Double, secondsLater: Double, accuracy: CLLocationAccuracy = 8) -> CLLocation {
+        CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 51.5 + metresNorth / 111_320, longitude: -0.12),
+            altitude: 0,
+            horizontalAccuracy: accuracy,
+            verticalAccuracy: 4,
+            timestamp: Date(timeIntervalSince1970: 1_000_000 + secondsLater)
+        )
+    }
+
+    /// GPS wanders a couple of metres while you stand at a traffic light. Left
+    /// unfiltered that drift is counted as distance and inflates every run.
+    func testSubThresholdDriftIsNotCountedAsDistance() {
+        let anchor = fix(metresNorth: 0, secondsLater: 0)
+        let jitter = fix(metresNorth: 2, secondsLater: 2)
+        XCTAssertEqual(RunTracker.verdict(from: anchor, to: jitter, kind: .run), .noise)
+    }
+
+    /// Crucially, drift must not advance the anchor either — otherwise slow
+    /// walking is discarded one sub-threshold step at a time. Three 2m steps
+    /// away from a kept anchor eventually clear the floor and count once.
+    func testSlowMovementStillAccumulatesAgainstTheKeptAnchor() {
+        let anchor = fix(metresNorth: 0, secondsLater: 0)
+        XCTAssertEqual(RunTracker.verdict(from: anchor, to: fix(metresNorth: 2, secondsLater: 2), kind: .run), .noise)
+        guard case .counted(let metres) = RunTracker.verdict(from: anchor, to: fix(metresNorth: 6, secondsLater: 6), kind: .run) else {
+            return XCTFail("6m from the retained anchor should count")
+        }
+        XCTAssertEqual(metres, 6, accuracy: 0.5)
+    }
+
+    func testImplausibleSpeedIsRejectedAsAJump() {
+        let anchor = fix(metresNorth: 0, secondsLater: 0)
+        let teleport = fix(metresNorth: 500, secondsLater: 1)
+        XCTAssertEqual(RunTracker.verdict(from: anchor, to: teleport, kind: .run), .jump)
+    }
+
+    func testRealStrideIsCounted() {
+        let anchor = fix(metresNorth: 0, secondsLater: 0)
+        guard case .counted(let metres) = RunTracker.verdict(from: anchor, to: fix(metresNorth: 10, secondsLater: 3), kind: .run) else {
+            return XCTFail("10m in 3s is a run, not noise")
+        }
+        XCTAssertEqual(metres, 10, accuracy: 0.5)
+    }
+
+    func testInaccurateAndStaleFixesAreDistrusted() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        // Negative accuracy means CoreLocation has no fix at all.
+        XCTAssertFalse(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: 0, accuracy: -1), now: now))
+        XCTAssertFalse(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: 0, accuracy: 50), now: now))
+        XCTAssertFalse(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: -60), now: now))
+        XCTAssertTrue(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: 0), now: now))
+    }
+
+    /// A saved run joins the History timeline and the streak, contributes no
+    /// sets or volume, and stays out of the cloud queue.
+    func testSavedRunBecomesALocalCardioSession() {
+        let app = AppState()
+        app.saveRun(CardioActivity(kind: .run, duration: 1_800, distance: 5_000, route: []))
+
+        XCTAssertEqual(app.sessions.count, 1)
+        let session = app.sessions[0]
+        XCTAssertTrue(session.isCardio)
+        XCTAssertEqual(session.activity?.distance, 5_000)
+        XCTAssertEqual(session.split, "Run")
+        XCTAssertTrue(session.exercises.isEmpty)
+        // Never queued for backup: the schema has nowhere to put the run.
+        XCTAssertEqual(session.syncState, .localOnly)
+        XCTAssertEqual(app.stats.sets, 0)
+        XCTAssertEqual(app.stats.volume, 0)
+        XCTAssertEqual(app.stats.streak, 1)
+    }
+
+    func testFinishingARunWithNothingTrackedSavesNothing() {
+        let app = AppState()
+        app.saveRun(nil)
+
+        XCTAssertTrue(app.sessions.isEmpty)
+        XCTAssertEqual(app.toast, "Nothing tracked yet — give it a few metres")
+    }
+
+    func testPaceIsPerDisplayUnitAndGuardsAgainstNonsense() {
+        currentWeightUnit = .kg
+        // 5 km in 30 min = 6:00 / km.
+        XCTAssertEqual(formatPace(seconds: 1_800, metres: 5_000), "6:00")
+        // Too little distance to mean anything yet.
+        XCTAssertEqual(formatPace(seconds: 10, metres: 3), "--:--")
+        XCTAssertEqual(formatPace(seconds: 0, metres: 5_000), "--:--")
+    }
+
+    func testElapsedGrowsIntoHours() {
+        XCTAssertEqual(formatElapsed(65), "1:05")
+        XCTAssertEqual(formatElapsed(1_450), "24:10")
+        XCTAssertEqual(formatElapsed(3_862), "1:04:22")
+    }
+
+    /// The speed gate must scale with the activity. A cyclist at 20 m/s
+    /// (72 km/h) on a descent is normal; judging that against a runner's ceiling
+    /// would discard the fastest part of every ride, silently and with nothing
+    /// in the UI to show for it.
+    func testSpeedGateScalesWithTheActivity() {
+        let anchor = fix(metresNorth: 0, secondsLater: 0)
+        let fast = fix(metresNorth: 20, secondsLater: 1)
+
+        XCTAssertEqual(RunTracker.verdict(from: anchor, to: fast, kind: .run), .jump)
+        guard case .counted(let metres) = RunTracker.verdict(from: anchor, to: fast, kind: .cycle) else {
+            return XCTFail("20 m/s is an ordinary descent on a bike")
+        }
+        XCTAssertEqual(metres, 20, accuracy: 0.5)
+    }
+
+    /// A brisk 4 m/s is a jog, believable inside a "walk"; 20 m/s is not.
+    func testWalkGateIsTighterThanRunning() {
+        let anchor = fix(metresNorth: 0, secondsLater: 0)
+        guard case .counted = RunTracker.verdict(from: anchor, to: fix(metresNorth: 8, secondsLater: 2), kind: .walk) else {
+            return XCTFail("4 m/s is a jog, not a teleport")
+        }
+        XCTAssertEqual(RunTracker.verdict(from: anchor, to: fix(metresNorth: 40, secondsLater: 2), kind: .walk), .jump)
+    }
+
+    /// A run recovered from disk must come back paused, keeping its distance and
+    /// its elapsed time, and must say why it is paused.
+    func testRestoredRunComesBackPausedAndIntact() {
+        let tracker = RunTracker.shared
+        tracker.discard()
+        defer { tracker.discard() }
+
+        tracker.restore(from: RunDraft(
+            kind: .cycle,
+            distance: 12_400,
+            elapsed: 2_640,
+            route: [RoutePoint(lat: 51.5, lon: -0.12), RoutePoint(lat: 51.51, lon: -0.12)],
+            startedAt: Date(timeIntervalSince1970: 1_000_000)
+        ))
+
+        XCTAssertEqual(tracker.phase, .paused)
+        XCTAssertEqual(tracker.interruption, .restored)
+        XCTAssertEqual(tracker.kind, .cycle)
+        XCTAssertEqual(tracker.distance, 12_400)
+        XCTAssertEqual(tracker.elapsed, 2_640)
+        XCTAssertEqual(tracker.route.count, 2)
+        // Recovered work is savable straight away.
+        XCTAssertEqual(tracker.activity?.distance, 12_400)
+    }
+
+    /// Discarding must leave nothing behind for the next run to inherit.
+    func testDiscardClearsEverything() {
+        let tracker = RunTracker.shared
+        tracker.restore(from: RunDraft(kind: .run, distance: 500, elapsed: 120, route: [], startedAt: Date()))
+        tracker.discard()
+
+        XCTAssertEqual(tracker.phase, .idle)
+        XCTAssertEqual(tracker.distance, 0)
+        XCTAssertEqual(tracker.elapsed, 0)
+        XCTAssertNil(tracker.interruption)
+        XCTAssertNil(tracker.activity)
+        XCTAssertFalse(tracker.hasActiveRun)
+    }
+
+    /// Every activity needs its own tile, label and icon in the picker.
+    func testEveryCardioKindIsSelectable() {
+        XCTAssertEqual(CardioKind.allCases, [.run, .walk, .cycle])
+        for kind in CardioKind.allCases {
+            XCTAssertFalse(kind.label.isEmpty)
+            XCTAssertFalse(kind.icon.isEmpty)
+            XCTAssertGreaterThan(kind.maxSpeed, 0)
+        }
+    }
 }

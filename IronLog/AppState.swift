@@ -12,11 +12,21 @@ final class AppState: ObservableObject {
 
     @Published var selectedSplit: String?
     @Published var selectedDay: String?
-    @Published var workoutStep: WorkoutStep = .split
+    @Published var workoutStep: WorkoutStep = .split {
+        didSet { steppingBack = workoutStep.order < oldValue.order }
+    }
+    /// Which way the wizard last moved, so the screen transition can push
+    /// forward or pop back. Derived here rather than at each call site — the
+    /// back buttons assign `workoutStep` directly, and a restored draft jumps
+    /// straight to its step — so every path animates the right way round.
+    @Published private(set) var steppingBack = false
     @Published var todayExercises: [ActiveExercise] = []
     @Published var showAddExerciseForm = false
     @Published var addExerciseWeighted = false
     @Published var workoutNote = ""
+    /// Last checkpoint of an in-progress run, mirrored into every snapshot so a
+    /// crash mid-activity does not lose it. Owned by `RunTracker`.
+    private var runDraft: RunDraft?
 
     @Published var sessions: [WorkoutSession] = []
     @Published var personalRecords: [String: PersonalRecord] = [:]
@@ -162,6 +172,8 @@ final class AppState: ObservableObject {
                 selectedTab = .log
             }
         }
+        attachRunTracking(snapshot)
+
         user = supabase.currentUser
         if user != nil {
             await refreshFromCloud()
@@ -320,6 +332,7 @@ final class AppState: ObservableObject {
                 name: template.name,
                 bodyweight: template.bodyweight,
                 timed: template.timed,
+                minutes: template.minutes,
                 // Split starts collapsed so the list isn't overwhelming — user opens each exercise as they reach it.
                 expanded: false,
                 sets: (0..<max(template.sets, 1)).map { _ in WorkoutSet() }
@@ -475,6 +488,7 @@ final class AppState: ObservableObject {
             name: template.name,
             bodyweight: template.bodyweight,
             timed: template.timed,
+            minutes: template.minutes,
             custom: false,
             sets: (0..<max(template.sets, 1)).map { _ in WorkoutSet() }
         ))
@@ -495,7 +509,7 @@ final class AppState: ObservableObject {
                 loggedSet(for: exercise, set: set)
             }
             guard !sets.isEmpty else { return nil }
-            return LoggedExercise(name: exercise.name, bodyweight: exercise.bodyweight, timed: exercise.timed, sets: sets)
+            return LoggedExercise(name: exercise.name, bodyweight: exercise.bodyweight, timed: exercise.timed, minutes: exercise.minutes, sets: sets)
         }
         guard !logged.isEmpty else {
             showToast("Log at least one set first")
@@ -535,6 +549,57 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Save a tracked run/walk as its own session. It carries no exercises, so
+    /// it bypasses `finishWorkout`'s set validation entirely; the streak and the
+    /// History timeline pick it up like any other session.
+    ///
+    /// ponytail: cardio stays on-device. The `sessions` table has no columns for
+    /// distance/duration/route, so backing one up would persist a row that has
+    /// lost everything that made it a run. Add the columns, then delete the
+    /// `.localOnly` here and the `isCardio` guard in `syncPending`.
+    /// Wire the tracker's periodic checkpoints into the local store and bring
+    /// back any run the app died in the middle of. Called once from `boot`.
+    func attachRunTracking(_ snapshot: AppSnapshot) {
+        RunTracker.shared.onCheckpoint = { [weak self] draft in
+            guard let self else { return }
+            runDraft = draft
+            persistAll()
+        }
+        // Lock-screen buttons run their intent in this process, so they drive the
+        // very same tracker the in-app buttons do — the two surfaces cannot drift.
+        LiveRunControls.pause = { RunTracker.shared.pause() }
+        LiveRunControls.resume = { RunTracker.shared.resume() }
+        LiveRunControls.finish = { [weak self] in
+            self?.saveRun(RunTracker.shared.finish())
+        }
+        if let draft = snapshot.runDraft {
+            runDraft = draft
+            RunTracker.shared.restore(from: draft)
+            selectedTab = .run
+        }
+    }
+
+    func saveRun(_ activity: CardioActivity?) {
+        guard let activity else {
+            showToast("Nothing tracked yet — give it a few metres")
+            return
+        }
+        let session = WorkoutSession(
+            userID: user?.id,
+            createdAt: Date(),
+            muscle: nil,
+            split: activity.kind.label,
+            note: nil,
+            exercises: [],
+            syncState: .localOnly,
+            activity: activity
+        )
+        sessions.insert(session, at: 0)
+        persistAll()
+        selectedTab = .history
+        showToast("\(activity.kind.label) saved")
+    }
+
     func deleteSession(_ id: WorkoutSession.ID) async {
         guard let session = sessions.first(where: { $0.id == id }) else { return }
         sessions.removeAll { $0.id == id }
@@ -553,7 +618,7 @@ final class AppState: ObservableObject {
         let logged = exercises.compactMap { exercise -> LoggedExercise? in
             let sets = exercise.sets.compactMap { loggedSet(for: exercise, set: $0) }
             guard !sets.isEmpty else { return nil }
-            return LoggedExercise(name: exercise.name, bodyweight: exercise.bodyweight, timed: exercise.timed, sets: sets)
+            return LoggedExercise(name: exercise.name, bodyweight: exercise.bodyweight, timed: exercise.timed, minutes: exercise.minutes, sets: sets)
         }
         guard !logged.isEmpty else {
             showToast("Keep at least one valid set")
@@ -660,7 +725,10 @@ final class AppState: ObservableObject {
     func syncPending() async {
         guard supabase.isAuthenticated else { return }
         let syncedUserID = supabase.currentUser?.id
-        for session in sessions where session.syncState != .synced {
+        // Cardio is deliberately excluded — see `saveRun`. Uploading one would
+        // create a session row stripped of the distance, duration and route that
+        // are the entire point of it.
+        for session in sessions where session.syncState != .synced && !session.isCardio {
             do {
                 let cloudID = try await supabase.backup(session: session, records: Array(personalRecords.values))
                 if let index = sessions.firstIndex(where: { $0.id == session.id }) {
@@ -727,6 +795,11 @@ final class AppState: ObservableObject {
 
     private func applyRecords(from session: WorkoutSession) {
         for exercise in session.exercises {
+            // Timed work carries no weight and its `reps` are seconds, so a
+            // 30-minute bike ride would land in Personal Records as "BW x 1800".
+            // ponytail: timed work earns no PR at all; add a duration comparator
+            // ("longest hold", "furthest row") if cardio records are wanted.
+            guard !exercise.timed else { continue }
             for set in exercise.sets {
                 let weight = set.weight ?? 0
                 let record = PersonalRecord(exerciseName: exercise.name, weight: weight, reps: set.reps, achievedAt: session.createdAt)
@@ -748,8 +821,10 @@ final class AppState: ObservableObject {
     }
 
     private func isNewPR(exercise: ActiveExercise, set: WorkoutSet) -> Bool {
-        guard let reps = Int(set.reps) else { return false }
-        let weight = exercise.timed ? 0 : (typedWeightKg(set) ?? 0)
+        // Must match `applyRecords`, or the toast celebrates a PR that is never
+        // recorded.
+        guard !exercise.timed, let reps = Int(set.reps) else { return false }
+        let weight = typedWeightKg(set) ?? 0
         guard let pr = personalRecords[exercise.name] else { return reps > 0 }
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
     }
@@ -763,7 +838,8 @@ final class AppState: ObservableObject {
     private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
         guard set.done, let reps = Int(set.reps), reps > 0 else { return nil }
         if exercise.timed {
-            return LoggedSet(weight: nil, reps: reps)
+            // Durations are stored in seconds; cardio machines type minutes.
+            return LoggedSet(weight: nil, reps: displayDurationToSeconds(reps, minutes: exercise.usesMinutes))
         }
         guard let weight = typedWeightKg(set) else {
             return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps) : nil
@@ -779,7 +855,9 @@ final class AppState: ObservableObject {
 
     private func validationMessage(for exercise: ActiveExercise) -> String {
         if exercise.timed {
-            return "Enter seconds before marking the set done"
+            return exercise.usesMinutes
+                ? "Enter minutes before marking the set done"
+                : "Enter seconds before marking the set done"
         }
         if exercise.bodyweight {
             return "Enter reps before marking the set done"
@@ -809,7 +887,8 @@ final class AppState: ObservableObject {
             draft: clearDraft ? nil : (draft ?? currentDraft),
             unitPreference: unitPreference,
             hasOnboarded: hasOnboarded,
-            timerPreset: timerMax
+            timerPreset: timerMax,
+            runDraft: runDraft
         )
         let previous = saveTask
         saveTask = Task { [localStore] in

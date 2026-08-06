@@ -105,7 +105,7 @@ struct HistoryCard: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(session.createdAt.displayDay)
                                 .font(.system(size: 15, weight: .semibold))
-                            Text("\(setCount) \(setCount == 1 ? "set" : "sets") · \(session.split ?? "Workout") · \(syncText)")
+                            Text(subtitle)
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.muted2)
                         }
@@ -125,19 +125,23 @@ struct HistoryCard: View {
                 .accessibilityIdentifier("history-card-toggle")
                 .accessibilityLabel("\(session.createdAt.displayDay), \(session.split ?? "Workout"), \(expanded ? "collapse" : "expand")")
 
-                Button {
-                    NativeFeedback.selection()
-                    editTarget = session
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 14))
-                        .frame(width: 30, height: 30)
-                        .foregroundStyle(Theme.muted2)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
+                // A run has no sets to edit, and the editor would refuse to save
+                // it ("Keep at least one valid set").
+                if !session.isCardio {
+                    Button {
+                        NativeFeedback.selection()
+                        editTarget = session
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                            .frame(width: 30, height: 30)
+                            .foregroundStyle(Theme.muted2)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                    .accessibilityIdentifier("edit-session-button")
+                    .accessibilityLabel("Edit session from \(session.createdAt.displayDay)")
                 }
-                .buttonStyle(TactileButtonStyle())
-                .accessibilityIdentifier("edit-session-button")
-                .accessibilityLabel("Edit session from \(session.createdAt.displayDay)")
 
                 Button {
                     NativeFeedback.selection()
@@ -158,12 +162,15 @@ struct HistoryCard: View {
 
             if expanded {
                 VStack(spacing: 0) {
+                    if let activity = session.activity {
+                        cardioDetail(activity)
+                    }
                     ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, exercise in
                         HStack(alignment: .top) {
                             Text(exercise.name)
                                 .font(.system(size: 13, weight: .medium))
                             Spacer()
-                            Text(exercise.sets.map(setLabel).joined(separator: ", "))
+                            Text(exercise.sets.map { setLabel($0, in: exercise) }.joined(separator: ", "))
                                 .font(.system(size: 12))
                                 .foregroundStyle(Theme.muted2)
                                 .multilineTextAlignment(.trailing)
@@ -201,6 +208,46 @@ struct HistoryCard: View {
         session.exercises.reduce(0) { $0 + $1.sets.count }
     }
 
+    /// A run's headline is its distance, not its (zero) set count.
+    private var subtitle: String {
+        if let activity = session.activity {
+            return "\(formatDistance(activity.distance)) \(currentDistanceUnit.label) · \(formatElapsed(activity.duration)) · \(syncText)"
+        }
+        return "\(setCount) \(setCount == 1 ? "set" : "sets") · \(session.split ?? "Workout") · \(syncText)"
+    }
+
+    private func cardioDetail(_ activity: CardioActivity) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                cardioMetric(formatDistance(activity.distance), currentDistanceUnit.label)
+                Spacer()
+                cardioMetric(formatElapsed(activity.duration), "time")
+                Spacer()
+                cardioMetric(formatPace(seconds: activity.duration, metres: activity.distance), "/\(currentDistanceUnit.label)")
+            }
+            // A two-point "route" is a straight line through nothing — not worth
+            // the map tiles.
+            if activity.route.count > 2 {
+                RouteMap(route: activity.route)
+            }
+        }
+        .padding(14)
+        .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .top)
+    }
+
+    private func cardioMetric(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 22, weight: .bold))
+                .fontWidth(.condensed)
+            Text(label)
+                .font(.system(size: 10))
+                .tracking(0.5)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.muted2)
+        }
+    }
+
     private var syncText: String {
         switch session.syncState {
         case .synced: "synced"
@@ -210,7 +257,12 @@ struct HistoryCard: View {
         }
     }
 
-    private func setLabel(_ set: LoggedSet) -> String {
+    private func setLabel(_ set: LoggedSet, in exercise: LoggedExercise) -> String {
+        // A timed set's `reps` are seconds, not repetitions — showing "BW x 1800"
+        // for a 30-minute ride reads as nonsense.
+        if exercise.timed {
+            return formatLoggedDuration(set.reps, minutes: exercise.usesMinutes)
+        }
         if let weight = set.weight, weight > 0 {
             return "\(formatWeight(weight)) x \(set.reps)"
         }
@@ -242,10 +294,13 @@ struct EditSessionSheet: View {
                 name: exercise.name,
                 bodyweight: exercise.bodyweight,
                 timed: exercise.timed,
+                minutes: exercise.minutes,
                 sets: exercise.sets.map { set in
                     WorkoutSet(
                         weight: set.weight.map { formatWeightValue($0) } ?? "",
-                        reps: String(set.reps),
+                        // Stored seconds back into the field's own unit, mirroring
+                        // the kg → display-unit conversion on the line above.
+                        reps: String(displayDuration(set.reps, minutes: exercise.usesMinutes)),
                         done: true
                     )
                 }
@@ -352,7 +407,8 @@ struct EditSessionSheet: View {
                         append(
                             name: template.name,
                             bodyweight: template.bodyweight,
-                            timed: template.timed
+                            timed: template.timed,
+                            minutes: template.minutes
                         )
                     }
                 }
@@ -382,11 +438,12 @@ struct EditSessionSheet: View {
 
     /// New sets start `done` like the rest of a saved session; `updateSession`
     /// still drops any left without valid reps.
-    private func append(name: String, bodyweight: Bool, timed: Bool, custom: Bool = false) {
+    private func append(name: String, bodyweight: Bool, timed: Bool, minutes: Bool = false, custom: Bool = false) {
         exercises.append(ActiveExercise(
             name: name,
             bodyweight: bodyweight,
             timed: timed,
+            minutes: minutes,
             custom: custom,
             sets: [WorkoutSet(done: true)]
         ))
@@ -413,7 +470,7 @@ struct EditSessionSheet: View {
                             exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
                         }
                     }
-                    SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? "SECS" : "REPS") : "", value: set.reps, identifier: "edit-reps-input") { value in
+                    SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, identifier: "edit-reps-input") { value in
                         exercise.wrappedValue.sets[index].reps = value.filter(\.isNumber)
                     }
                     Button {

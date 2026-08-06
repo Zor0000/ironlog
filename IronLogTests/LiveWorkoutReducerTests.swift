@@ -136,6 +136,100 @@ final class LiveWorkoutReducerTests: XCTestCase {
         XCTAssertEqual(LiveWorkoutReducer.formatWeight(60.0), "60")
         XCTAssertEqual(LiveWorkoutReducer.formatWeight(100), "100")
     }
+
+    // MARK: - Navigating back to a finished exercise
+
+    /// Exercise 0 fully logged, exercise 1 still open, sitting on exercise 0 —
+    /// exactly what "go back one exercise" lands you in.
+    private func finishedFirstExercise() -> LiveWorkoutState {
+        var state = weightedWorkout()
+        for index in state.exercises[0].sets.indices {
+            state.exercises[0].sets[index].weight = "60"
+            state.exercises[0].sets[index].reps = "8"
+            state.exercises[0].sets[index].done = true
+        }
+        state.currentExerciseIndex = 0
+        return state
+    }
+
+    /// The reported bug: on a finished exercise, `Log set` re-logged its last
+    /// completed set and restarted the rest period from full.
+    func testLoggingOnAFinishedExerciseDoesNotRestartRest() {
+        var state = finishedFirstExercise()
+        state.restEndsAt = nil
+
+        state = LiveWorkoutReducer.logCurrentSet(state)
+
+        XCTAssertNil(state.restEndsAt, "A finished exercise has nothing to log, so rest must not restart")
+    }
+
+    /// The steppers stayed bound to the last completed set, so ± silently
+    /// rewrote work the user had already logged.
+    func testSteppersCannotRewriteAFinishedExercise() {
+        var state = finishedFirstExercise()
+
+        state = LiveWorkoutReducer.adjustWeight(state, by: 1)
+        state = LiveWorkoutReducer.adjustReps(state, by: 1)
+
+        XCTAssertEqual(state.exercises[0].sets[2].weight, "60")
+        XCTAssertEqual(state.exercises[0].sets[2].reps, "8")
+    }
+
+    /// Undo is the one action that must still work there — it is how you reopen
+    /// a set you finished by mistake.
+    func testUndoStillWorksOnAFinishedExercise() {
+        var state = finishedFirstExercise()
+        state = LiveWorkoutReducer.unlogCurrentSet(state)
+        XCTAssertFalse(state.exercises[0].sets[2].done)
+
+        // And once reopened, the steppers own it again.
+        state = LiveWorkoutReducer.adjustReps(state, by: 1)
+        XCTAssertEqual(state.exercises[0].sets[2].reps, "9")
+    }
+
+    /// Display still points at the last set, so the card reads "Set 3/3" rather
+    /// than snapping back to "Set 1/3" on a finished exercise.
+    func testFinishedExerciseStillDisplaysItsLastSet() {
+        let state = finishedFirstExercise()
+        XCTAssertEqual(state.currentSetNumber, 3)
+        XCTAssertNil(state.editableSetIndex)
+        XCTAssertTrue(state.isCurrentExerciseComplete)
+    }
+
+    // MARK: - Which exercise the card follows
+
+    /// `previous` is the last synced index, not just one a Next/Prev tap made,
+    /// so honouring it unconditionally pinned the card to exercise 1 for the
+    /// whole workout.
+    func testCardAdvancesOnceAnExerciseIsFinished() {
+        let exercises = finishedFirstExercise().exercises
+        XCTAssertEqual(LiveWorkoutReducer.exerciseIndex(for: exercises, previous: 0), 1)
+    }
+
+    /// Navigating to an exercise that still has work is respected.
+    func testCardStaysWhereTheUserNavigated() {
+        var state = weightedWorkout()
+        state.exercises[0].sets[0].done = true
+        XCTAssertEqual(LiveWorkoutReducer.exerciseIndex(for: state.exercises, previous: 1), 1)
+        XCTAssertEqual(LiveWorkoutReducer.exerciseIndex(for: state.exercises, previous: nil), 0)
+    }
+
+    /// An index left over from a deleted exercise must not crash or stick.
+    func testOutOfBoundsPreviousIndexFallsBack() {
+        let exercises = weightedWorkout().exercises
+        XCTAssertEqual(LiveWorkoutReducer.exerciseIndex(for: exercises, previous: 99), 0)
+    }
+
+    /// With everything logged there is no open set to move to; hold on the last.
+    func testFullyLoggedWorkoutHoldsOnTheLastExercise() {
+        var state = weightedWorkout()
+        for ei in state.exercises.indices {
+            for si in state.exercises[ei].sets.indices {
+                state.exercises[ei].sets[si].done = true
+            }
+        }
+        XCTAssertEqual(LiveWorkoutReducer.exerciseIndex(for: state.exercises, previous: 0), 1)
+    }
 }
 
 @MainActor
