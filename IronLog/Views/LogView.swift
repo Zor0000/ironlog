@@ -453,7 +453,7 @@ struct LogExerciseCard: View {
                         app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                     }
                 }
-                SmallInput(label: index == 0 ? (exercise.timed ? "SECS" : "REPS") : "", value: set.reps, placeholder: refSet.map { String($0.reps) } ?? "0", keyboard: .numberPad, identifier: "set-reps-input") { value in
+                SmallInput(label: index == 0 ? (exercise.timed ? durationFieldLabel(minutes: exercise.usesMinutes) : "REPS") : "", value: set.reps, placeholder: refPlaceholder(refSet), keyboard: .numberPad, identifier: "set-reps-input") { value in
                     app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
                 }
                 Button {
@@ -501,10 +501,17 @@ struct LogExerciseCard: View {
         }
     }
 
+    /// Last time's value pre-filled into the duration/reps field. Stored durations
+    /// are seconds, so a minutes-based move shows them back in minutes.
+    private func refPlaceholder(_ refSet: LoggedSet?) -> String {
+        guard let refSet else { return "0" }
+        return String(displayDuration(refSet.reps, minutes: exercise.usesMinutes))
+    }
+
     /// Muted "Last: …" hint mirroring the web client's `.set-ref` line.
     private func referenceLabel(_ refSet: LoggedSet?) -> String? {
         guard let refSet else { return nil }
-        if exercise.timed { return "Last: \(refSet.reps)s" }
+        if exercise.timed { return "Last: \(formatLoggedDuration(refSet.reps, minutes: exercise.usesMinutes))" }
         // Weight presence decides, not the bodyweight flag — a loaded lunge
         // logs its weight and should show it back.
         guard let weight = refSet.weight, weight > 0 else { return "Last: \(refSet.reps) reps" }
@@ -803,7 +810,7 @@ struct ExerciseCatalogPicker: View {
     }
 
     private func meta(_ template: ExerciseTemplate) -> String {
-        var parts = ["\(template.sets)×\(template.reps) \(template.timed ? "sec" : "reps")"]
+        var parts = ["\(template.sets)×\(template.reps) \(template.timed ? (template.minutes ? "min" : "sec") : "reps")"]
         if template.bodyweight || template.timed {
             parts.append(template.timed ? "Timed" : "Bodyweight")
         }

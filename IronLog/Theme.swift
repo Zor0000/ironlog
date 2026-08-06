@@ -130,19 +130,38 @@ extension View {
     }
 }
 
+/// Set on a subtree whose content is *returning* rather than arriving for the
+/// first time — stepping back through the workout wizard, say. The staggered
+/// entrance is an arrival cue, and replaying it on the way back makes a screen
+/// you already visited feel like somewhere new.
+private struct SuppressesEntranceKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var suppressesEntrance: Bool {
+        get { self[SuppressesEntranceKey.self] }
+        set { self[SuppressesEntranceKey.self] = newValue }
+    }
+}
+
 private struct EntranceModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.suppressesEntrance) private var suppressed
     @State private var isVisible = false
     let index: Int
     let offset: CGFloat
 
     func body(content: Content) -> some View {
         content
-            .opacity(isVisible ? 1 : 0)
-            .offset(y: isVisible || reduceMotion ? 0 : offset)
-            .scaleEffect(isVisible || reduceMotion ? 1 : 0.985)
+        // `suppressed` short-circuits the rendered values too, not just
+        // `onAppear` — settling in `onAppear` alone would still flash one frame
+        // at zero opacity before the content is ever seen.
+            .opacity(isVisible || suppressed ? 1 : 0)
+            .offset(y: isVisible || reduceMotion || suppressed ? 0 : offset)
+            .scaleEffect(isVisible || reduceMotion || suppressed ? 1 : 0.985)
             .onAppear {
-                if reduceMotion {
+                if reduceMotion || suppressed {
                     isVisible = true
                 } else {
                     withAnimation(AppMotion.smooth.delay(Double(index) * 0.045)) {

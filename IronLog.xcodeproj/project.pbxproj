@@ -30,11 +30,14 @@
 		E7691DC4A67222E1C0CF2FAC /* LiveWorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8FF3237BB35ED3FD9706F /* LiveWorkoutModels.swift */; };
 		045F12CD1151AC48628B04C6 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7490018D513D20D790C206 /* WorkoutActivityAttributes.swift */; };
 		EC7A1232B61068BA04E6268F /* LiveWorkoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8221B5E33865DC4FA621AE8D /* LiveWorkoutEngine.swift */; };
+		AA10000000000000000011AA /* RunTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000001AA /* RunTracker.swift */; };
+		AA10000000000000000012AA /* RunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000002AA /* RunView.swift */; };
 		4C71EE95612BD068AC0300E7 /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ECB09ACA3D422D0D77A99F8 /* WorkoutLiveActivityIntents.swift */; };
 		40FA29DB20EF6FCC4D838212 /* AppState+LiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0B9AEEA599A0BAA14D3AA2 /* AppState+LiveActivity.swift */; };
 		193CDAAD6CBCCF3026E43AF8 /* LiveWorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8FF3237BB35ED3FD9706F /* LiveWorkoutModels.swift */; };
 		101BCBF2E23D6C3B931F64BA /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7490018D513D20D790C206 /* WorkoutActivityAttributes.swift */; };
 		B06BC0D1CA94C96534FC3333 /* LiveWorkoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8221B5E33865DC4FA621AE8D /* LiveWorkoutEngine.swift */; };
+		BB20000000000000000011BB /* RunLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB20000000000000000001BB /* RunLiveActivity.swift */; };
 		9793A682A5C26E75D4B62E02 /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ECB09ACA3D422D0D77A99F8 /* WorkoutLiveActivityIntents.swift */; };
 		6672757A9505E579A4A80FA4 /* IronLogWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC228C93D523EEF9E07BF27D /* IronLogWidgetBundle.swift */; };
 		D8510F749EA5DAF2557A15D4 /* WorkoutLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08650DE863E7A465C279CA7D /* WorkoutLiveActivity.swift */; };
@@ -84,6 +87,9 @@
 		5CF8FF3237BB35ED3FD9706F /* LiveWorkoutModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveWorkoutModels.swift; sourceTree = "<group>"; };
 		CC7490018D513D20D790C206 /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutActivityAttributes.swift; sourceTree = "<group>"; };
 		8221B5E33865DC4FA621AE8D /* LiveWorkoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveWorkoutEngine.swift; sourceTree = "<group>"; };
+		BB20000000000000000001BB /* RunLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunLiveActivity.swift; sourceTree = "<group>"; };
+		AA10000000000000000001AA /* RunTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunTracker.swift; sourceTree = "<group>"; };
+		AA10000000000000000002AA /* RunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunView.swift; sourceTree = "<group>"; };
 		4ECB09ACA3D422D0D77A99F8 /* WorkoutLiveActivityIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLiveActivityIntents.swift; sourceTree = "<group>"; };
 		AB0B9AEEA599A0BAA14D3AA2 /* AppState+LiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppState+LiveActivity.swift"; sourceTree = "<group>"; };
 		AC228C93D523EEF9E07BF27D /* IronLogWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogWidgetBundle.swift; sourceTree = "<group>"; };
@@ -200,6 +206,7 @@
 				8B8AC012C1D9C2E0DBDE5761 /* Models.swift */,
 				70BC36223073AEFE8DA47054 /* Theme.swift */,
 				416F539C799028CC49CD329F /* Live */,
+				AA10000000000000000021AA /* Run */,
 				3F47C8A5B2BD310177171771 /* Resources */,
 				86C6B699A050091305C25FF7 /* Services */,
 				AB75DA28F96AD1ED73A9EE2D /* Views */,
@@ -219,9 +226,19 @@
 			path = Live;
 			sourceTree = "<group>";
 		};
+		AA10000000000000000021AA /* Run */ = {
+			isa = PBXGroup;
+			children = (
+				AA10000000000000000001AA /* RunTracker.swift */,
+				AA10000000000000000002AA /* RunView.swift */,
+			);
+			path = Run;
+			sourceTree = "<group>";
+		};
 		1BE741D1F1205DCB026A1FB5 /* IronLogWidget */ = {
 			isa = PBXGroup;
 			children = (
+				BB20000000000000000001BB /* RunLiveActivity.swift */,
 				DB75AB91118614E308B07413 /* Info.plist */,
 				AC228C93D523EEF9E07BF27D /* IronLogWidgetBundle.swift */,
 				08650DE863E7A465C279CA7D /* WorkoutLiveActivity.swift */,
@@ -398,6 +415,8 @@
 				EC7A1232B61068BA04E6268F /* LiveWorkoutEngine.swift in Sources */,
 				4C71EE95612BD068AC0300E7 /* WorkoutLiveActivityIntents.swift in Sources */,
 				40FA29DB20EF6FCC4D838212 /* AppState+LiveActivity.swift in Sources */,
+				AA10000000000000000011AA /* RunTracker.swift in Sources */,
+				AA10000000000000000012AA /* RunView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +432,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB20000000000000000011BB /* RunLiveActivity.swift in Sources */,
 				193CDAAD6CBCCF3026E43AF8 /* LiveWorkoutModels.swift in Sources */,
 				101BCBF2E23D6C3B931F64BA /* WorkoutActivityAttributes.swift in Sources */,
 				B06BC0D1CA94C96534FC3333 /* LiveWorkoutEngine.swift in Sources */,

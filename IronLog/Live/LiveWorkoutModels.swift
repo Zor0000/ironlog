@@ -17,21 +17,36 @@ struct LiveSet: Codable, Hashable, Identifiable {
     }
 }
 
+/// The unit label for a timed exercise's duration field. Lives in this shared
+/// file (rather than beside the other duration helpers in `Models.swift`)
+/// because the widget extension does not compile `Models.swift`, and the app and
+/// lock screen must never disagree about what the field means.
+func durationFieldLabel(minutes: Bool) -> String {
+    minutes ? "MINS" : "SECS"
+}
+
 /// One exercise in the live (lock-screen) workout.
 struct LiveExercise: Codable, Hashable, Identifiable {
     var id: UUID
     var name: String
     var bodyweight: Bool
     var timed: Bool
+    /// Optional so an engine snapshot written before cardio existed still
+    /// decodes — synthesized `Decodable` has no default-value fallback.
+    var minutes: Bool?
     var sets: [LiveSet]
 
-    init(id: UUID = UUID(), name: String, bodyweight: Bool = false, timed: Bool = false, sets: [LiveSet] = []) {
+    init(id: UUID = UUID(), name: String, bodyweight: Bool = false, timed: Bool = false, minutes: Bool? = nil, sets: [LiveSet] = []) {
         self.id = id
         self.name = name
         self.bodyweight = bodyweight
         self.timed = timed
+        self.minutes = minutes
         self.sets = sets
     }
+
+    /// See `ActiveExercise.usesMinutes` — the two surfaces must agree.
+    var usesMinutes: Bool { minutes == true }
 }
 
 /// The full state shared between the app and the lock-screen Live Activity.
@@ -88,6 +103,24 @@ extension LiveWorkoutState {
     var currentSet: LiveSet? {
         guard let exercise = currentExercise, let index = currentSetIndex else { return nil }
         return exercise.sets[index]
+    }
+
+    /// The set that may actually be *changed*: the first not-yet-done one. Nil
+    /// once every set in the exercise is finished.
+    ///
+    /// Deliberately not the same as `currentSetIndex`, which falls back to the
+    /// last set so a finished exercise still reads "Set 3/3" instead of snapping
+    /// back to "Set 1/3". Using that fallback as an edit target meant navigating
+    /// back to a finished exercise left the steppers rewriting already-logged
+    /// work, and `Log set` re-logging its last set and restarting rest from full.
+    var editableSetIndex: Int? {
+        currentExercise?.sets.firstIndex(where: { !$0.done })
+    }
+
+    /// True when the exercise on screen has no set left to log.
+    var isCurrentExerciseComplete: Bool {
+        guard let exercise = currentExercise, !exercise.sets.isEmpty else { return false }
+        return exercise.sets.allSatisfy(\.done)
     }
 
     var isComplete: Bool {
@@ -169,6 +202,21 @@ enum LiveWorkoutReducer {
         return state
     }
 
+    /// Which exercise the card should show, given the last synced index.
+    ///
+    /// Pure and separate from `buildLiveState` so the rule is testable: it is
+    /// the choice that decides whether the activity follows the workout or gets
+    /// stuck on a finished exercise.
+    static func exerciseIndex(for exercises: [LiveExercise], previous: Int?) -> Int {
+        func hasOpenSet(_ index: Int) -> Bool {
+            exercises[index].sets.contains { !$0.done }
+        }
+        if let previous, exercises.indices.contains(previous), hasOpenSet(previous) {
+            return previous
+        }
+        return exercises.indices.first(where: hasOpenSet) ?? max(exercises.count - 1, 0)
+    }
+
     static func nextExercise(_ state: LiveWorkoutState) -> LiveWorkoutState {
         move(state, by: 1)
     }
@@ -187,9 +235,12 @@ enum LiveWorkoutReducer {
 
     // MARK: helpers
 
+    /// The one gate every mutating transform goes through, so a finished
+    /// exercise is read-only on all of them at once rather than each having to
+    /// remember the check.
     private static func currentEditableIndices(_ state: LiveWorkoutState) -> (exercise: Int, set: Int)? {
         guard state.exercises.indices.contains(state.currentExerciseIndex),
-              let setIndex = state.currentSetIndex else { return nil }
+              let setIndex = state.editableSetIndex else { return nil }
         return (state.currentExerciseIndex, setIndex)
     }
 

@@ -22,17 +22,21 @@ extension AppState {
                 name: exercise.name,
                 bodyweight: exercise.bodyweight,
                 timed: exercise.timed,
+                minutes: exercise.minutes,
                 sets: exercise.sets.map { LiveSet(id: $0.id, weight: $0.weight, reps: $0.reps, done: $0.done) }
             )
         }
 
-        // Prefer the first not-yet-finished exercise, but keep whatever the user
-        // navigated to from the lock screen if it is still valid.
-        let firstIncomplete = exercises.firstIndex { ex in ex.sets.contains { !$0.done } }
-        var index = firstIncomplete ?? max(exercises.count - 1, 0)
-        if let previousIndex, exercises.indices.contains(previousIndex) {
-            index = previousIndex
-        }
+        // Prefer the first not-yet-finished exercise, but stay where the user
+        // navigated to from the lock screen.
+        //
+        // The "still has work left" condition matters: `previousIndex` is the
+        // last *synced* index, not only one a Next/Prev tap produced, so it is
+        // non-nil and in-bounds from the first sync onward. Preferring it
+        // unconditionally pinned the card to exercise 1 for the whole workout —
+        // it never advanced as sets were logged in the app, and users ended up
+        // staring at a finished exercise they never navigated to.
+        let index = LiveWorkoutReducer.exerciseIndex(for: exercises, previous: previousIndex)
 
         let restEndsAt: Date? = timerRunning ? Date().addingTimeInterval(TimeInterval(timerSecs)) : nil
 
@@ -51,8 +55,13 @@ extension AppState {
     /// Fill the active set's empty fields with sensible suggestions so the
     /// lock-screen stepper is immediately usable.
     private func seedCurrentSet(_ state: inout LiveWorkoutState) {
+        // `editableSetIndex`, not `currentSetIndex`: on a finished exercise the
+        // latter resolves to the last *completed* set, and seeding there wrote a
+        // PR weight into an already-logged bodyweight set (whose weight is
+        // legitimately empty). `reconcileFromLiveActivity` then folded that
+        // invented load back into the saved session.
         guard state.exercises.indices.contains(state.currentExerciseIndex),
-              let setIndex = state.currentSetIndex else { return }
+              let setIndex = state.editableSetIndex else { return }
         let exerciseIndex = state.currentExerciseIndex
         let exercise = state.exercises[exerciseIndex]
 
@@ -108,6 +117,12 @@ extension AppState {
         if let endsAt = live.restEndsAt, endsAt > Date() {
             timerMax = live.restSeconds
             resumeTimer(until: endsAt)
+        } else if timerRunning {
+            // The lock screen cleared rest (Undo, or navigating exercises) and
+            // cancelled its notification. Without this the in-app countdown kept
+            // running against a rest that no longer exists, and would never
+            // alert — the two surfaces disagreeing about the same timer.
+            resetTimer()
         }
 
         // Persist so lock-screen navigation (Next/Prev) and set edits both survive,

@@ -59,7 +59,7 @@ struct ExerciseLibrary: Codable {
     static let empty = ExerciseLibrary(splits: [], muscles: [], splitDays: [:], workouts: [:])
 
     /// Preferred display order for catalog muscle filters.
-    private static let catalogOrder = ["chest", "back", "legs", "shoulders", "biceps", "triceps", "arms", "core"]
+    private static let catalogOrder = ["chest", "back", "legs", "shoulders", "biceps", "triceps", "arms", "core", "cardio"]
 
     /// Muscle groups that have catalog entries, in display order.
     var catalogMuscles: [Muscle] {

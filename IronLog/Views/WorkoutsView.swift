@@ -21,10 +21,21 @@ struct WorkoutsView: View {
                         workoutStep
                     }
                 }
+                // Covers every `.entrance()` in the step's subtree at once, so
+                // new rows added later inherit it without threading a flag.
+                .environment(\.suppressesEntrance, app.steppingBack)
                 .id(app.workoutStep)
+                // Only the *insertion* edge carries the direction: the new screen
+                // arrives from the right going forward, from the left going back.
+                //
+                // The outgoing screen deliberately just fades. A removal
+                // transition is baked into a view instance when it is created,
+                // so it can only ever use the direction of the navigation that
+                // brought that screen in — one step stale, and visibly wrong the
+                // moment you go back and then forward again.
                 .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
+                    insertion: .move(edge: app.steppingBack ? .leading : .trailing).combined(with: .opacity),
+                    removal: .opacity
                 ))
             }
             .padding(18)
@@ -330,7 +341,7 @@ struct ExerciseSuggestionCard: View {
     }
 
     private var meta: String {
-        var parts = ["\(exercise.sets) sets x \(exercise.reps) \(exercise.timed ? "sec" : "reps")"]
+        var parts = ["\(exercise.sets) sets x \(exercise.reps) \(exercise.timed ? (exercise.minutes ? "min" : "sec") : "reps")"]
         if exercise.bodyweight || exercise.timed { parts.append(exercise.timed ? "Timed" : "Bodyweight") }
         if let record {
             parts.append(record.weight > 0 ? "Best: \(formatWeight(record.weight)) x \(record.reps)" : "Best: BW x \(record.reps)")

@@ -45,6 +45,11 @@
       "id": "core",
       "label": "Core",
       "systemImage": "figure.core.training"
+    },
+    {
+      "id": "cardio",
+      "label": "Cardio",
+      "systemImage": "figure.run"
     }
   ],
   "SPLIT_DAYS": {
@@ -223,6 +228,18 @@
       { "name": "Cable Crunch", "sets": 3, "reps": "15–20", "tip": "Kneel at the cable, crunch ribs to hips. Keep the hips still. Builds ab thickness." },
       { "name": "Ab Wheel Rollout", "sets": 3, "reps": "8–12", "tip": "Start from the knees, roll out until flat, pull back with the abs. Best ab strength move.", "bodyweight": true },
       { "name": "Decline Sit-Up", "sets": 3, "reps": "15–20", "tip": "Full range on a decline bench. Hold a plate at the chest to progress.", "bodyweight": true }
+    ],
+    "cardio": [
+      { "name": "Treadmill Run", "sets": 1, "reps": "20–30", "tip": "Set a pace you can hold to the end. Land under your hips, don't reach with the heel.", "timed": true, "minutes": true },
+      { "name": "Treadmill Incline Walk", "sets": 1, "reps": "20–40", "tip": "10–12% incline, 5–6 km/h, hands off the rails. Brutal on the calves, easy on the knees.", "timed": true, "minutes": true },
+      { "name": "Stationary Bike", "sets": 1, "reps": "20–30", "tip": "Saddle at hip height so the knee stays soft at the bottom. Spin, don't grind.", "timed": true, "minutes": true },
+      { "name": "Assault Bike", "sets": 1, "reps": "10–20", "tip": "Push and pull with the arms as hard as the legs. The fan punishes pacing mistakes.", "timed": true, "minutes": true },
+      { "name": "Rowing Machine", "sets": 1, "reps": "15–25", "tip": "Legs, then hips, then arms — reverse it on the way back. The legs do most of the work.", "timed": true, "minutes": true },
+      { "name": "Ski Erg", "sets": 1, "reps": "10–20", "tip": "Drive from the lats and hinge at the hips. It's a crunch with the arms, not an arm pull.", "timed": true, "minutes": true },
+      { "name": "Elliptical", "sets": 1, "reps": "20–30", "tip": "Keep the heels down and let the legs lead. Raise the ramp to bias the glutes.", "timed": true, "minutes": true },
+      { "name": "Stair Climber", "sets": 1, "reps": "15–25", "tip": "Stand tall, light touch on the rails. Leaning on the handles cuts the work in half.", "timed": true, "minutes": true },
+      { "name": "Jump Rope", "sets": 4, "reps": "60–90", "tip": "Small wrist circles, low hops. Rest between rounds — this is an interval, not a grind.", "timed": true },
+      { "name": "Battle Ropes", "sets": 4, "reps": "30–45", "tip": "Stay in a quarter squat and keep the waves reaching the anchor. Short, hard rounds.", "timed": true }
     ]
   },
   "WORKOUTS": {

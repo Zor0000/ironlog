@@ -148,13 +148,16 @@ private struct LockScreenView: View {
                 )
             }
             StepperTile(
-                label: (exercise?.timed ?? false) ? "SECS" : "REPS",
+                label: (exercise?.timed ?? false) ? durationFieldLabel(minutes: exercise?.usesMinutes ?? false) : "REPS",
                 value: nonEmpty(state.currentSet?.reps),
                 down: DecreaseRepsIntent(),
                 up: IncreaseRepsIntent(),
                 size: .large
             )
         }
+        // The reducer makes a finished exercise read-only; dim it so the ±
+        // buttons look inert rather than broken.
+        .opacity(state.isCurrentExerciseComplete ? 0.45 : 1)
     }
 
     @ViewBuilder private var actions: some View {
@@ -431,19 +434,34 @@ private struct ExpandedControls: View {
                     )
                 }
                 StepperTile(
-                    label: (exercise?.timed ?? false) ? "SECS" : "REPS",
+                    label: (exercise?.timed ?? false) ? durationFieldLabel(minutes: exercise?.usesMinutes ?? false) : "REPS",
                     value: nonEmpty(state.currentSet?.reps),
                     down: DecreaseRepsIntent(),
                     up: IncreaseRepsIntent()
                 )
-                Button(intent: LogSetIntent()) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 46, height: 46)
-                        .background(WidgetPalette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                // Gated on the *current exercise*, not the whole workout: on a
+                // finished exercise this button used to re-log its last set and
+                // restart rest from full. The lock-screen card already made the
+                // same swap; the island had been missed.
+                if state.isCurrentExerciseComplete {
+                    Button(intent: UndoSetIntent()) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(WidgetPalette.text)
+                            .frame(width: 46, height: 46)
+                            .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button(intent: LogSetIntent()) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 46, height: 46)
+                            .background(WidgetPalette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.top, 2)
         }
