@@ -82,11 +82,45 @@ struct ExerciseTemplate: Identifiable, Codable, Hashable {
     }
 }
 
+/// How a set was performed, when it was something other than a straight
+/// working set. Stored as an Optional everywhere: nil is an ordinary set, which
+/// is also how every set logged before this existed decodes.
+enum SetType: String, Codable, Hashable, CaseIterable {
+    case warmup, drop, failure, restPause
+
+    var label: String {
+        switch self {
+        case .warmup: "Warm-up"
+        case .drop: "Drop set"
+        case .failure: "To failure"
+        case .restPause: "Rest-pause"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .warmup: "sun.max"
+        case .drop: "arrow.down.right.circle"
+        case .failure: "flame"
+        case .restPause: "pause.circle"
+        }
+    }
+
+    /// Whether the set is real work. A warm-up is the one type that is not:
+    /// counting an empty-bar set toward the day's tonnage inflates volume, and
+    /// letting it reach `applyRecords` lets a warm-up claim a personal record.
+    /// A drop set and a set to failure are both working sets — harder ones.
+    var countsAsVolume: Bool { self != .warmup }
+}
+
 struct WorkoutSet: Identifiable, Codable, Hashable {
     var id = UUID()
     var weight: String = ""
     var reps: String = ""
     var done: Bool = false
+    /// Optional — synthesized `Decodable` has no default-value fallback, so a
+    /// plain value would fail to decode drafts written before set types existed.
+    var type: SetType?
 }
 
 struct ActiveExercise: Identifiable, Codable, Hashable {
@@ -146,6 +180,12 @@ struct LoggedSet: Identifiable, Codable, Hashable {
     /// which matters because `LocalStore.load` turns a decode failure into an
     /// empty snapshot and would wipe every saved session.
     var reps: Double
+    /// See `WorkoutSet.type` — Optional for the same decode reason, which here
+    /// guards saved history rather than a draft.
+    var type: SetType?
+
+    /// Volume and personal records both skip anything that is not real work.
+    var isWorkingSet: Bool { type?.countsAsVolume ?? true }
 }
 
 struct LoggedExercise: Identifiable, Codable, Hashable {

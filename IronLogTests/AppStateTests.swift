@@ -621,6 +621,169 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(snapshot.personalRecords[0].reps, 8)
     }
 
+    // MARK: - PR toast
+
+    /// The toast fires when a record actually breaks — once. `personalRecords`
+    /// stays on the pre-workout best until the session is saved, so without the
+    /// de-dupe every back-off set at the same new weight re-announces the same PR.
+    func testPRToastFiresOncePerRecordAndNotAtAll() async {
+        let app = AppState()
+
+        // Session one: no record to beat, so nothing is announced.
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+        var exerciseID = app.todayExercises[0].id
+        app.updateSet(exerciseID: exerciseID, setID: app.todayExercises[0].sets[0].id, weight: "90", reps: "8")
+        app.toast = nil // "Free workout started"
+        app.toggleDone(exerciseID: exerciseID, setID: app.todayExercises[0].sets[0].id)
+        XCTAssertNil(app.toast, "a first-ever set beats nothing")
+        await app.finishWorkout(note: "")
+
+        // Session two: three sets at a heavier weight — one PR, not three.
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+        exerciseID = app.todayExercises[0].id
+        app.toast = nil
+        var toasts = 0
+        for index in 0..<3 {
+            if index > 0 { app.addSet(to: exerciseID) }
+            let setID = app.todayExercises[0].sets[index].id
+            app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100", reps: "8")
+            app.toggleDone(exerciseID: exerciseID, setID: setID)
+            if app.toast == "New PR on Bench Press" { toasts += 1 }
+            app.toast = nil
+        }
+
+        XCTAssertEqual(toasts, 1, "100 kg was a PR once, not once per set")
+    }
+
+    // MARK: - Set types
+
+    /// A warm-up must not inflate the day's tonnage, and must not be able to
+    /// claim a personal record — those are the only two things the tag changes,
+    /// so if they do not hold the tag is decoration.
+    func testWarmUpSetsAreExcludedFromVolumeAndRecords() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Squat")
+        let exerciseID = app.todayExercises[0].id
+        let warmUpID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: warmUpID, weight: "60", reps: "10")
+        app.setType(exerciseID: exerciseID, setID: warmUpID, to: .warmup)
+        app.toggleDone(exerciseID: exerciseID, setID: warmUpID)
+
+        app.addSet(to: exerciseID)
+        let workingID = app.todayExercises[0].sets[1].id
+        app.updateSet(exerciseID: exerciseID, setID: workingID, weight: "100", reps: "5")
+        app.toggleDone(exerciseID: exerciseID, setID: workingID)
+
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.stats.volume, 500, "600 kg of warm-up is not the day's work")
+        XCTAssertEqual(app.personalRecords["Squat"]?.weight, 100)
+        XCTAssertEqual(app.personalRecords["Squat"]?.reps, 5)
+        XCTAssertEqual(app.stats.sets, 2, "the set is still logged — only the maths skips it")
+    }
+
+    /// A heavier warm-up than any working set still cannot take the record.
+    func testAWarmUpNeverBecomesAPersonalRecord() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Deadlift")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "200", reps: "1")
+        app.setType(exerciseID: exerciseID, setID: setID, to: .warmup)
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertNil(app.personalRecords["Deadlift"])
+        XCTAssertEqual(app.stats.volume, 0)
+    }
+
+    /// Drop sets and sets to failure are working sets — harder ones. Only the
+    /// warm-up is excluded.
+    func testOtherSetTypesStillCount() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Curl")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "20", reps: "10")
+        app.setType(exerciseID: exerciseID, setID: setID, to: .failure)
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.stats.volume, 200)
+        XCTAssertEqual(app.personalRecords["Curl"]?.weight, 20)
+    }
+
+    func testSetTypeSurvivesSaveAndReopeningForEdit() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "40", reps: "12")
+        app.setType(exerciseID: exerciseID, setID: setID, to: .drop)
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].type, .drop)
+
+        // The edit sheet round-trips through ActiveExercise/WorkoutSet.
+        let reopened = [ActiveExercise(name: "Bench", bodyweight: false, timed: false,
+                                       sets: [WorkoutSet(weight: "40", reps: "12", done: true, type: .drop)])]
+        await app.updateSession(id: app.sessions[0].id, exercises: reopened, note: "")
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].type, .drop, "editing must not strip the tag")
+    }
+
+    /// Clearing the tag puts the set back into the working maths.
+    func testClearingTheTagRestoresTheSetToVolume() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Row")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "50", reps: "10")
+        app.setType(exerciseID: exerciseID, setID: setID, to: .warmup)
+        app.setType(exerciseID: exerciseID, setID: setID, to: nil)
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.stats.volume, 500)
+    }
+
+    /// Drafts and sessions written before set types existed have no key at all.
+    /// A non-Optional field would throw, and `LocalStore.load` turns that into
+    /// an empty snapshot.
+    func testSetsWithoutATypeStillDecode() throws {
+        let workoutSet = try JSONDecoder().decode(
+            WorkoutSet.self,
+            from: Data(#"{"id":"\#(UUID().uuidString)","weight":"60","reps":"8","done":true}"#.utf8)
+        )
+        XCTAssertNil(workoutSet.type)
+
+        let logged = try JSONDecoder().decode(
+            LoggedSet.self,
+            from: Data(#"{"id":"\#(UUID().uuidString)","weight":60,"reps":8}"#.utf8)
+        )
+        XCTAssertNil(logged.type)
+        XCTAssertTrue(logged.isWorkingSet, "an untagged set is ordinary work")
+    }
+
     // MARK: - Edit past session
 
     func testEditingSessionUpdatesVolumeAndPRAndReentersSyncQueue() async {
@@ -644,6 +807,30 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.personalRecords["Squat"]?.weight, 110)
         XCTAssertEqual(app.sessions[0].note, "corrected")
         XCTAssertNotEqual(app.sessions[0].syncState, .synced)
+    }
+
+    /// Tagging the wrong set must not be permanent: the editor writes the type
+    /// straight into its draft, so `updateSession` has to carry the change and
+    /// recompute the volume the tag was suppressing.
+    func testEditingASessionCanRetagASet() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Squat")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100", reps: "5")
+        app.setType(exerciseID: exerciseID, setID: setID, to: .warmup)
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+        XCTAssertEqual(app.stats.volume, 0, "a warm-up is not the day's work")
+
+        let corrected = [ActiveExercise(name: "Squat", bodyweight: false, timed: false,
+                                        sets: [WorkoutSet(weight: "100", reps: "5", done: true, type: .drop)])]
+        await app.updateSession(id: app.sessions[0].id, exercises: corrected, note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].type, .drop)
+        XCTAssertEqual(app.stats.volume, 500, "a drop set is work the warm-up tag was hiding")
     }
 
     // MARK: - Onboarding

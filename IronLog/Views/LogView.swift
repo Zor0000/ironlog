@@ -465,12 +465,9 @@ struct LogExerciseCard: View {
             : (exercise.bodyweight ? "BW" : "0")
 
         return VStack(alignment: .leading, spacing: 3) {
+            // No set-number column: the row needs the width for the set-type
+            // button, and the header already counts them ("0/4 sets done").
             HStack(alignment: .bottom, spacing: 8) {
-                Text("\(index + 1)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 20, height: 34, alignment: .bottom)
-
                 if !exercise.timed {
                     // Label + reference placeholder follow the display unit;
                     // typed input converts back to kg at the save boundary.
@@ -504,6 +501,11 @@ struct LogExerciseCard: View {
                 .accessibilityIdentifier("set-done-button")
                 .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
 
+                SetTypeMenu(type: Binding(
+                    get: { set.type },
+                    set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
+                ))
+
                 Button {
                     NativeFeedback.selection()
                     withAnimation(AppMotion.quick) {
@@ -520,14 +522,20 @@ struct LogExerciseCard: View {
                 .accessibilityLabel("Remove set")
             }
 
-            if let refText = referenceLabel(refSet) {
-                Text(refText)
+            if let subtitle = setSubtitle(set, refSet) {
+                Text(subtitle)
                     .font(.system(size: 10))
-                    .foregroundStyle(Theme.muted)
-                    .padding(.leading, 28)
+                    .foregroundStyle(set.type == nil ? Theme.muted : Theme.accent.opacity(0.85))
                     .accessibilityIdentifier("set-reference")
             }
         }
+    }
+
+    /// The set's tag and last time's numbers share one line, so a tag costs no
+    /// vertical space in a row that already had none to give.
+    private func setSubtitle(_ set: WorkoutSet, _ refSet: LoggedSet?) -> String? {
+        let parts = [set.type?.label, referenceLabel(refSet)].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// Last time's value pre-filled into the duration/reps field. Stored durations
@@ -546,6 +554,41 @@ struct LogExerciseCard: View {
         // logs its weight and should show it back.
         guard let weight = refSet.weight, weight > 0 else { return "Last: \(clean(refSet.reps)) reps" }
         return "Last: \(formatWeight(weight)) × \(clean(refSet.reps))"
+    }
+}
+
+/// Tag a set as a warm-up, drop set and so on. A `Picker` inside the menu
+/// checkmarks the current choice and carries "Normal set" as the way back, so
+/// there is no separate clear action to find.
+///
+/// Takes a plain `Binding` so the live log (which writes through `AppState`)
+/// and the session editor (which writes into its own draft) share one menu.
+struct SetTypeMenu: View {
+    @Binding var type: SetType?
+
+    var body: some View {
+        Menu {
+            Picker("Set type", selection: Binding(
+                get: { type },
+                set: { newValue in
+                    NativeFeedback.selection()
+                    type = newValue
+                }
+            )) {
+                Text("Normal set").tag(SetType?.none)
+                ForEach(SetType.allCases, id: \.self) { type in
+                    Label(type.label, systemImage: type.icon).tag(SetType?.some(type))
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: type == nil ? "note.text" : "note.text.badge.plus")
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 28, height: 34)
+                .foregroundStyle(type == nil ? Theme.muted2 : Theme.accent)
+        }
+        .accessibilityIdentifier("set-type-button")
+        .accessibilityLabel(type.map { "Set type: \($0.label)" } ?? "Set type")
     }
 }
 
