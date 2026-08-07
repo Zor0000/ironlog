@@ -28,6 +28,9 @@ final class AppState: ObservableObject {
     /// crash mid-activity does not lose it. Owned by `RunTracker`.
     private var runDraft: RunDraft?
 
+    /// Workouts the user saved to run again, oldest first.
+    @Published var routines: [SavedRoutine] = []
+
     @Published var sessions: [WorkoutSession] = []
     @Published var personalRecords: [String: PersonalRecord] = [:]
     @Published var waterByDay: [String: Int] = [:]
@@ -111,7 +114,7 @@ final class AppState: ObservableObject {
                 sets += exercise.sets.count
                 exercise.sets.forEach { set in
                     if let weight = set.weight, weight > 0 {
-                        volume += weight * Double(set.reps)
+                        volume += weight * set.reps
                     }
                 }
             }
@@ -154,6 +157,7 @@ final class AppState: ObservableObject {
         sessions = snapshot.sessions.sorted { $0.createdAt > $1.createdAt }
         personalRecords = Dictionary(uniqueKeysWithValues: snapshot.personalRecords.map { ($0.exerciseName, $0) })
         waterByDay = snapshot.waterByDay
+        routines = snapshot.routines ?? []
         unitPreference = snapshot.unitPreference ?? .kg
         currentWeightUnit = unitPreference
         timerMax = snapshot.timerPreset ?? 90
@@ -255,6 +259,7 @@ final class AppState: ObservableObject {
         sessions = []
         personalRecords = [:]
         waterByDay = [:]
+        routines = []
         resetActiveWorkout()
         hasOnboarded = false
         updateLiveActivity(clearedDraft: true)
@@ -327,20 +332,27 @@ final class AppState: ObservableObject {
             showToast("No exercises found for this workout")
             return
         }
-        todayExercises = templates.map { template in
+        todayExercises = Self.activeExercises(from: templates)
+        selectedTab = .log
+        persistDraft()
+        showToast("\(selectedWorkoutMuscleLabel) workout started")
+    }
+
+    /// Blank sets laid out from a set of templates — the one way a workout is
+    /// stocked, whether the templates came from a bundled split or a routine the
+    /// user saved.
+    private static func activeExercises(from templates: [ExerciseTemplate]) -> [ActiveExercise] {
+        templates.map { template in
             ActiveExercise(
                 name: template.name,
                 bodyweight: template.bodyweight,
                 timed: template.timed,
                 minutes: template.minutes,
-                // Split starts collapsed so the list isn't overwhelming — user opens each exercise as they reach it.
+                // Starts collapsed so the list isn't overwhelming — user opens each exercise as they reach it.
                 expanded: false,
                 sets: (0..<max(template.sets, 1)).map { _ in WorkoutSet() }
             )
         }
-        selectedTab = .log
-        persistDraft()
-        showToast("\(selectedWorkoutMuscleLabel) workout started")
     }
 
     func startFreeWorkout() {
@@ -357,6 +369,123 @@ final class AppState: ObservableObject {
         selectedTab = .log
         persistDraft()
         showToast("Free workout started")
+    }
+
+    // MARK: - Saved routines
+
+    /// The routine the active workout was started from, if any. `selectedSplit`
+    /// carries the routine's name, so a match means "this is your staple, edited".
+    var matchingRoutineName: String? {
+        guard let split = selectedSplit else { return nil }
+        return routines.first { $0.name == split }?.name
+    }
+
+    /// Keep whatever is in the log as a named routine to run again.
+    ///
+    /// Saving under a name already in use replaces that routine rather than
+    /// adding a second one: the staple workout this is built for is something
+    /// you tweak over months, and "Leg Day" three times over helps nobody.
+    func saveRoutine(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            showToast("Name the routine first")
+            return
+        }
+        guard !todayExercises.isEmpty else {
+            showToast("Add an exercise before saving a routine")
+            return
+        }
+
+        let templates = todayExercises.map { exercise in
+            ExerciseTemplate(
+                name: exercise.name,
+                sets: max(exercise.sets.count, 1),
+                // The target to aim for next time, taken from what was actually
+                // entered. Blank until a set is filled in, which is fine — it is
+                // shown as guidance, never used to prefill.
+                reps: exercise.sets.first(where: { !$0.reps.isEmpty })?.reps ?? "",
+                tip: "",
+                bodyweight: exercise.bodyweight,
+                timed: exercise.timed,
+                minutes: exercise.usesMinutes
+            )
+        }
+
+        if let existing = routines.firstIndex(where: { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            routines[existing].exercises = templates
+            showToast("\(routines[existing].name) updated")
+        } else {
+            routines.append(SavedRoutine(name: trimmed, exercises: templates))
+            showToast("\(trimmed) saved")
+        }
+        persistAll()
+        syncRoutines()
+    }
+
+    func startRoutine(_ routine: SavedRoutine) {
+        guard !hasActiveWorkout else {
+            selectedTab = .log
+            showToast("Finish or discard the current workout first")
+            return
+        }
+        guard !routine.exercises.isEmpty else {
+            showToast("That routine has no exercises")
+            return
+        }
+        // The routine's name stands in for the split, so it labels the session in
+        // History and titles the Live Activity. `muscleIDs` finds nothing for it,
+        // which is correct — a routine spans whatever the user put in it.
+        selectedSplit = routine.name
+        selectedDay = nil
+        workoutStep = .split
+        todayExercises = Self.activeExercises(from: routine.exercises)
+        selectedTab = .log
+        persistDraft()
+        showToast("\(routine.name) started")
+    }
+
+    func deleteRoutine(_ id: SavedRoutine.ID) {
+        guard let index = routines.firstIndex(where: { $0.id == id }) else { return }
+        let name = routines.remove(at: index).name
+        persistAll()
+        showToast("\(name) deleted")
+        guard supabase.isAuthenticated else { return }
+        Task { try? await supabase.deleteCloudRoutine(id) }
+    }
+
+    /// Push every routine the cloud may not have yet. Routines carry no
+    /// per-record sync state: they are small, and an upsert keyed on the
+    /// routine's own id is idempotent, so re-sending all of them costs less
+    /// than tracking which ones are dirty.
+    ///
+    /// ponytail: a delete made offline can be resurrected by the next pull,
+    /// because "the cloud has one we don't" is indistinguishable from "we
+    /// deleted it". Tombstone rows would fix it — the same gap `deleteSession`
+    /// already has, so routines are no worse than sessions here.
+    private func syncRoutines() {
+        guard supabase.isAuthenticated else { return }
+        let snapshot = routines
+        Task {
+            for routine in snapshot {
+                try? await supabase.backup(routine: routine)
+            }
+        }
+    }
+
+    /// Union the cloud's routines with the local ones by id, then collapse any
+    /// name collision the merge introduced — two devices can each invent a
+    /// "Leg Day" with different ids, and the app promises one routine per name.
+    /// Most recently created wins, matching the local save-replaces rule.
+    private func mergeCloudRoutines(_ cloud: [SavedRoutine]) {
+        var byID = Dictionary(uniqueKeysWithValues: routines.map { ($0.id, $0) })
+        for routine in cloud where byID[routine.id] == nil {
+            byID[routine.id] = routine
+        }
+        var seen: [String: SavedRoutine] = [:]
+        for routine in byID.values.sorted(by: { $0.createdAt < $1.createdAt }) {
+            seen[routine.name.lowercased()] = routine
+        }
+        routines = seen.values.sorted { $0.createdAt < $1.createdAt }
     }
 
     func continueWorkout() {
@@ -378,7 +507,10 @@ final class AppState: ObservableObject {
             todayExercises[ei].sets[si].weight = sanitizeDecimal(weight)
         }
         if let reps {
-            todayExercises[ei].sets[si].reps = reps.filter(\.isNumber)
+            // Timed work types seconds/minutes, which have no halves.
+            todayExercises[ei].sets[si].reps = todayExercises[ei].timed
+                ? reps.filter(\.isNumber)
+                : snapReps(reps)
         }
         // A set stays editable after it is marked done. If an edit drops it below
         // the validation bar (e.g. the weight is cleared), clear the done flag so
@@ -552,11 +684,6 @@ final class AppState: ObservableObject {
     /// Save a tracked run/walk as its own session. It carries no exercises, so
     /// it bypasses `finishWorkout`'s set validation entirely; the streak and the
     /// History timeline pick it up like any other session.
-    ///
-    /// ponytail: cardio stays on-device. The `sessions` table has no columns for
-    /// distance/duration/route, so backing one up would persist a row that has
-    /// lost everything that made it a run. Add the columns, then delete the
-    /// `.localOnly` here and the `isCardio` guard in `syncPending`.
     /// Wire the tracker's periodic checkpoints into the local store and bring
     /// back any run the app died in the middle of. Called once from `boot`.
     func attachRunTracking(_ snapshot: AppSnapshot) {
@@ -591,13 +718,16 @@ final class AppState: ObservableObject {
             split: activity.kind.label,
             note: nil,
             exercises: [],
-            syncState: .localOnly,
+            syncState: supabase.isAuthenticated ? .pending : .localOnly,
             activity: activity
         )
         sessions.insert(session, at: 0)
         persistAll()
         selectedTab = .history
         showToast("\(activity.kind.label) saved")
+        if supabase.isAuthenticated {
+            Task { await syncPending() }
+        }
     }
 
     func deleteSession(_ id: WorkoutSession.ID) async {
@@ -725,10 +855,7 @@ final class AppState: ObservableObject {
     func syncPending() async {
         guard supabase.isAuthenticated else { return }
         let syncedUserID = supabase.currentUser?.id
-        // Cardio is deliberately excluded — see `saveRun`. Uploading one would
-        // create a session row stripped of the distance, duration and route that
-        // are the entire point of it.
-        for session in sessions where session.syncState != .synced && !session.isCardio {
+        for session in sessions where session.syncState != .synced {
             do {
                 let cloudID = try await supabase.backup(session: session, records: Array(personalRecords.values))
                 if let index = sessions.firstIndex(where: { $0.id == session.id }) {
@@ -761,11 +888,14 @@ final class AppState: ObservableObject {
         do {
             let cloudSessions = try await supabase.pullSessions()
             let cloudRecords = try await supabase.pullPRs()
+            let cloudRoutines = try await supabase.pullRoutines()
             mergeCloudSessions(cloudSessions)
+            mergeCloudRoutines(cloudRoutines)
             for record in cloudRecords {
                 personalRecords[record.exerciseName] = better(record, than: personalRecords[record.exerciseName])
             }
             persistAll()
+            syncRoutines()
             syncMessage = "Synced with Supabase"
         } catch {
             syncMessage = "Local first. Cloud unavailable."
@@ -823,7 +953,7 @@ final class AppState: ObservableObject {
     private func isNewPR(exercise: ActiveExercise, set: WorkoutSet) -> Bool {
         // Must match `applyRecords`, or the toast celebrates a PR that is never
         // recorded.
-        guard !exercise.timed, let reps = Int(set.reps) else { return false }
+        guard !exercise.timed, let reps = Double(set.reps) else { return false }
         let weight = typedWeightKg(set) ?? 0
         guard let pr = personalRecords[exercise.name] else { return reps > 0 }
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
@@ -836,10 +966,11 @@ final class AppState: ObservableObject {
     /// weighted pull-ups and dips log a weight; leaving the field blank keeps
     /// the set bodyweight. Timed sets have no weight field at all.
     private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
-        guard set.done, let reps = Int(set.reps), reps > 0 else { return nil }
+        guard set.done, let reps = Double(set.reps), reps > 0 else { return nil }
         if exercise.timed {
             // Durations are stored in seconds; cardio machines type minutes.
-            return LoggedSet(weight: nil, reps: displayDurationToSeconds(reps, minutes: exercise.usesMinutes))
+            let seconds = displayDurationToSeconds(Int(reps), minutes: exercise.usesMinutes)
+            return LoggedSet(weight: nil, reps: Double(seconds))
         }
         guard let weight = typedWeightKg(set) else {
             return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps) : nil
@@ -888,7 +1019,8 @@ final class AppState: ObservableObject {
             unitPreference: unitPreference,
             hasOnboarded: hasOnboarded,
             timerPreset: timerMax,
-            runDraft: runDraft
+            runDraft: runDraft,
+            routines: routines
         )
         let previous = saveTask
         saveTask = Task { [localStore] in
@@ -979,7 +1111,7 @@ extension AppState {
             let base = calendar.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
             return calendar.date(bySettingHour: 18, minute: 20, second: 0, of: base) ?? base
         }
-        func exercise(_ name: String, _ sets: [(Double?, Int)], bodyweight: Bool = false) -> LoggedExercise {
+        func exercise(_ name: String, _ sets: [(Double?, Double)], bodyweight: Bool = false) -> LoggedExercise {
             LoggedExercise(name: name, bodyweight: bodyweight, timed: false,
                            sets: sets.map { LoggedSet(weight: $0.0, reps: $0.1) })
         }

@@ -132,9 +132,9 @@ final class LiveWorkoutReducerTests: XCTestCase {
     }
 
     func testHalfPlateWeightFormatsWithoutTrailingZeros() {
-        XCTAssertEqual(LiveWorkoutReducer.formatWeight(62.5), "62.5")
-        XCTAssertEqual(LiveWorkoutReducer.formatWeight(60.0), "60")
-        XCTAssertEqual(LiveWorkoutReducer.formatWeight(100), "100")
+        XCTAssertEqual(LiveWorkoutReducer.formatNumber(62.5), "62.5")
+        XCTAssertEqual(LiveWorkoutReducer.formatNumber(60.0), "60")
+        XCTAssertEqual(LiveWorkoutReducer.formatNumber(100), "100")
     }
 
     // MARK: - Navigating back to a finished exercise

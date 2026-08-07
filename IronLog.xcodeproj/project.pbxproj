@@ -26,6 +26,7 @@
 		CD712D9F513C9ADCF86E9518 /* IronLogUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 899F06F1968D97F14BD885E8 /* IronLogUITests.swift */; };
 		D6609B6FCD5A616C7B4752E3 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8080B3EB9CF08F43637FB44C /* AppStateTests.swift */; };
 		0EC12E2D34983FB9F50BAD67 /* LiveWorkoutReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B193ADEEE3DB0263372B2FF7 /* LiveWorkoutReducerTests.swift */; };
+		A1B2C3D40000000000000001 /* SupabaseWireFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* SupabaseWireFormatTests.swift */; };
 		F7DDEF65A56526D4848FCB2A /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECDB41C749882B25E25C00AA /* SupabaseService.swift */; };
 		E7691DC4A67222E1C0CF2FAC /* LiveWorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF8FF3237BB35ED3FD9706F /* LiveWorkoutModels.swift */; };
 		045F12CD1151AC48628B04C6 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7490018D513D20D790C206 /* WorkoutActivityAttributes.swift */; };
@@ -106,6 +107,7 @@
 		77FD0FF6F621454F8735020E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8080B3EB9CF08F43637FB44C /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		B193ADEEE3DB0263372B2FF7 /* LiveWorkoutReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveWorkoutReducerTests.swift; sourceTree = "<group>"; };
+		A1B2C3D40000000000000002 /* SupabaseWireFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseWireFormatTests.swift; sourceTree = "<group>"; };
 		899F06F1968D97F14BD885E8 /* IronLogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogUITests.swift; sourceTree = "<group>"; };
 		8B8AC012C1D9C2E0DBDE5761 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		9F11C8514ADE4D2439119EAE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -193,6 +195,7 @@
 			children = (
 				8080B3EB9CF08F43637FB44C /* AppStateTests.swift */,
 				B193ADEEE3DB0263372B2FF7 /* LiveWorkoutReducerTests.swift */,
+				A1B2C3D40000000000000002 /* SupabaseWireFormatTests.swift */,
 			);
 			path = IronLogTests;
 			sourceTree = "<group>";
@@ -389,6 +392,7 @@
 			files = (
 				D6609B6FCD5A616C7B4752E3 /* AppStateTests.swift in Sources */,
 				0EC12E2D34983FB9F50BAD67 /* LiveWorkoutReducerTests.swift in Sources */,
+				A1B2C3D40000000000000001 /* SupabaseWireFormatTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

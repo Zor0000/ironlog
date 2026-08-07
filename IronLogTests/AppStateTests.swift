@@ -536,6 +536,91 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(app.timerRunning)
     }
 
+    // MARK: - Half reps
+
+    /// The grid itself. Anything typed between two halves lands on the nearer
+    /// one, so the field can never hold a value that would be rejected later.
+    func testTypedRepsSnapToTheNearestHalf() {
+        XCTAssertEqual(snapReps("7"), "7")
+        XCTAssertEqual(snapReps("7.5"), "7.5")
+        XCTAssertEqual(snapReps("7.2"), "7", "below the midpoint falls back to the whole rep")
+        XCTAssertEqual(snapReps("7.4"), "7.5", "above the midpoint climbs to the half")
+        XCTAssertEqual(snapReps("7.7"), "7.5")
+        XCTAssertEqual(snapReps("7.8"), "8", "a high fraction rounds up to the next whole")
+        XCTAssertEqual(snapReps("12"), "12")
+        XCTAssertEqual(snapReps(""), "")
+    }
+
+    /// A trailing "." must survive, or the user could never type the decimal
+    /// point: snapping "7." to "7" on the keystroke makes "7.5" unreachable.
+    func testARepsFieldMidDecimalIsLeftAlone() {
+        XCTAssertEqual(snapReps("7."), "7.")
+        XCTAssertEqual(snapReps("7,"), "7.", "the comma keyboards give still opens a decimal")
+        XCTAssertEqual(snapReps("7,5"), "7.5")
+    }
+
+    /// Junk and over-typing cannot get through: one separator, one decimal
+    /// digit, digits only.
+    func testRepsInputRejectsAnythingOffTheGrid() {
+        XCTAssertEqual(snapReps("7.55"), "7.5", "a second decimal key is dead — the grid is already full")
+        XCTAssertEqual(snapReps("7.5.5"), "7.5")
+        XCTAssertEqual(snapReps("7a.5b"), "7.5")
+    }
+
+    func testHalfRepIsSnappedOnEntryAndSurvivesToTheSavedSession() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Pull Ups")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100", reps: "7.4")
+        XCTAssertEqual(app.todayExercises[0].sets[0].reps, "7.5", "the field shows the snapped value immediately")
+
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 7.5)
+        XCTAssertEqual(app.stats.volume, 750, "half a rep is half the volume")
+        XCTAssertEqual(app.personalRecords["Pull Ups"]?.reps, 7.5)
+    }
+
+    /// `reps` doubles as seconds for a timed move, where halves are noise.
+    func testTimedSetsStayWholeNumbers() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(template: ExerciseTemplate(name: "Plank", sets: 1, reps: "45", tip: "",
+                                                   bodyweight: true, timed: true))
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "45.5")
+        XCTAssertEqual(app.todayExercises[0].sets[0].reps, "455", "the decimal point is stripped, not snapped")
+    }
+
+    /// `LocalStore.load` turns any decode failure into an empty snapshot, so
+    /// widening `reps` from Int to Double had to stay readable — otherwise the
+    /// first launch after the update silently wipes every saved workout.
+    func testSnapshotsWrittenWithWholeRepsStillDecode() throws {
+        let payload = """
+        {"sessions":[{"id":"\(UUID().uuidString)","createdAt":"2026-03-01T18:20:00Z","muscle":"back","split":"PPL",
+          "exercises":[{"id":"\(UUID().uuidString)","name":"Row","bodyweight":false,"timed":false,
+                        "sets":[{"id":"\(UUID().uuidString)","weight":60,"reps":8}]}],
+          "syncState":"synced"}],
+         "personalRecords":[{"exerciseName":"Row","weight":60,"reps":8,"achievedAt":"2026-03-01T18:20:00Z"}],
+         "waterByDay":{}}
+        """
+        // Same configuration `LocalStore` reads saved snapshots with.
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let snapshot = try decoder.decode(AppSnapshot.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(snapshot.sessions.count, 1)
+        XCTAssertEqual(snapshot.sessions[0].exercises[0].sets[0].reps, 8)
+        XCTAssertEqual(snapshot.personalRecords[0].reps, 8)
+    }
+
     // MARK: - Edit past session
 
     func testEditingSessionUpdatesVolumeAndPRAndReentersSyncQueue() async {
@@ -655,6 +740,136 @@ final class AppStateTests: XCTestCase {
         // Full Body skips the day step; a two-step jump is still forward.
         app.workoutStep = .workout
         XCTAssertFalse(app.steppingBack, "split → workout skips a step but is forward")
+    }
+
+    // MARK: - Saved routines
+
+    /// Builds the free workout someone runs every week, so it can be saved.
+    private func stapleWorkout() -> AppState {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Barbell Squat")
+        app.setAddExerciseWeighted(false)
+        app.addExercise(name: "Pull Ups")
+
+        // Three sets of squats, logged.
+        let squatID = app.todayExercises[0].id
+        app.addSet(to: squatID)
+        app.addSet(to: squatID)
+        for set in app.todayExercises[0].sets {
+            app.updateSet(exerciseID: squatID, setID: set.id, weight: "100", reps: "5")
+        }
+        return app
+    }
+
+    func testSavingARoutineCapturesTheExercisesAndTheirShape() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "Anshul's Leg Day")
+
+        XCTAssertEqual(app.routines.count, 1)
+        let routine = app.routines[0]
+        XCTAssertEqual(routine.name, "Anshul's Leg Day")
+        XCTAssertEqual(routine.exercises.map(\.name), ["Barbell Squat", "Pull Ups"])
+
+        let squat = routine.exercises[0]
+        XCTAssertEqual(squat.sets, 3, "set count carries over so the routine starts the same shape")
+        XCTAssertEqual(squat.reps, "5", "the reps actually logged become the target")
+        XCTAssertFalse(squat.bodyweight)
+        XCTAssertTrue(routine.exercises[1].bodyweight, "a bodyweight move stays bodyweight")
+    }
+
+    func testStartingARoutineStocksTheLogWithEmptySets() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "Anshul's Leg Day")
+        let routine = app.routines[0]
+        app.discardWorkout()
+        XCTAssertFalse(app.hasActiveWorkout)
+
+        app.startRoutine(routine)
+
+        XCTAssertEqual(app.todayExercises.map(\.name), ["Barbell Squat", "Pull Ups"])
+        XCTAssertEqual(app.todayExercises[0].sets.count, 3)
+        XCTAssertEqual(app.selectedTab, .log)
+        XCTAssertEqual(app.selectedSplit, "Anshul's Leg Day", "the routine names the session in History")
+        XCTAssertEqual(app.selectedWorkoutMuscleLabel, "Anshul's Leg Day")
+        // Sets arrive blank — a routine is a plan, not last week's numbers.
+        XCTAssertTrue(app.todayExercises.allSatisfy { $0.sets.allSatisfy { $0.weight.isEmpty && $0.reps.isEmpty } })
+        XCTAssertTrue(app.todayExercises.allSatisfy { !$0.expanded })
+    }
+
+    /// The staple gets tweaked over months; re-saving under the same name has to
+    /// replace it, or the list fills with near-duplicates.
+    func testResavingUnderTheSameNameReplacesTheRoutine() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "Anshul's Leg Day")
+        app.addExercise(name: "Calf Raise")
+        app.saveRoutine(name: "anshul's leg day") // and casing must not matter
+
+        XCTAssertEqual(app.routines.count, 1)
+        XCTAssertEqual(app.routines[0].exercises.count, 3)
+        XCTAssertEqual(app.routines[0].name, "Anshul's Leg Day", "the original name and its casing stand")
+    }
+
+    func testMultipleRoutinesCoexist() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "Anshul's Leg Day")
+        app.discardWorkout()
+        app.startFreeWorkout()
+        app.addExercise(name: "Barbell Row")
+        app.saveRoutine(name: "Anshul's Pull Day")
+
+        XCTAssertEqual(app.routines.map(\.name), ["Anshul's Leg Day", "Anshul's Pull Day"])
+
+        app.deleteRoutine(app.routines[0].id)
+        XCTAssertEqual(app.routines.map(\.name), ["Anshul's Pull Day"])
+    }
+
+    func testRoutineIsRejectedWithoutANameOrExercises() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "   ")
+        XCTAssertTrue(app.routines.isEmpty)
+
+        app.discardWorkout()
+        app.saveRoutine(name: "Empty")
+        XCTAssertTrue(app.routines.isEmpty, "nothing in the log means nothing to save")
+    }
+
+    func testStartingARoutineIsBlockedByAnActiveWorkout() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "Anshul's Leg Day")
+        let routine = app.routines[0]
+
+        // Still mid-workout: starting the routine must not wipe it.
+        app.startRoutine(routine)
+
+        XCTAssertEqual(app.todayExercises.count, 2)
+        XCTAssertTrue(app.todayExercises[0].sets.contains { $0.weight == "100" }, "logged work survives")
+    }
+
+    /// The save sheet prefills from this, so tweaking your staple updates it
+    /// instead of quietly creating "Leg Day 2".
+    func testActiveWorkoutReportsTheRoutineItCameFrom() {
+        let app = stapleWorkout()
+        app.saveRoutine(name: "Anshul's Leg Day")
+        let routine = app.routines[0]
+        app.discardWorkout()
+        XCTAssertNil(app.matchingRoutineName)
+
+        app.startRoutine(routine)
+        XCTAssertEqual(app.matchingRoutineName, "Anshul's Leg Day")
+    }
+
+    func testRoutinesSurviveASnapshotRoundTrip() throws {
+        let routine = SavedRoutine(name: "Anshul's Pull Day", exercises: [
+            ExerciseTemplate(name: "Barbell Row", sets: 4, reps: "8", tip: "")
+        ])
+        let snapshot = AppSnapshot(routines: [routine])
+        let decoded = try JSONDecoder().decode(
+            AppSnapshot.self, from: JSONEncoder().encode(snapshot)
+        )
+        XCTAssertEqual(decoded.routines?.first?.name, "Anshul's Pull Day")
+        XCTAssertEqual(decoded.routines?.first?.exercises.first?.sets, 4)
     }
 
     // MARK: - Run tracking

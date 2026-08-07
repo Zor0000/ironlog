@@ -223,7 +223,7 @@ struct StatsView: View {
                         Text(record.exerciseName)
                             .font(.system(size: 13, weight: .medium))
                         Spacer()
-                        Text(record.weight > 0 ? "\(formatWeight(record.weight)) x \(record.reps) reps" : "BW x \(record.reps)")
+                        Text(record.weight > 0 ? "\(formatWeight(record.weight)) x \(clean(record.reps)) reps" : "BW x \(clean(record.reps))")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                     }

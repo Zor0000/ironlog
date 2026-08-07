@@ -4,6 +4,8 @@ struct LogView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
     @State private var pendingDelete: ActiveExercise?
+    @State private var showSaveRoutine = false
+    @State private var routineName = ""
     @FocusState private var noteFocused: Bool
 
     var body: some View {
@@ -111,6 +113,31 @@ struct LogView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .accessibilityIdentifier("finish-workout-button")
+
+            if !app.todayExercises.isEmpty {
+                Button {
+                    NativeFeedback.selection()
+                    // Prefill when this workout came from a routine, so the
+                    // common case — tweaking your staple — updates it in place
+                    // instead of quietly making a near-duplicate.
+                    routineName = app.matchingRoutineName ?? ""
+                    showSaveRoutine = true
+                } label: {
+                    Label("Save as Routine", systemImage: "bookmark")
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .accessibilityIdentifier("save-routine-button")
+            }
+        }
+        .alert("Save as routine", isPresented: $showSaveRoutine) {
+            TextField("e.g. Chris's Leg Day", text: $routineName)
+            Button("Save") {
+                app.saveRoutine(name: routineName)
+                routineName = ""
+            }
+            Button("Cancel", role: .cancel) { routineName = "" }
+        } message: {
+            Text("Keeps these \(app.todayExercises.count) exercises so you can start them again in one tap from Workouts.")
         }
     }
 
@@ -453,7 +480,9 @@ struct LogExerciseCard: View {
                         app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                     }
                 }
-                SmallInput(label: index == 0 ? (exercise.timed ? durationFieldLabel(minutes: exercise.usesMinutes) : "REPS") : "", value: set.reps, placeholder: refPlaceholder(refSet), keyboard: .numberPad, identifier: "set-reps-input") { value in
+                // Decimal pad only where halves mean something — a timed set's
+                // field is seconds/minutes, and `updateSet` strips the point.
+                SmallInput(label: index == 0 ? (exercise.timed ? durationFieldLabel(minutes: exercise.usesMinutes) : "REPS") : "", value: set.reps, placeholder: refPlaceholder(refSet), keyboard: exercise.timed ? .numberPad : .decimalPad, identifier: "set-reps-input") { value in
                     app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
                 }
                 Button {
@@ -505,17 +534,18 @@ struct LogExerciseCard: View {
     /// are seconds, so a minutes-based move shows them back in minutes.
     private func refPlaceholder(_ refSet: LoggedSet?) -> String {
         guard let refSet else { return "0" }
-        return String(displayDuration(refSet.reps, minutes: exercise.usesMinutes))
+        guard exercise.timed else { return clean(refSet.reps) }
+        return String(displayDuration(Int(refSet.reps), minutes: exercise.usesMinutes))
     }
 
     /// Muted "Last: …" hint mirroring the web client's `.set-ref` line.
     private func referenceLabel(_ refSet: LoggedSet?) -> String? {
         guard let refSet else { return nil }
-        if exercise.timed { return "Last: \(formatLoggedDuration(refSet.reps, minutes: exercise.usesMinutes))" }
+        if exercise.timed { return "Last: \(formatLoggedDuration(Int(refSet.reps), minutes: exercise.usesMinutes))" }
         // Weight presence decides, not the bodyweight flag — a loaded lunge
         // logs its weight and should show it back.
-        guard let weight = refSet.weight, weight > 0 else { return "Last: \(refSet.reps) reps" }
-        return "Last: \(formatWeight(weight)) × \(refSet.reps)"
+        guard let weight = refSet.weight, weight > 0 else { return "Last: \(clean(refSet.reps)) reps" }
+        return "Last: \(formatWeight(weight)) × \(clean(refSet.reps))"
     }
 }
 

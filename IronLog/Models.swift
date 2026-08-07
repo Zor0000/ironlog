@@ -124,10 +124,28 @@ struct WorkoutDraft: Codable, Equatable {
     var note: String?
 }
 
+/// A workout the user saved to run again — "Anshul's leg day". The counterpart
+/// to a bundled split, authored from whatever is in the log rather than shipped
+/// in workouts.json.
+///
+/// It holds `ExerciseTemplate`s, the same currency the bundled splits deal in,
+/// so starting one reuses the existing template → `todayExercises` mapping
+/// instead of growing a second way to begin a workout.
+struct SavedRoutine: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var name: String
+    var createdAt: Date = Date()
+    var exercises: [ExerciseTemplate]
+}
+
 struct LoggedSet: Identifiable, Codable, Hashable {
     var id = UUID()
     var weight: Double?
-    var reps: Int
+    /// Half-rep capable — see the REP HELPERS section. `Double` rather than
+    /// `Int` decodes old snapshots unchanged (JSON `7` reads back as `7.0`),
+    /// which matters because `LocalStore.load` turns a decode failure into an
+    /// empty snapshot and would wipe every saved session.
+    var reps: Double
 }
 
 struct LoggedExercise: Identifiable, Codable, Hashable {
@@ -288,7 +306,7 @@ struct PersonalRecord: Identifiable, Codable, Hashable {
     var id: String { exerciseName }
     var exerciseName: String
     var weight: Double
-    var reps: Int
+    var reps: Double
     var achievedAt: Date
 }
 
@@ -303,6 +321,7 @@ struct AppSnapshot: Codable {
     var hasOnboarded: Bool?
     var timerPreset: Int?
     var runDraft: RunDraft?
+    var routines: [SavedRoutine]?
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -348,6 +367,49 @@ func formatWeightValue(_ kg: Double) -> String {
 /// Reuses `clean(_:)` so the number matches everywhere it is shown.
 func formatWeight(_ kg: Double) -> String {
     "\(formatWeightValue(kg)) \(currentWeightUnit.label)"
+}
+
+// ─────────────────────────────────────────────────────────────
+//  REP HELPERS
+//  Reps are stored as a Double so a set can be "7.5" — the rep you failed
+//  partway up, or a deliberate partial-ROM rep pushed past failure.
+//
+//  A half is as fine as the grid goes. Training literature names quarter, half
+//  and three-quarter partials, but that is a description of range of motion,
+//  not a counting unit: no one logs a rep tally to the quarter, and a finer
+//  grid only buys typing. Timed moves stay whole — `reps` is seconds there.
+// ─────────────────────────────────────────────────────────────
+
+/// The half-rep grid. Mirrors how `displayWeight` rounds pounds, for the same
+/// reason: finer than anything real, coarse enough to hide float noise.
+func snapToHalf(_ value: Double) -> Double { (value * 2).rounded() / 2 }
+
+/// Typed reps snapped to the nearest half *on the keystroke*, so the field can
+/// only ever hold a loggable value — "7.2" collapses to "7" and "7.4" to "7.5"
+/// as they type, rather than being silently rejected later at save time.
+///
+/// A lone trailing "." survives untouched: snapping it away would make the
+/// decimal point impossible to type in the first place.
+func snapReps(_ input: String) -> String {
+    var whole = ""
+    var fraction: Character?
+    var seenSeparator = false
+    for character in input {
+        if character.isNumber {
+            // One decimal digit is all the grid can hold; further keys are dead.
+            if seenSeparator {
+                if fraction == nil { fraction = character }
+            } else {
+                whole.append(character)
+            }
+        } else if character == "." || character == ",", !seenSeparator {
+            seenSeparator = true
+        }
+    }
+    guard seenSeparator else { return whole }
+    guard let fraction else { return whole + "." }
+    let value = (Double(whole) ?? 0) + (Double(String(fraction)) ?? 0) / 10
+    return clean(snapToHalf(value))
 }
 
 // ─────────────────────────────────────────────────────────────
