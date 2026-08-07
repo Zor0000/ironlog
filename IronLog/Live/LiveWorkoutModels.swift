@@ -153,17 +153,21 @@ enum LiveWorkoutReducer {
         guard !exercise.timed else { return state }
         let current = parseDouble(state.exercises[ei.exercise].sets[ei.set].weight)
         let next = max(0, current + Double(direction) * state.weightStep)
-        state.exercises[ei.exercise].sets[ei.set].weight = formatWeight(next)
+        state.exercises[ei.exercise].sets[ei.set].weight = formatNumber(next)
         return state
     }
 
     /// Nudge the current set's reps (or seconds) by one.
+    ///
+    /// Whole steps only — a half typed in the app is carried along (7.5 → 8.5)
+    /// but the lock screen has no way to enter one.
+    /// ponytail: add a long-press half-step if anyone asks for it on the widget.
     static func adjustReps(_ state: LiveWorkoutState, by direction: Int) -> LiveWorkoutState {
         var state = state
         guard let ei = currentEditableIndices(state) else { return state }
-        let current = Int(state.exercises[ei.exercise].sets[ei.set].reps) ?? 0
-        let next = max(0, current + direction)
-        state.exercises[ei.exercise].sets[ei.set].reps = String(next)
+        let current = parseDouble(state.exercises[ei.exercise].sets[ei.set].reps)
+        let next = max(0, current + Double(direction))
+        state.exercises[ei.exercise].sets[ei.set].reps = formatNumber(next)
         return state
     }
 
@@ -245,7 +249,7 @@ enum LiveWorkoutReducer {
     }
 
     static func isValid(_ set: LiveSet, in exercise: LiveExercise) -> Bool {
-        guard let reps = Int(set.reps), reps > 0 else { return false }
+        guard let reps = parseDoubleOptional(set.reps), reps > 0 else { return false }
         if exercise.bodyweight || exercise.timed { return true }
         guard let weight = parseDoubleOptional(set.weight), weight >= 0 else { return false }
         return true
@@ -263,9 +267,9 @@ extension LiveWorkoutReducer {
         Double(value.replacingOccurrences(of: ",", with: "."))
     }
 
-    /// Renders a weight without a trailing ".0" so the stepper reads "60" not
-    /// "60.0", but keeps a half-plate as "62.5".
-    static func formatWeight(_ value: Double) -> String {
+    /// Renders a stepper value without a trailing ".0" — "60" not "60.0" — while
+    /// keeping a half-plate as "62.5" and a half-rep as "7.5".
+    static func formatNumber(_ value: Double) -> String {
         String(format: "%g", value)
     }
 }

@@ -261,12 +261,12 @@ struct HistoryCard: View {
         // A timed set's `reps` are seconds, not repetitions — showing "BW x 1800"
         // for a 30-minute ride reads as nonsense.
         if exercise.timed {
-            return formatLoggedDuration(set.reps, minutes: exercise.usesMinutes)
+            return formatLoggedDuration(Int(set.reps), minutes: exercise.usesMinutes)
         }
         if let weight = set.weight, weight > 0 {
-            return "\(formatWeight(weight)) x \(set.reps)"
+            return "\(formatWeight(weight)) x \(clean(set.reps))"
         }
-        return "BW x \(set.reps)"
+        return "BW x \(clean(set.reps))"
     }
 }
 
@@ -300,7 +300,9 @@ struct EditSessionSheet: View {
                         weight: set.weight.map { formatWeightValue($0) } ?? "",
                         // Stored seconds back into the field's own unit, mirroring
                         // the kg → display-unit conversion on the line above.
-                        reps: String(displayDuration(set.reps, minutes: exercise.usesMinutes)),
+                        reps: exercise.timed
+                            ? String(displayDuration(Int(set.reps), minutes: exercise.usesMinutes))
+                            : clean(set.reps),
                         done: true
                     )
                 }
@@ -470,8 +472,10 @@ struct EditSessionSheet: View {
                             exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
                         }
                     }
-                    SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, identifier: "edit-reps-input") { value in
-                        exercise.wrappedValue.sets[index].reps = value.filter(\.isNumber)
+                    SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input") { value in
+                        exercise.wrappedValue.sets[index].reps = exercise.wrappedValue.timed
+                            ? value.filter(\.isNumber)
+                            : snapReps(value)
                     }
                     Button {
                         NativeFeedback.selection()

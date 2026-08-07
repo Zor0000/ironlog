@@ -52,6 +52,7 @@ struct WorkoutsView: View {
             TitleBlock(title: "Split Type", subtitle: "Choose your training program")
             freeWorkoutCard
                 .entrance(0)
+            savedRoutines
             if app.library.splits.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Workout library unavailable", systemImage: "exclamationmark.triangle")
@@ -92,6 +93,65 @@ struct WorkoutsView: View {
                 }
             }
         }
+    }
+
+    /// The user's own saved workouts, above the bundled splits — for anyone
+    /// running the same staple day after day, this is the whole screen. Hidden
+    /// entirely until there is one, so the wizard is unchanged for everyone else.
+    @ViewBuilder
+    private var savedRoutines: some View {
+        if !app.routines.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("My Routines")
+                    .cardLabel()
+                    .padding(.top, 4)
+                ForEach(Array(app.routines.enumerated()), id: \.element.id) { index, routine in
+                    Button {
+                        NativeFeedback.light()
+                        withAnimation(AppMotion.smooth) {
+                            app.startRoutine(routine)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(routine.name)
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text(exerciseCount(routine))
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Theme.muted2)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Theme.muted2)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
+                        .background(Theme.surface2)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+                    }
+                    .foregroundStyle(Theme.text)
+                    .buttonStyle(TactileButtonStyle())
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            app.deleteRoutine(routine.id)
+                        } label: {
+                            Label("Delete Routine", systemImage: "trash")
+                        }
+                    }
+                    .entrance(index + 1)
+                }
+            }
+        }
+    }
+
+    private func exerciseCount(_ routine: SavedRoutine) -> String {
+        let count = routine.exercises.count
+        return "\(count) exercise\(count == 1 ? "" : "s")"
     }
 
     /// Accent-tinted "start empty" card, set apart from the plain split rows so
@@ -344,7 +404,7 @@ struct ExerciseSuggestionCard: View {
         var parts = ["\(exercise.sets) sets x \(exercise.reps) \(exercise.timed ? (exercise.minutes ? "min" : "sec") : "reps")"]
         if exercise.bodyweight || exercise.timed { parts.append(exercise.timed ? "Timed" : "Bodyweight") }
         if let record {
-            parts.append(record.weight > 0 ? "Best: \(formatWeight(record.weight)) x \(record.reps)" : "Best: BW x \(record.reps)")
+            parts.append(record.weight > 0 ? "Best: \(formatWeight(record.weight)) x \(clean(record.reps))" : "Best: BW x \(clean(record.reps))")
         }
         return parts.joined(separator: " · ")
     }

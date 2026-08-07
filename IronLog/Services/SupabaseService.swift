@@ -49,7 +49,7 @@ final class SupabaseService {
 
     func pullSessions() async throws -> [WorkoutSession] {
         guard let user = currentUser else { return [] }
-        let select = "*,session_sets(weight_kg,reps,exercises(name))"
+        let select = "*,session_sets(weight_kg,reps,set_index,bodyweight,timed,uses_minutes,exercises(name))"
         let rows: [RemoteSession] = try await restGet(
             path: "/rest/v1/sessions",
             query: [
@@ -76,6 +76,48 @@ final class SupabaseService {
         }
     }
 
+    func pullRoutines() async throws -> [SavedRoutine] {
+        guard let user = currentUser else { return [] }
+        let rows: [RemoteRoutine] = try await restGet(
+            path: "/rest/v1/routines",
+            query: [
+                URLQueryItem(name: "select", value: "id,name,exercises,created_at"),
+                URLQueryItem(name: "user_id", value: "eq.\(user.id)"),
+                URLQueryItem(name: "order", value: "created_at.asc")
+            ]
+        )
+        return rows.compactMap { $0.localRoutine() }
+    }
+
+    /// Upserts on the routine's own id, so the row and the local record are the
+    /// same object on every device — no server-minted id to map back, and
+    /// re-saving a routine updates in place instead of accumulating copies.
+    func backup(routine: SavedRoutine) async throws {
+        guard let user = currentUser else { throw SupabaseError.notAuthenticated }
+        let body = RemoteRoutineInsert(
+            id: routine.id.uuidString,
+            userID: user.id,
+            name: routine.name,
+            exercises: routine.exercises,
+            createdAt: Self.iso8601.string(from: routine.createdAt),
+            updatedAt: Self.iso8601.string(from: Date())
+        )
+        let _: [EmptyResponse] = try await restPost(
+            path: "/rest/v1/routines",
+            query: [URLQueryItem(name: "on_conflict", value: "id")],
+            body: [body],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            emptyValue: []
+        )
+    }
+
+    func deleteCloudRoutine(_ id: UUID) async throws {
+        try await restDelete(
+            path: "/rest/v1/routines",
+            query: [URLQueryItem(name: "id", value: "eq.\(id.uuidString)")]
+        )
+    }
+
     func backup(session local: WorkoutSession, records: [PersonalRecord]) async throws -> String {
         guard let user = currentUser else { throw SupabaseError.notAuthenticated }
         if let cloudID = local.cloudID { return cloudID }
@@ -83,15 +125,24 @@ final class SupabaseService {
         let remoteSession = try await insertSession(local, userID: user.id)
         do {
             let exerciseIDs = try await ensureExercises(local.exercises.map(\.name))
+            // `setIndex` is the position in this flat list, so it records both
+            // exercise order and set order in one column — a pull sorts by it and
+            // groups by first appearance to rebuild the session as it was logged.
+            var setIndex = 0
             let rows = local.exercises.flatMap { exercise in
-                exercise.sets.map { set in
-                    RemoteSetInsert(
+                exercise.sets.map { set -> RemoteSetInsert in
+                    defer { setIndex += 1 }
+                    return RemoteSetInsert(
                         sessionID: remoteSession.id,
                         exerciseID: exerciseIDs[exercise.name] ?? "",
                         // set.weight is already nil for timed/unloaded sets — see
                         // AppState.loggedSet, the one place that decision is made.
                         weightKg: set.weight,
-                        reps: set.reps
+                        reps: set.reps,
+                        setIndex: setIndex,
+                        bodyweight: exercise.bodyweight,
+                        timed: exercise.timed,
+                        usesMinutes: exercise.usesMinutes
                     )
                 }
             }.filter { !$0.exerciseID.isEmpty }
@@ -127,10 +178,20 @@ final class SupabaseService {
         }
         try await restDelete(path: "/rest/v1/sessions", query: [userFilter])
         try await restDelete(path: "/rest/v1/personal_records", query: [userFilter])
+        try await restDelete(path: "/rest/v1/routines", query: [userFilter])
     }
 
     private func insertSession(_ session: WorkoutSession, userID: String) async throws -> RemoteSessionInsertResult {
-        let body = RemoteSessionInsert(userID: userID, muscleGroup: session.muscle, splitType: session.split, note: session.note)
+        let body = RemoteSessionInsert(
+            userID: userID,
+            muscleGroup: session.muscle,
+            splitType: session.split,
+            note: session.note,
+            activityType: session.activity?.kind.rawValue,
+            distanceM: session.activity?.distance,
+            durationS: session.activity?.duration,
+            route: session.activity?.route
+        )
         let rows: [RemoteSessionInsertResult] = try await restPost(path: "/rest/v1/sessions", query: [], body: body, prefer: "return=representation")
         guard let row = rows.first else { throw SupabaseError.emptyResponse }
         return row
@@ -226,10 +287,24 @@ final class SupabaseService {
         URL(string: projectURL.absoluteString + path)!
     }
 
-    private func encode<Body: Encodable>(_ body: Body) throws -> Data {
+    /// The wire coders, exposed so tests exercise the very same configuration
+    /// the requests use — a test that built its own would still pass after the
+    /// service's strategy changed underneath it.
+    static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
-        return try encoder.encode(body)
+        return encoder
+    }
+
+    static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+
+    private func encode<Body: Encodable>(_ body: Body) throws -> Data {
+        try Self.makeEncoder().encode(body)
     }
 
     private func decode<Response: Decodable>(_ request: URLRequest, emptyValue: Response? = nil) async throws -> Response {
@@ -241,10 +316,7 @@ final class SupabaseService {
             throw SupabaseError.requestFailed(message)
         }
         if data.isEmpty, let emptyValue { return emptyValue }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(Response.self, from: data)
+        return try Self.makeDecoder().decode(Response.self, from: data)
     }
 
     private func decodeWithAuthRetry<Response: Decodable>(_ request: URLRequest, emptyValue: Response? = nil) async throws -> Response {
@@ -311,6 +383,31 @@ struct RemoteExercise: Codable {
     var name: String
 }
 
+/// A routine round-trips as a document — the exercise list is stored in one
+/// `jsonb` column because it is only ever read and written whole. Nothing
+/// queries inside it, so a join table would add a second table, an ordering
+/// column and an N+1 insert for no gain.
+struct RemoteRoutine: Codable {
+    var id: String
+    var name: String
+    var exercises: [ExerciseTemplate]
+    var createdAt: Date?
+
+    func localRoutine() -> SavedRoutine? {
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        return SavedRoutine(id: uuid, name: name, createdAt: createdAt ?? Date(), exercises: exercises)
+    }
+}
+
+struct RemoteRoutineInsert: Encodable {
+    var id: String
+    var userID: String
+    var name: String
+    var exercises: [ExerciseTemplate]
+    var createdAt: String
+    var updatedAt: String
+}
+
 struct RemoteExerciseInsert: Encodable {
     var name: String
 }
@@ -320,6 +417,11 @@ struct RemoteSessionInsert: Encodable {
     var muscleGroup: String?
     var splitType: String?
     var note: String?
+    /// Nil for a strength session; a `CardioKind` raw value for a tracked one.
+    var activityType: String?
+    var distanceM: Double?
+    var durationS: Int?
+    var route: [RoutePoint]?
 }
 
 struct RemoteSessionInsertResult: Codable {
@@ -330,20 +432,28 @@ struct RemoteSetInsert: Encodable {
     var sessionID: String
     var exerciseID: String
     var weightKg: Double?
-    var reps: Int
+    /// Fractional — the column is `numeric`, not `integer`, so a 7.5 survives.
+    var reps: Double
+    var setIndex: Int
+    /// Exercise-level facts, denormalised onto the set row. Without them a pull
+    /// cannot tell a 20-minute bike ride from 1200 reps, nor a loaded pull-up
+    /// from a weighted press.
+    var bodyweight: Bool
+    var timed: Bool
+    var usesMinutes: Bool
 }
 
 struct RemotePRInsert: Encodable {
     var userID: String
     var exerciseID: String
     var weightKg: Double
-    var reps: Int
+    var reps: Double
     var achievedAt: String
 }
 
 struct RemotePR: Codable {
     var weightKg: Double?
-    var reps: Int?
+    var reps: Double?
     var achievedAt: Date?
     var exercises: RemoteExerciseName?
 }
@@ -359,36 +469,77 @@ struct RemoteSession: Codable {
     var muscleGroup: String?
     var splitType: String?
     var note: String?
+    var activityType: String?
+    var distanceM: Double?
+    var durationS: Int?
+    var route: [RoutePoint]?
     var sessionSets: [RemoteSessionSet]?
 
     func localSession(userID: String) -> WorkoutSession {
-        let grouped = Dictionary(grouping: sessionSets ?? []) { $0.exercises?.name ?? "Unknown" }
-        let exercises = grouped.map { name, sets in
-            LoggedExercise(
-                name: name,
-                bodyweight: sets.allSatisfy { ($0.weightKg ?? 0) == 0 },
-                timed: false,
-                sets: sets.compactMap { set in
-                    guard let reps = set.reps else { return nil }
-                    return LoggedSet(weight: set.weightKg, reps: reps)
-                }
-            )
-        }.filter { !$0.sets.isEmpty }
-        return WorkoutSession(
+        WorkoutSession(
             cloudID: id,
             userID: userID,
             createdAt: createdAt ?? Date(),
             muscle: muscleGroup,
             split: splitType,
             note: note,
-            exercises: exercises,
-            syncState: .synced
+            exercises: loggedExercises,
+            syncState: .synced,
+            activity: activity
         )
+    }
+
+    /// A tracked run/walk/ride, or nil for an ordinary strength session.
+    private var activity: CardioActivity? {
+        guard let kind = activityType.flatMap(CardioKind.init(rawValue:)) else { return nil }
+        return CardioActivity(
+            kind: kind,
+            duration: durationS ?? 0,
+            distance: distanceM ?? 0,
+            route: route ?? []
+        )
+    }
+
+    /// Rebuilds the session in the order it was logged. `set_index` is a single
+    /// running counter across the whole session, so sorting by it and grouping
+    /// by first appearance restores exercise order and set order together —
+    /// grouping straight into a dictionary loses both.
+    private var loggedExercises: [LoggedExercise] {
+        let ordered = (sessionSets ?? []).sorted { ($0.setIndex ?? 0) < ($1.setIndex ?? 0) }
+        var order: [String] = []
+        var grouped: [String: [RemoteSessionSet]] = [:]
+        for set in ordered {
+            let name = set.exercises?.name ?? "Unknown"
+            if grouped[name] == nil { order.append(name) }
+            grouped[name, default: []].append(set)
+        }
+        return order.compactMap { name in
+            let sets = grouped[name] ?? []
+            let logged = sets.compactMap { set -> LoggedSet? in
+                guard let reps = set.reps else { return nil }
+                return LoggedSet(weight: set.weightKg, reps: reps)
+            }
+            guard !logged.isEmpty else { return nil }
+            return LoggedExercise(
+                name: name,
+                // Rows written before these columns existed carry nil, so fall
+                // back to the old "no weight anywhere means bodyweight" guess
+                // rather than silently reclassifying old history.
+                bodyweight: sets.first?.bodyweight ?? sets.allSatisfy { ($0.weightKg ?? 0) == 0 },
+                timed: sets.first?.timed ?? false,
+                minutes: sets.first?.usesMinutes,
+                sets: logged
+            )
+        }
     }
 }
 
 struct RemoteSessionSet: Codable {
     var weightKg: Double?
-    var reps: Int?
+    var reps: Double?
+    var setIndex: Int?
+    var bodyweight: Bool?
+    var timed: Bool?
+    var usesMinutes: Bool?
     var exercises: RemoteExerciseName?
 }
