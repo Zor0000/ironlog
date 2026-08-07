@@ -49,7 +49,7 @@ final class SupabaseService {
 
     func pullSessions() async throws -> [WorkoutSession] {
         guard let user = currentUser else { return [] }
-        let select = "*,session_sets(weight_kg,reps,set_index,bodyweight,timed,uses_minutes,exercises(name))"
+        let select = "*,session_sets(weight_kg,reps,set_index,bodyweight,timed,uses_minutes,set_type,exercises(name))"
         let rows: [RemoteSession] = try await restGet(
             path: "/rest/v1/sessions",
             query: [
@@ -142,7 +142,8 @@ final class SupabaseService {
                         setIndex: setIndex,
                         bodyweight: exercise.bodyweight,
                         timed: exercise.timed,
-                        usesMinutes: exercise.usesMinutes
+                        usesMinutes: exercise.usesMinutes,
+                        setType: set.type?.rawValue
                     )
                 }
             }.filter { !$0.exerciseID.isEmpty }
@@ -441,6 +442,8 @@ struct RemoteSetInsert: Encodable {
     var bodyweight: Bool
     var timed: Bool
     var usesMinutes: Bool
+    /// `SetType.rawValue`, or nil for an ordinary working set.
+    var setType: String?
 }
 
 struct RemotePRInsert: Encodable {
@@ -517,7 +520,8 @@ struct RemoteSession: Codable {
             let sets = grouped[name] ?? []
             let logged = sets.compactMap { set -> LoggedSet? in
                 guard let reps = set.reps else { return nil }
-                return LoggedSet(weight: set.weightKg, reps: reps)
+                return LoggedSet(weight: set.weightKg, reps: reps,
+                                 type: set.setType.flatMap(SetType.init(rawValue:)))
             }
             guard !logged.isEmpty else { return nil }
             return LoggedExercise(
@@ -541,5 +545,6 @@ struct RemoteSessionSet: Codable {
     var bodyweight: Bool?
     var timed: Bool?
     var usesMinutes: Bool?
+    var setType: String?
     var exercises: RemoteExerciseName?
 }

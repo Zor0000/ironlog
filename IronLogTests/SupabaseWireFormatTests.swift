@@ -47,7 +47,7 @@ final class SupabaseWireFormatTests: XCTestCase {
     func testSetInsertCarriesOrderingAndExerciseFlags() throws {
         let body = RemoteSetInsert(
             sessionID: "s1", exerciseID: "e1", weightKg: 100, reps: 5,
-            setIndex: 3, bodyweight: false, timed: false, usesMinutes: false
+            setIndex: 3, bodyweight: false, timed: false, usesMinutes: false, setType: nil
         )
         let keys = Set(try json(body).keys)
         XCTAssertEqual(keys, [
@@ -168,7 +168,7 @@ final class SupabaseWireFormatTests: XCTestCase {
     func testHalfRepsCrossTheWireInBothDirections() throws {
         let body = RemoteSetInsert(
             sessionID: "s1", exerciseID: "e1", weightKg: 100, reps: 7.5,
-            setIndex: 0, bodyweight: false, timed: false, usesMinutes: false
+            setIndex: 0, bodyweight: false, timed: false, usesMinutes: false, setType: nil
         )
         XCTAssertEqual(try json(body)["reps"] as? Double, 7.5, "not truncated to 7 on the way out")
 
@@ -181,6 +181,43 @@ final class SupabaseWireFormatTests: XCTestCase {
         let rows = try decoder.decode([RemoteSession].self, from: Data(payload.utf8))
         let session = try XCTUnwrap(rows.first).localSession(userID: "u1")
         XCTAssertEqual(session.exercises[0].sets[0].reps, 7.5)
+    }
+
+    /// The column is constrained to the enum's raw values, so a rename on the
+    /// client that is not mirrored in the CHECK constraint is a 400.
+    func testSetTypeCrossesTheWireAsItsRawValue() throws {
+        let body = RemoteSetInsert(
+            sessionID: "s1", exerciseID: "e1", weightKg: 60, reps: 10,
+            setIndex: 0, bodyweight: false, timed: false, usesMinutes: false,
+            setType: SetType.warmup.rawValue
+        )
+        XCTAssertEqual(try json(body)["set_type"] as? String, "warmup")
+
+        let payload = """
+        [{"id":"s1","created_at":"2026-08-07T10:00:00Z","muscle_group":"legs","split_type":"PPL","session_sets":[
+          {"weight_kg":60,"reps":10,"set_index":0,"bodyweight":false,"timed":false,"uses_minutes":false,
+           "set_type":"warmup","exercises":{"name":"Squat"}},
+          {"weight_kg":100,"reps":5,"set_index":1,"bodyweight":false,"timed":false,"uses_minutes":false,
+           "set_type":null,"exercises":{"name":"Squat"}}
+        ]}]
+        """
+        let rows = try decoder.decode([RemoteSession].self, from: Data(payload.utf8))
+        let sets = try XCTUnwrap(rows.first).localSession(userID: "u1").exercises[0].sets
+
+        XCTAssertEqual(sets[0].type, .warmup)
+        XCTAssertFalse(sets[0].isWorkingSet)
+        XCTAssertNil(sets[1].type, "a null column is an ordinary set, not a decode failure")
+        XCTAssertTrue(sets[1].isWorkingSet)
+    }
+
+    /// An ordinary set omits the key entirely rather than sending a null, which
+    /// is what lets the column keep its default.
+    func testAnOrdinarySetOmitsTheTypeKey() throws {
+        let body = RemoteSetInsert(
+            sessionID: "s1", exerciseID: "e1", weightKg: 100, reps: 5,
+            setIndex: 0, bodyweight: false, timed: false, usesMinutes: false, setType: nil
+        )
+        XCTAssertFalse(try json(body).keys.contains("set_type"))
     }
 
     /// A loaded pull-up used to lose its bodyweight flag, because that was

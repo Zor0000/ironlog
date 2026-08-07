@@ -113,6 +113,7 @@ final class AppState: ObservableObject {
             session.exercises.forEach { exercise in
                 sets += exercise.sets.count
                 exercise.sets.forEach { set in
+                    guard set.isWorkingSet else { return }
                     if let weight = set.weight, weight > 0 {
                         volume += weight * set.reps
                     }
@@ -523,6 +524,14 @@ final class AppState: ObservableObject {
         persistDraft()
     }
 
+    /// Tag how a set was performed, or pass nil to make it an ordinary set again.
+    func setType(exerciseID: ActiveExercise.ID, setID: WorkoutSet.ID, to type: SetType?) {
+        guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
+              let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
+        todayExercises[ei].sets[si].type = type
+        persistDraft()
+    }
+
     func toggleDone(exerciseID: ActiveExercise.ID, setID: WorkoutSet.ID) {
         guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
               let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
@@ -930,7 +939,7 @@ final class AppState: ObservableObject {
             // ponytail: timed work earns no PR at all; add a duration comparator
             // ("longest hold", "furthest row") if cardio records are wanted.
             guard !exercise.timed else { continue }
-            for set in exercise.sets {
+            for set in exercise.sets where set.isWorkingSet {
                 let weight = set.weight ?? 0
                 let record = PersonalRecord(exerciseName: exercise.name, weight: weight, reps: set.reps, achievedAt: session.createdAt)
                 personalRecords[exercise.name] = better(record, than: personalRecords[exercise.name])
@@ -950,12 +959,27 @@ final class AppState: ObservableObject {
         return current
     }
 
+    /// Whether finishing this set just broke a record — announced once.
+    ///
+    /// `personalRecords` only refreshes when a session is saved, so all workout
+    /// long it holds the *pre-workout* best. That is the right thing to beat,
+    /// but it also means every back-off set at the same new weight beats it too
+    /// and re-announces the same PR. Only the first set to clear the bar counts.
+    ///
+    /// An exercise with no record yet is not a PR either: there is nothing to
+    /// beat, and on a fresh install that fired on literally every set.
     private func isNewPR(exercise: ActiveExercise, set: WorkoutSet) -> Bool {
         // Must match `applyRecords`, or the toast celebrates a PR that is never
-        // recorded.
-        guard !exercise.timed, let reps = Double(set.reps) else { return false }
+        // recorded — including its warm-up exclusion.
+        guard !exercise.timed, let pr = personalRecords[exercise.name],
+              beats(pr, set) else { return false }
+        return !exercise.sets.contains { $0.id != set.id && $0.done && beats(pr, $0) }
+    }
+
+    private func beats(_ pr: PersonalRecord, _ set: WorkoutSet) -> Bool {
+        guard set.type?.countsAsVolume ?? true,
+              let reps = Double(set.reps), reps > 0 else { return false }
         let weight = typedWeightKg(set) ?? 0
-        guard let pr = personalRecords[exercise.name] else { return reps > 0 }
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
     }
 
@@ -970,12 +994,12 @@ final class AppState: ObservableObject {
         if exercise.timed {
             // Durations are stored in seconds; cardio machines type minutes.
             let seconds = displayDurationToSeconds(Int(reps), minutes: exercise.usesMinutes)
-            return LoggedSet(weight: nil, reps: Double(seconds))
+            return LoggedSet(weight: nil, reps: Double(seconds), type: set.type)
         }
         guard let weight = typedWeightKg(set) else {
-            return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps) : nil
+            return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps, type: set.type) : nil
         }
-        return LoggedSet(weight: weight, reps: reps)
+        return LoggedSet(weight: weight, reps: reps, type: set.type)
     }
 
     /// Typed weight in canonical KG, or nil when the field is blank/invalid.

@@ -169,11 +169,18 @@ struct HistoryCard: View {
                         HStack(alignment: .top) {
                             Text(exercise.name)
                                 .font(.system(size: 13, weight: .medium))
-                            Spacer()
-                            Text(exercise.sets.map { setLabel($0, in: exercise) }.joined(separator: ", "))
-                                .font(.system(size: 12))
-                                .foregroundStyle(Theme.muted2)
-                                .multilineTextAlignment(.trailing)
+                            Spacer(minLength: 12)
+                            // One line per set, not a comma-joined run-on: a set
+                            // tag ("Warm-up · 60 kg x 10") makes that string long
+                            // enough to wrap into an unreadable block.
+                            VStack(alignment: .trailing, spacing: 3) {
+                                ForEach(exercise.sets) { set in
+                                    Text(setLabel(set, in: exercise))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(set.type == nil ? Theme.muted2 : Theme.accent.opacity(0.85))
+                                }
+                            }
+                            .multilineTextAlignment(.trailing)
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
@@ -260,13 +267,14 @@ struct HistoryCard: View {
     private func setLabel(_ set: LoggedSet, in exercise: LoggedExercise) -> String {
         // A timed set's `reps` are seconds, not repetitions — showing "BW x 1800"
         // for a 30-minute ride reads as nonsense.
+        let tag = set.type.map { "\($0.label) · " } ?? ""
         if exercise.timed {
-            return formatLoggedDuration(Int(set.reps), minutes: exercise.usesMinutes)
+            return tag + formatLoggedDuration(Int(set.reps), minutes: exercise.usesMinutes)
         }
         if let weight = set.weight, weight > 0 {
-            return "\(formatWeight(weight)) x \(clean(set.reps))"
+            return "\(tag)\(formatWeight(weight)) x \(clean(set.reps))"
         }
-        return "BW x \(clean(set.reps))"
+        return "\(tag)BW x \(clean(set.reps))"
     }
 }
 
@@ -303,7 +311,8 @@ struct EditSessionSheet: View {
                         reps: exercise.timed
                             ? String(displayDuration(Int(set.reps), minutes: exercise.usesMinutes))
                             : clean(set.reps),
-                        done: true
+                        done: true,
+                        type: set.type
                     )
                 }
             )
@@ -462,38 +471,44 @@ struct EditSessionSheet: View {
                 Spacer()
             }
             ForEach(Array(exercise.wrappedValue.sets.enumerated()), id: \.element.id) { index, set in
-                HStack(alignment: .bottom, spacing: 8) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.muted)
-                        .frame(width: 20, height: 34, alignment: .bottom)
-                    if !exercise.wrappedValue.timed {
-                        SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
-                            exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
-                        }
-                    }
-                    SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input") { value in
-                        exercise.wrappedValue.sets[index].reps = exercise.wrappedValue.timed
-                            ? value.filter(\.isNumber)
-                            : snapReps(value)
-                    }
-                    Button {
-                        NativeFeedback.selection()
-                        withAnimation(AppMotion.quick) {
-                            exercise.wrappedValue.sets.remove(at: index)
-                            // Removing the last set removes the exercise.
-                            if exercise.wrappedValue.sets.isEmpty {
-                                exercises.removeAll { $0.id == exercise.wrappedValue.id }
+                // Mirrors the live log's row: no set-number column, so the
+                // set-type button has the width it needs.
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .bottom, spacing: 8) {
+                        if !exercise.wrappedValue.timed {
+                            SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
+                                exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
                             }
                         }
-                    } label: {
-                        Image(systemName: "minus.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 30, height: 34)
-                            .foregroundStyle(Theme.muted2)
+                        SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input") { value in
+                            exercise.wrappedValue.sets[index].reps = exercise.wrappedValue.timed
+                                ? value.filter(\.isNumber)
+                                : snapReps(value)
+                        }
+                        SetTypeMenu(type: exercise.sets[index].type)
+                        Button {
+                            NativeFeedback.selection()
+                            withAnimation(AppMotion.quick) {
+                                exercise.wrappedValue.sets.remove(at: index)
+                                // Removing the last set removes the exercise.
+                                if exercise.wrappedValue.sets.isEmpty {
+                                    exercises.removeAll { $0.id == exercise.wrappedValue.id }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 30, height: 34)
+                                .foregroundStyle(Theme.muted2)
+                        }
+                        .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Remove set")
                     }
-                    .buttonStyle(TactileButtonStyle())
-                    .accessibilityLabel("Remove set")
+                    if let label = set.type?.label {
+                        Text(label)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.accent.opacity(0.85))
+                    }
                 }
             }
             Button {
