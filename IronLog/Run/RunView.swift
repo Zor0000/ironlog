@@ -1,12 +1,16 @@
 import SwiftUI
 import MapKit
 
-/// The Run tab: start a GPS-tracked run, walk or ride, watch the numbers that
+/// The Run tab: start a GPS-tracked run or walk, watch the numbers that
 /// matter, save it into the same History timeline as a lifting session.
 struct RunView: View {
     @EnvironmentObject private var app: AppState
     @StateObject private var tracker = RunTracker.shared
     @State private var showDiscardConfirmation = false
+    @State private var showManualLog = false
+    /// Typed distance, in the display unit, for a session GPS could not measure.
+    @State private var manualDistance = ""
+    @FocusState private var distanceFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 14) {
@@ -25,7 +29,7 @@ struct RunView: View {
             if showDiscardConfirmation {
                 ConfirmActionModal(
                     title: "Discard \(tracker.kind.label.lowercased())?",
-                    message: "The \(formatDistance(tracker.distance)) \(currentDistanceUnit.label) tracked so far will be lost.",
+                    message: "The \(formatElapsed(tracker.elapsed)) tracked so far will be lost.",
                     confirmTitle: "Discard \(tracker.kind.label)",
                     cancelTitle: "Keep Going",
                     systemImage: "trash"
@@ -45,14 +49,14 @@ struct RunView: View {
 
     private var idleScreen: some View {
         VStack(spacing: 12) {
-            TitleBlock(title: "Go Outside", subtitle: "GPS-tracked run, walk or ride")
+            TitleBlock(title: "Get Moving", subtitle: "GPS outside, or type the distance indoors")
 
             if tracker.permissionDenied {
                 permissionCard
             }
 
-            // The three tiles share whatever height is left, so the picker fills
-            // the screen instead of huddling under the title.
+            // The tiles share whatever height is left, so the picker fills the
+            // screen instead of huddling under the title.
             VStack(spacing: 10) {
                 ForEach(Array(CardioKind.allCases.enumerated()), id: \.element) { index, kind in
                     kindTile(kind)
@@ -62,7 +66,11 @@ struct RunView: View {
             .frame(maxHeight: .infinity)
 
             startButton
+            manualLogButton
             lastActivityLine
+        }
+        .sheet(isPresented: $showManualLog) {
+            ManualCardioSheet(kind: tracker.kind)
         }
     }
 
@@ -122,10 +130,26 @@ struct RunView: View {
         .accessibilityIdentifier("run-start-button")
     }
 
+    /// For a run that already happened — on a treadmill, yesterday, or with the
+    /// phone left at home. Nothing to track, just the numbers.
+    private var manualLogButton: some View {
+        Button {
+            NativeFeedback.selection()
+            showManualLog = true
+        } label: {
+            Label("Log One I Already Did", systemImage: "square.and.pencil")
+        }
+        .buttonStyle(SecondaryButtonStyle())
+        .accessibilityIdentifier("run-manual-log-button")
+    }
+
     private var lastActivityLine: some View {
         Group {
             if let session = app.sessions.first(where: \.isCardio), let activity = session.activity {
-                Text("Last \(activity.kind.label.lowercased()): \(formatDistance(activity.distance)) \(currentDistanceUnit.label) · \(formatElapsed(activity.duration)) · \(session.createdAt.displayDay)")
+                let measured = activity.distance > 0
+                    ? "\(formatDistance(activity.distance)) \(currentDistanceUnit.label) · "
+                    : ""
+                Text("Last \(activity.kind.label.lowercased()): \(measured)\(formatElapsed(activity.duration)) · \(session.createdAt.displayDay)")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.muted)
             }
@@ -174,9 +198,19 @@ struct RunView: View {
                     .accessibilityIdentifier("run-elapsed")
 
                 HStack {
-                    metric(formatDistance(tracker.distance), currentDistanceUnit.label)
+                    if tracker.measuringNothing {
+                        // GPS is running but measuring nothing — a treadmill, a
+                        // basement, a covered track. Let the number be typed
+                        // instead of leaving a permanently dead 0.00 on screen.
+                        manualDistanceField
+                    } else {
+                        metric(
+                            formatDistance(tracker.distance),
+                            tracker.stepCounting ? "\(currentDistanceUnit.label) — steps" : currentDistanceUnit.label
+                        )
+                    }
                     Spacer()
-                    metric(formatPace(seconds: tracker.elapsed, metres: tracker.distance), "/\(currentDistanceUnit.label)")
+                    metric(formatPace(seconds: tracker.elapsed, metres: enteredMetres ?? tracker.distance), "/\(currentDistanceUnit.label)")
                 }
             }
             .cardStyle()
@@ -201,9 +235,11 @@ struct RunView: View {
 
                     Button {
                         NativeFeedback.success()
+                        distanceFieldFocused = false
                         // `finish()` returns nil and keeps the run alive when
                         // nothing was tracked; `saveRun` explains that.
-                        app.saveRun(tracker.finish())
+                        app.saveRun(tracker.finish(manualMetres: enteredMetres))
+                        manualDistance = ""
                     } label: {
                         Label("Finish", systemImage: "checkmark")
                     }
@@ -269,6 +305,8 @@ struct RunView: View {
             case .idle: return ("", Theme.muted2)
             case .running:
                 if tracker.waitingForFix { return ("Acquiring GPS…", Theme.blue) }
+                if tracker.stepCounting { return ("Indoor — counting steps", Theme.success) }
+                if tracker.measuringNothing { return ("Indoor — timing only", Theme.blue) }
                 if tracker.signalLost { return ("Weak GPS signal", Theme.danger) }
                 return ("Tracking", Theme.success)
             }
@@ -283,6 +321,35 @@ struct RunView: View {
             .accessibilityIdentifier("run-status")
     }
 
+    /// The typed distance in metres, or nil when the box is empty or nonsense.
+    private var enteredMetres: Double? {
+        guard let value = decimalEntry(manualDistance), value > 0 else { return nil }
+        return value * currentDistanceUnit.metres
+    }
+
+    private var manualDistanceField: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            TextField("0.00", text: $manualDistance)
+                .keyboardType(.decimalPad)
+                .font(.system(size: 28, weight: .bold))
+                .fontWidth(.condensed)
+                .focused($distanceFieldFocused)
+                .frame(width: 110)
+                .accessibilityIdentifier("run-manual-distance")
+            Text("\(currentDistanceUnit.label) — from the machine")
+                .font(.system(size: 10))
+                .tracking(0.5)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.muted2)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { distanceFieldFocused = false }
+            }
+        }
+    }
+
     private func metric(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
@@ -294,6 +361,115 @@ struct RunView: View {
                 .tracking(0.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted2)
+        }
+    }
+}
+
+/// Log a run or walk that already happened: a treadmill session, yesterday
+/// evening, anything done without the phone. No tracking, no GPS, no route —
+/// just distance and time, saved into the same History timeline.
+struct ManualCardioSheet: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var kind: CardioKind
+    @State private var distance = ""
+    @State private var minutes = ""
+    @State private var date = Date()
+    @FocusState private var focused: Bool
+
+    init(kind: CardioKind) {
+        _kind = State(initialValue: kind)
+    }
+
+    private var activity: CardioActivity? {
+        manualCardio(kind: kind, minutes: minutes, distance: distance)
+    }
+
+    var body: some View {
+        ZStack {
+            NativeBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top) {
+                        TitleBlock(title: "Log It Manually", subtitle: "Treadmill, or one you already finished")
+                        Spacer()
+                        Button {
+                            NativeFeedback.selection()
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .frame(width: 30, height: 30)
+                                .foregroundStyle(Theme.muted2)
+                                .background(Theme.surface2)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Theme.border))
+                        }
+                        .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Close manual log")
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Picker("Activity", selection: $kind) {
+                            ForEach(CardioKind.allCases, id: \.self) { kind in
+                                Text(kind.label).tag(kind)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        field("Time", unit: "minutes", text: $minutes, placeholder: "30")
+                        field("Distance (optional)", unit: currentDistanceUnit.label, text: $distance, placeholder: "5.0")
+
+                        DatePicker("When", selection: $date, in: ...Date(), displayedComponents: .date)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                    }
+                    .cardStyle()
+
+                    Button {
+                        NativeFeedback.success()
+                        app.saveRun(activity, at: date)
+                        dismiss()
+                    } label: {
+                        Label("Save \(kind.label)", systemImage: "checkmark")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(activity == nil)
+                    .opacity(activity == nil ? 0.5 : 1)
+                    .accessibilityIdentifier("save-manual-cardio-button")
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .foregroundStyle(Theme.text)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { focused = false }
+            }
+        }
+    }
+
+    private func field(_ label: String, unit: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).cardLabel()
+            HStack {
+                TextField(placeholder, text: text)
+                    .keyboardType(.decimalPad)
+                    .font(.system(size: 24, weight: .bold))
+                    .fontWidth(.condensed)
+                    .focused($focused)
+                Text(unit)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.surface2)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
         }
     }
 }

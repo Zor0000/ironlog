@@ -1,4 +1,5 @@
 import CoreLocation
+import CoreMotion
 import Foundation
 
 /// GPS tracking for the Run tab.
@@ -44,6 +45,9 @@ final class RunTracker: NSObject, ObservableObject {
     @Published private(set) var permissionDenied = false
     /// When the last trusted fix arrived. Drives the signal indicator.
     @Published private(set) var lastFixAt: Date?
+    /// How much of `distance` the pedometer contributed. Display only — it says
+    /// which source is measuring, and never adds to the total a second time.
+    @Published private(set) var stepMetres: Double = 0
 
     /// Called at most every `checkpointInterval` seconds while a run is active,
     /// and once when it ends (with nil). `AppState` persists this so the run
@@ -79,6 +83,14 @@ final class RunTracker: NSObject, ObservableObject {
     private static let liveActivityInterval: TimeInterval = 10
 
     private let manager = CLLocationManager()
+    /// Step-counted distance for the indoor case — see `applyStepDistance`.
+    /// Built on first use, not at launch: constructing it is enough to raise the
+    /// Motion & Fitness prompt, and asking during onboarding — before the user
+    /// has ever opened the Run tab — earns a "Don't Allow" it never recovers from.
+    private var pedometer: CMPedometer?
+    /// Pedometer metres already credited from the current segment. The API
+    /// reports a running total from its start date, so only the increment is new.
+    private var creditedStepMetres: Double = 0
     private var lastFix: CLLocation?
     private var ticker: Timer?
     /// Start of the current un-banked moving segment; nil while paused.
@@ -112,12 +124,37 @@ final class RunTracker: NSObject, ObservableObject {
         return Date().timeIntervalSince(lastFixAt) > Self.signalTimeout
     }
 
-    /// True before the very first trusted fix of a run.
-    var waitingForFix: Bool { phase == .running && lastFixAt == nil }
+    /// True before the very first trusted fix of a run, for the first few
+    /// seconds only — see `measuringNothing` for what happens after that.
+    var waitingForFix: Bool {
+        phase == .running && lastFixAt == nil && elapsed < Int(Self.signalTimeout)
+    }
+
+    /// Distance is coming from step counting rather than GPS, so there will be
+    /// no route to draw. The UI says so instead of implying a tracked line.
+    ///
+    /// Asks what the pedometer actually contributed rather than inferring it
+    /// from "no fix yet, but distance": a run recovered from disk comes back in
+    /// exactly that state with GPS-measured metres, and would otherwise claim to
+    /// be counting steps when it never was.
+    var stepCounting: Bool { stepMetres > 0 }
+
+    /// GPS has had its chance and produced no distance: a treadmill, a basement
+    /// gym, an indoor track. Not an error state — it is how most runs indoors
+    /// look — so the UI switches to asking for the number instead of sitting on
+    /// "Acquiring GPS…" for the whole session.
+    var measuringNothing: Bool {
+        phase != .idle && distance == 0 && elapsed >= Int(Self.signalTimeout)
+    }
 
     /// The finished activity, or nil if nothing worth saving was recorded.
+    ///
+    /// Time is the only requirement. Distance may legitimately be zero — a
+    /// treadmill, a basement gym, a covered track — and refusing to save those
+    /// made the whole tab a dead end indoors: the clock ran, Finish did nothing,
+    /// and Discard was the only way out.
     var activity: CardioActivity? {
-        guard elapsed > 0, distance > 0 else { return nil }
+        guard elapsed > 0 else { return nil }
         return CardioActivity(kind: kind, duration: elapsed, distance: distance, route: route)
     }
 
@@ -179,13 +216,21 @@ final class RunTracker: NSObject, ObservableObject {
 
     /// Stop tracking and return the recorded activity, or nil if there is
     /// nothing worth saving — in which case the run is deliberately left alive.
-    /// Finishing a run that recorded nothing is almost always a mis-tap or an
-    /// early tap before the first fix, and resetting here would throw the
-    /// session away with no way back.
+    /// Finishing a run that recorded nothing is almost always a mis-tap, and
+    /// resetting here would throw the session away with no way back.
+    ///
+    /// `manualMetres` is the treadmill path: GPS measured nothing, so the user
+    /// reads the distance off the machine and types it in. It only ever fills a
+    /// gap — a measured distance is never overwritten.
     @discardableResult
-    func finish() -> CardioActivity? {
-        guard phase != .idle, distance > 0, elapsed > 0 else { return nil }
+    func finish(manualMetres: Double? = nil) -> CardioActivity? {
+        // Guard before banking: banking clears `segmentStart`, so an early return
+        // afterwards would leave the run "running" with a stopped clock.
+        guard phase != .idle, elapsed > 0 else { return nil }
         bankSegment()
+        if distance == 0, let manualMetres, manualMetres > 0 {
+            distance = manualMetres
+        }
         let result = activity
         reset()
         return result
@@ -225,6 +270,8 @@ final class RunTracker: NSObject, ObservableObject {
 
     private func clearMeasurements() {
         distance = 0
+        stepMetres = 0
+        creditedStepMetres = 0
         route = []
         lastFix = nil
         lastFixAt = nil
@@ -253,6 +300,7 @@ final class RunTracker: NSObject, ObservableObject {
             manager.allowsBackgroundLocationUpdates = true
         }
         manager.startUpdatingLocation()
+        beginStepUpdates()
     }
 
     /// Stop *and* surrender the background-location capability. The Info.plist
@@ -261,6 +309,65 @@ final class RunTracker: NSObject, ObservableObject {
     private func endUpdates() {
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
+        // Only if it was ever started — see the `pedometer` declaration.
+        pedometer?.stopUpdates()
+    }
+
+    // MARK: Step counting
+    //
+    // The motion coprocessor counts steps and estimates distance with no GPS
+    // and no meaningful battery cost, which is the only thing that measures a
+    // treadmill at all. It is the second of three sources, in falling order of
+    // trust: GPS, then steps, then a number the user types in.
+
+    /// Start counting from *now*, so a segment resumed after a pause never
+    /// inherits the steps taken while paused.
+    private func beginStepUpdates() {
+        guard CMPedometer.isDistanceAvailable() else { return }
+        let pedometer = pedometer ?? CMPedometer()
+        self.pedometer = pedometer
+        // A re-grant of location permission mid-run calls `beginUpdates` again;
+        // stop first so a second handler is never stacked on the first.
+        pedometer.stopUpdates()
+        creditedStepMetres = 0
+        pedometer.startUpdates(from: Date()) { [weak self] data, _ in
+            // Delivered on an arbitrary queue; `distance` is @Published.
+            guard let metres = data?.distance?.doubleValue else { return }
+            DispatchQueue.main.async { self?.applyStepDistance(metres) }
+        }
+    }
+
+    /// Internal rather than private so tests can drive it without a real
+    /// pedometer — the simulator has no CoreMotion at all.
+    func applyStepDistance(_ cumulative: Double) {
+        // Readings are delivered asynchronously and can land after a pause, a
+        // finish or a discard. Anything but an active run must be ignored, or a
+        // saved run grows metres the user did not cover while stopped.
+        guard phase == .running else { return }
+        let credit = Self.stepCredit(
+            cumulative: cumulative,
+            alreadyCredited: creditedStepMetres,
+            hasGPSFix: lastFixAt != nil
+        )
+        creditedStepMetres = cumulative
+        distance += credit
+        stepMetres += credit
+    }
+
+    /// How many metres a pedometer reading contributes.
+    ///
+    /// Steps only count while GPS has never produced a trusted fix this
+    /// session, so exactly one source is live at a time and the two can never
+    /// double-count each other. Outdoors the first fix hands ownership to GPS
+    /// permanently; the metres counted before it arrived are kept, because they
+    /// were covered — just not yet seen by satellite.
+    ///
+    /// The reading is a running total from the segment's start, so only the
+    /// increment is new. It can go backwards when CoreMotion revises an
+    /// estimate downwards, and distance must never shrink under the user.
+    static func stepCredit(cumulative: Double, alreadyCredited: Double, hasGPSFix: Bool) -> Double {
+        guard !hasGPSFix else { return 0 }
+        return max(0, cumulative - alreadyCredited)
     }
 
     private func bankSegment() {

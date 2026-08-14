@@ -215,10 +215,14 @@ struct HistoryCard: View {
         session.exercises.reduce(0) { $0 + $1.sets.count }
     }
 
-    /// A run's headline is its distance, not its (zero) set count.
+    /// A run's headline is its distance, not its (zero) set count. An indoor
+    /// session with no distance at all leads with the time instead of "0.00 km".
     private var subtitle: String {
         if let activity = session.activity {
-            return "\(formatDistance(activity.distance)) \(currentDistanceUnit.label) · \(formatElapsed(activity.duration)) · \(syncText)"
+            let head = activity.distance > 0
+                ? "\(formatDistance(activity.distance)) \(currentDistanceUnit.label) · "
+                : ""
+            return "\(head)\(formatElapsed(activity.duration)) · \(syncText)"
         }
         return "\(setCount) \(setCount == 1 ? "set" : "sets") · \(session.split ?? "Workout") · \(syncText)"
     }
@@ -226,8 +230,10 @@ struct HistoryCard: View {
     private func cardioDetail(_ activity: CardioActivity) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                cardioMetric(formatDistance(activity.distance), currentDistanceUnit.label)
-                Spacer()
+                if activity.distance > 0 {
+                    cardioMetric(formatDistance(activity.distance), currentDistanceUnit.label)
+                    Spacer()
+                }
                 cardioMetric(formatElapsed(activity.duration), "time")
                 Spacer()
                 cardioMetric(formatPace(seconds: activity.duration, metres: activity.distance), "/\(currentDistanceUnit.label)")
