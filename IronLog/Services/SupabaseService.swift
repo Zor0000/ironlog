@@ -492,7 +492,7 @@ struct RemoteSession: Codable {
         )
     }
 
-    /// A tracked run/walk/ride, or nil for an ordinary strength session.
+    /// A tracked run or walk, or nil for an ordinary strength session.
     private var activity: CardioActivity? {
         guard let kind = activityType.flatMap(CardioKind.init(rawValue:)) else { return nil }
         return CardioActivity(

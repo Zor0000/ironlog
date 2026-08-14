@@ -14,7 +14,7 @@ struct WorkoutActivityAttributes: ActivityAttributes {
     var weightUnit: String = "KG"
 }
 
-/// Drives the tracked run/walk/ride Live Activity.
+/// Drives the tracked run or walk Live Activity.
 ///
 /// Unlike the lifting activity — which ships the whole `LiveWorkoutState` so the
 /// Lock Screen can *edit* it — a run is measured by GPS in the app process and

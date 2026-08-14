@@ -715,14 +715,16 @@ final class AppState: ObservableObject {
         }
     }
 
-    func saveRun(_ activity: CardioActivity?) {
+    /// `at` is only ever passed by the manual logger, which can back-date a run
+    /// the user did before opening the app.
+    func saveRun(_ activity: CardioActivity?, at date: Date = Date()) {
         guard let activity else {
-            showToast("Nothing tracked yet — give it a few metres")
+            showToast("Nothing tracked yet — give it a few seconds")
             return
         }
         let session = WorkoutSession(
             userID: user?.id,
-            createdAt: Date(),
+            createdAt: date,
             muscle: nil,
             split: activity.kind.label,
             note: nil,
@@ -731,6 +733,8 @@ final class AppState: ObservableObject {
             activity: activity
         )
         sessions.insert(session, at: 0)
+        // A back-dated run belongs where its date puts it, not at the top.
+        sessions.sort { $0.createdAt > $1.createdAt }
         persistAll()
         selectedTab = .history
         showToast("\(activity.kind.label) saved")

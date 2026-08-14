@@ -3,7 +3,7 @@ import AppIntents
 import WidgetKit
 import SwiftUI
 
-/// Lock Screen / Dynamic Island card for a tracked run, walk or ride.
+/// Lock Screen / Dynamic Island card for a tracked run or walk.
 ///
 /// The elapsed clock is drawn by iOS from `Text(timerInterval:)` rather than
 /// pushed by the app: a Live Activity cannot run a timer of its own, and pushing

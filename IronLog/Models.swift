@@ -225,13 +225,24 @@ struct WorkoutSession: Identifiable, Codable, Hashable {
 // ─────────────────────────────────────────────────────────────
 
 enum CardioKind: String, Codable, Hashable, CaseIterable {
-    case run, walk, cycle
+    case run, walk
+
+    /// Anything unrecognised decodes as a walk rather than throwing.
+    ///
+    /// `LocalStore.load` discards the *entire* snapshot on any decode error, so
+    /// a single session saved under a kind we no longer ship — "cycle", which
+    /// this app used to offer — would silently wipe every workout, routine and
+    /// setting on upgrade. A ride mislabelled as a walk keeps its distance,
+    /// time and route; that is the far smaller loss.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = CardioKind(rawValue: raw) ?? .walk
+    }
 
     var label: String {
         switch self {
         case .run: "Run"
         case .walk: "Walk"
-        case .cycle: "Cycle"
         }
     }
 
@@ -239,15 +250,13 @@ enum CardioKind: String, Codable, Hashable, CaseIterable {
         switch self {
         case .run: "figure.run"
         case .walk: "figure.walk"
-        case .cycle: "figure.outdoor.cycle"
         }
     }
 
     var blurb: String {
         switch self {
-        case .run: "Pace, distance and your route"
+        case .run: "Outside or on a treadmill"
         case .walk: "Easy miles still count"
-        case .cycle: "Longer rides, faster speeds"
         }
     }
 
@@ -256,13 +265,10 @@ enum CardioKind: String, Codable, Hashable, CaseIterable {
     /// This gate exists to throw away GPS teleports, not to police performance,
     /// so every value is deliberately generous — set it too tight and real
     /// distance is silently discarded with nothing in the UI to show for it.
-    /// A cyclist genuinely moves several times faster than a runner, which is
-    /// why this cannot be one shared constant.
     var maxSpeed: Double {
         switch self {
         case .walk: 5     // 18 km/h — covers breaking into a jog mid-walk
         case .run: 12     // 43 km/h — quicker than the 100m world record pace
-        case .cycle: 30   // 108 km/h — covers a fast descent
         }
     }
 }
@@ -281,6 +287,27 @@ struct CardioActivity: Codable, Hashable {
     /// Metres, accumulated from accuracy-filtered fixes.
     var distance: Double
     var route: [RoutePoint]
+}
+
+/// Build an activity from what the user typed into the manual logger.
+///
+/// Returns nil unless there is a real duration: time is the only hard
+/// requirement for a tracked session, so it cannot be optional here either.
+/// Distance is taken in the display unit and may be left blank — a treadmill
+/// that only shows a clock is still a session worth keeping.
+func manualCardio(kind: CardioKind, minutes: String, distance: String) -> CardioActivity? {
+    guard let mins = decimalEntry(minutes), mins > 0 else { return nil }
+    return CardioActivity(
+        kind: kind,
+        duration: Int((mins * 60).rounded()),
+        distance: max(decimalEntry(distance).map { $0 * currentDistanceUnit.metres } ?? 0, 0),
+        route: []
+    )
+}
+
+/// A typed number, accepting the comma decimal separator most of the world uses.
+func decimalEntry(_ text: String) -> Double? {
+    Double(text.replacingOccurrences(of: ",", with: "."))
 }
 
 /// An in-progress run checkpointed to disk, so a crash, a force-quit or an OS
