@@ -69,6 +69,44 @@ jobs:
             -only-testing:IronLogTests \
             CODE_SIGNING_ALLOWED=NO
 
+      # Without a distribution certificate already on the runner, xcodebuild's
+      # -allowProvisioningUpdates mints a fresh one per run until the account
+      # hits Apple's cap. Supplying our own keeps the count at one, forever.
+      - name: Import the signing certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_CERTIFICATE_P12"
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          # Runners are ephemeral, but a locked keychain mid-archive fails the
+          # build, so disable the inactivity auto-lock rather than time it.
+          security set-keychain-settings "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          printf '%s' "$SIGNING_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$keychain" \
+            -P "$SIGNING_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+          # Lets codesign use the key without a GUI prompt nothing can answer.
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+
+          # Prepend, keeping the existing keychains: the Apple intermediate that
+          # completes the certificate chain lives in the runner's system one.
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '" ')
+
+          security find-identity -v -p codesigning "$keychain"
+
       - name: Build and archive
         env:
           BUILD_NUMBER: ${{ github.run_id }}
@@ -76,3 +114,7 @@ jobs:
 
       - name: Upload build with asc
         run: scripts/upload_testflight.sh
+
+      - name: Delete the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
