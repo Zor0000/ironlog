@@ -59,6 +59,12 @@ archive_build=(
   -destination 'generic/platform=iOS'
   -archivePath build/IronLog.xcarchive
   -allowProvisioningUpdates
+  # Archive with the same distribution identity the export step re-signs with.
+  # Left alone, automatic signing archives against "iPhone Developer" (pinned in
+  # the project), so every fresh CI runner asks Apple for another *development*
+  # certificate — the type with the tight per-account cap. After enough runs the
+  # account fills up and the archive dies with "choose a certificate to revoke".
+  "CODE_SIGN_IDENTITY=Apple Distribution"
 )
 if (( ${#authentication_args[@]} > 0 )); then
   archive_build+=("${authentication_args[@]}")
