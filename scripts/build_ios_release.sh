@@ -52,19 +52,18 @@ simulator_build+=(build)
 
 rm -rf build/IronLog.xcarchive build/export
 
+# No -allowProvisioningUpdates on either step below, deliberately. That flag is
+# what let a fresh runner ask Apple for a new signing certificate on every build
+# until the account hit its limit and CI stopped working. Release signing is
+# manual now: the identity and profiles are named in the project and in
+# ExportOptions.plist, and scripts/install_provisioning_profiles.sh puts them on
+# the machine first. If something is missing, this fails — which is the point.
 archive_build=(
   xcodebuild
   -project IronLog.xcodeproj
   -scheme IronLog
   -destination 'generic/platform=iOS'
   -archivePath build/IronLog.xcarchive
-  -allowProvisioningUpdates
-  # Archive with the same distribution identity the export step re-signs with.
-  # Left alone, automatic signing archives against "iPhone Developer" (pinned in
-  # the project), so every fresh CI runner asks Apple for another *development*
-  # certificate — the type with the tight per-account cap. After enough runs the
-  # account fills up and the archive dies with "choose a certificate to revoke".
-  "CODE_SIGN_IDENTITY=Apple Distribution"
 )
 if (( ${#authentication_args[@]} > 0 )); then
   archive_build+=("${authentication_args[@]}")
@@ -81,7 +80,6 @@ export_build=(
   -archivePath build/IronLog.xcarchive
   -exportPath build/export
   -exportOptionsPlist ExportOptions.plist
-  -allowProvisioningUpdates
 )
 if (( ${#authentication_args[@]} > 0 )); then
   export_build+=("${authentication_args[@]}")

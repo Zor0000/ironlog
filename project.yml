@@ -30,6 +30,15 @@ targets:
         SUPPORTS_MACCATALYST: NO
         SWIFT_VERSION: 5.0
         CODE_SIGN_STYLE: Automatic
+      # Debug stays automatic so day-to-day work on a device needs no setup.
+      # Release is pinned so a CI archive can never mint a signing certificate:
+      # scripts/install_provisioning_profiles.sh puts this profile in place, and
+      # a missing one fails the build instead of asking Apple for another.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: IronLog App Store
     scheme:
       testTargets:
         - IronLogTests
@@ -55,6 +64,11 @@ targets:
         TARGETED_DEVICE_FAMILY: 1
         SWIFT_VERSION: 5.0
         CODE_SIGN_STYLE: Automatic
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: IronLog Widget App Store
   IronLogTests:
     type: bundle.unit-test
     platform: iOS
