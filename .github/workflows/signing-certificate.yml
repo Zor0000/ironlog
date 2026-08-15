@@ -55,6 +55,12 @@ jobs:
       - name: List certificates
         run: asc certificates list --paginate --output table
 
+      - name: List bundle IDs and profiles
+        run: |
+          set -euo pipefail
+          asc bundle-ids list --paginate --output table
+          asc profiles list --paginate --output table
+
       # Everything printed below is public by design: a certificate ships inside
       # every provisioning profile and every signed app. The private key that
       # matches it is on the laptop that produced the request and is not here.
