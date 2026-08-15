@@ -1,0 +1,90 @@
+name: Signing certificate
+
+# Run by hand from scripts/new_signing_certificate.sh, not on a schedule.
+#
+# Creating a distribution certificate needs the App Store Connect key, and the
+# only copy of that lives in this repository's secrets. Signing with the
+# certificate needs its private key, and this repository is public, so that half
+# must never reach a runner log. Hence the split: the private key is generated
+# on a laptop and stays there, and only the certificate request — which carries
+# nothing but the public half — is sent here to be signed.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: List the certificates on the account, or create one
+        type: choice
+        options: [list, create]
+        default: list
+      csr:
+        description: Base64 certificate signing request (create only)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  certificate:
+    name: Manage signing certificates
+    runs-on: macos-26
+    timeout-minutes: 15
+    env:
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+
+    steps:
+      - name: Install asc CLI
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: brew install asc
+
+      - name: Authenticate
+        env:
+          ASC_API_PRIVATE_KEY: ${{ secrets.ASC_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$ASC_API_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+          asc auth login \
+            --name ironlog \
+            --key-id "$ASC_API_KEY_ID" \
+            --issuer-id "$ASC_API_ISSUER_ID" \
+            --private-key "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: List certificates
+        run: asc certificates list --paginate --output table
+
+      # Everything printed below is public by design: a certificate ships inside
+      # every provisioning profile and every signed app. The private key that
+      # matches it is on the laptop that produced the request and is not here.
+      - name: Create certificate
+        if: inputs.action == 'create'
+        # Through the environment rather than inline ${{ }}, which would splice
+        # the input straight into the script for the shell to interpret.
+        env:
+          CSR_BASE64: ${{ inputs.csr }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$CSR_BASE64" ]]; then
+            echo "::error::csr input is required to create a certificate."
+            echo "Run scripts/new_signing_certificate.sh to generate one."
+            exit 1
+          fi
+          printf '%s' "$CSR_BASE64" | base64 --decode > "$RUNNER_TEMP/request.csr"
+          openssl req -in "$RUNNER_TEMP/request.csr" -noout -subject
+
+          asc certificates create \
+            --certificate-type DISTRIBUTION \
+            --csr "$RUNNER_TEMP/request.csr" \
+            --output json > "$RUNNER_TEMP/certificate.json"
+
+          certificate="$(/usr/bin/plutil -extract data.attributes.certificateContent raw -o - "$RUNNER_TEMP/certificate.json" 2>/dev/null \
+            || /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["attributes"]["certificateContent"])' "$RUNNER_TEMP/certificate.json")"
+          test -n "$certificate"
+
+          echo "Certificate created. Copy the line between the markers and pass"
+          echo "it to: scripts/new_signing_certificate.sh <certificate>"
+          echo "-----BEGIN COPY-----"
+          echo "$certificate"
+          echo "-----END COPY-----"

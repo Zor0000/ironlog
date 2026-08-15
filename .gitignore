@@ -44,6 +44,15 @@ bun.lock
 .env.local
 .env.*.local
 
+# Signing material. build/ is ignored already and that is where
+# scripts/new_signing_certificate.sh writes, but this repository is public and a
+# committed private key would have to be treated as leaked wherever it landed.
+*.p12
+*.key
+*.csr
+*.cer
+*.p8
+
 # Build output (if added later)
 dist/
 build/
