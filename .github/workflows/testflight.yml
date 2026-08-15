@@ -107,6 +107,9 @@ jobs:
 
           security find-identity -v -p codesigning "$keychain"
 
+      - name: Install the App Store provisioning profiles
+        run: scripts/install_provisioning_profiles.sh
+
       - name: Build and archive
         env:
           BUILD_NUMBER: ${{ github.run_id }}
