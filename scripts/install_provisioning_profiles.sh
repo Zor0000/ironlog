@@ -103,8 +103,12 @@ install_profile() {
     echo "Reusing profile $name ($profile_id)"
   fi
 
-  asc profiles download --id "$profile_id" --output "$work_dir/profile.mobileprovision" > /dev/null
-  asc profiles local install --path "$work_dir/profile.mobileprovision"
+  # Named per profile: the download refuses to write over an existing file, so a
+  # shared filename fails the moment there is more than one profile to fetch.
+  local downloaded="$work_dir/$profile_id.mobileprovision"
+  rm -f "$downloaded"
+  asc profiles download --id "$profile_id" --output "$downloaded" > /dev/null
+  asc profiles local install --path "$downloaded"
 }
 
 install_profile "$APP_PROFILE_NAME" "$APP_BUNDLE_ID"
