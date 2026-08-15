@@ -79,9 +79,14 @@ jobs:
             --csr "$RUNNER_TEMP/request.csr" \
             --output json > "$RUNNER_TEMP/certificate.json"
 
-          certificate="$(/usr/bin/plutil -extract data.attributes.certificateContent raw -o - "$RUNNER_TEMP/certificate.json" 2>/dev/null \
-            || /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["attributes"]["certificateContent"])' "$RUNNER_TEMP/certificate.json")"
-          test -n "$certificate"
+          # Recursive descent rather than a fixed path, so a change in how the
+          # CLI wraps its output does not quietly break this.
+          certificate="$(jq -r '.. | objects | .certificateContent // empty' \
+            "$RUNNER_TEMP/certificate.json" | head -1)"
+          if [[ -z "$certificate" ]]; then
+            echo "::error::No certificateContent in the response."
+            exit 1
+          fi
 
           echo "Certificate created. Copy the line between the markers and pass"
           echo "it to: scripts/new_signing_certificate.sh <certificate>"
