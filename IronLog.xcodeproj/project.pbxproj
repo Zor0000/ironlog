@@ -280,6 +280,7 @@
 			);
 			name = IronLog;
 			packageProductDependencies = (
+				1F2A102A241F48A49E97F36CF347839F /* Liveline */,
 			);
 			productName = IronLog;
 			productReference = BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */;
@@ -357,6 +358,12 @@
 			productRefGroup = 495CA01E4CE7E827A22E4F5C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packages = {
+				F15C6CB1B4A24CBEB93338BAD814319D = {
+					url = "https://github.com/ParthJadhav/liveline-swift.git";
+					requirement = {kind = upTo; minimumVersion = 0.7.0;};
+				};
+			};
 			targets = (
 				68F127FF37A8B7D8E5F786A1 /* IronLog */,
 				8633BC4C0B6352A37ED39929 /* IronLogWidgetExtension */,
@@ -378,6 +385,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXRemoteSwiftPackageReference section */
+		F15C6CB1B4A24CBEB93338BAD814319D = {
+			isa = PBXRemoteSwiftPackageReference;
+			url = "https://github.com/ParthJadhav/liveline-swift.git";
+			requirement = {kind = upTo; minimumVersion = 0.7.0;};
+		};
+/* End PBXRemoteSwiftPackageReference section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0096275CAC45106DF0436750 /* Sources */ = {
