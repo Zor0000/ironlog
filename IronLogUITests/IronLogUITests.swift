@@ -98,113 +98,74 @@ final class IronLogUITests: XCTestCase {
 
     // MARK: Run tab
 
-    /// The system permission alert can surface in either the app or SpringBoard
-    /// depending on iOS version. Prefer a durable grant over "Allow Once".
-    private func allowLocationIfAsked() {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        guard let app else { return }
-        for host in [app, springboard] {
-            let alert = host.alerts.firstMatch
-            guard alert.waitForExistence(timeout: 2) else { continue }
-            let allow = alert.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Allow While Using")).firstMatch
-            if allow.exists { allow.tap(); return }
-            let once = alert.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Allow Once")).firstMatch
-            if once.exists { once.tap(); return }
-        }
-    }
-
+    /// The Run tab is a manual logger: pick the kind, type time (required) and
+    /// optionally distance/elevation, save into History.
     private func openRunTab() {
         XCTAssertTrue(app.buttons["Run"].waitForExistence(timeout: 6))
         app.buttons["Run"].tap()
-        XCTAssertTrue(app.buttons["run-start-button"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["run-kind-run"].waitForExistence(timeout: 4))
     }
 
-    func testRunTabSelectsRunOrWalkAndDiscardsCleanly() {
+    private func typeInto(_ identifier: String, _ text: String) {
+        let field = app.textFields[identifier]
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText(text)
+    }
+
+    func testRunTabSelectsRunOrWalkAndSavesManually() {
         openRunTab()
 
-        // Both kinds are offered, and the start button follows the selection.
-        XCTAssertTrue(app.buttons["run-kind-run"].exists)
+        // Both kinds are offered, and the save button follows the selection.
         XCTAssertTrue(app.buttons["run-kind-walk"].exists)
-        XCTAssertEqual(app.buttons["run-start-button"].label, "Start Run")
+        XCTAssertEqual(app.buttons["save-manual-cardio-button"].label, "Save Run")
         app.buttons["run-kind-walk"].tap()
-        XCTAssertEqual(app.buttons["run-start-button"].label, "Start Walk")
+        XCTAssertEqual(app.buttons["save-manual-cardio-button"].label, "Save Walk")
         app.buttons["run-kind-run"].tap()
 
-        app.buttons["run-start-button"].tap()
-        allowLocationIfAsked()
-
-        // The clock runs and advances on its own.
-        let elapsed = app.staticTexts["run-elapsed"]
-        XCTAssertTrue(elapsed.waitForExistence(timeout: 6))
-        let first = elapsed.label
-        sleep(4)
-        XCTAssertNotEqual(elapsed.label, first)
-        XCTAssertFalse(app.staticTexts["run-status"].label.isEmpty)
-
-        // Pause freezes the session; resume brings it back.
-        app.buttons["run-pause-button"].tap()
-        XCTAssertEqual(app.staticTexts["run-status"].label, "Paused")
-        app.buttons["run-pause-button"].tap()
-        XCTAssertNotEqual(app.staticTexts["run-status"].label, "Paused")
-
-        // Discard asks first, and "Keep Going" genuinely keeps going.
-        app.buttons["Discard"].tap()
-        XCTAssertTrue(app.staticTexts["Discard run?"].waitForExistence(timeout: 3))
-        app.buttons["Keep Going"].tap()
-        XCTAssertTrue(app.staticTexts["run-elapsed"].waitForExistence(timeout: 3))
-
-        app.buttons["Discard"].tap()
-        app.buttons["Discard Run"].tap()
-        XCTAssertTrue(app.buttons["run-start-button"].waitForExistence(timeout: 4))
-    }
-
-    func testIndoorRunSavesTypedDistanceIntoHistory() {
-        openRunTab()
-        app.buttons["run-start-button"].tap()
-        allowLocationIfAsked()
-        XCTAssertTrue(app.staticTexts["run-elapsed"].waitForExistence(timeout: 6))
-
-        // With no GPS distance arriving (a treadmill, a basement), the tracker
-        // eventually offers the typed-distance field instead of a dead 0.00.
-        let manualField = app.textFields["run-manual-distance"]
-        XCTAssertTrue(manualField.waitForExistence(timeout: 35))
-        manualField.tap()
-        manualField.typeText("5")
+        typeInto("run-minutes-field", "30")
+        typeInto("run-distance-field", "3")
         app.buttons["Done"].tap()
 
-        app.buttons["run-finish-button"].tap()
-        XCTAssertTrue(app.staticTexts["History"].waitForExistence(timeout: 4))
-        // The collapsed card leads with "5.00 km" and is labelled "Run" in its
-        // accessibility description (the kind is not visible text otherwise).
-        let subtitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "5.00 km")).firstMatch
-        XCTAssertTrue(subtitle.waitForExistence(timeout: 4))
-        XCTAssertTrue(app.buttons["history-card-toggle"].firstMatch.label.contains("Run"))
-    }
-
-    func testManualLogSheetSavesAWalk() {
-        openRunTab()
-
-        // Pick Walk before opening the sheet — the logger's segmented picker
-        // would be ambiguous to tap ("Walk" also matches the tile behind it).
-        app.buttons["run-kind-walk"].tap()
-
-        app.buttons["run-manual-log-button"].tap()
-        XCTAssertTrue(app.staticTexts["Log It Manually"].waitForExistence(timeout: 4))
-
-        let minutes = app.textFields.firstMatch
-        minutes.tap()
-        minutes.typeText("30")
-        let distance = app.textFields.element(boundBy: 1)
-        distance.tap()
-        distance.typeText("3")
-
-        // The button names the kind it will save — proof the picker agreed.
-        XCTAssertEqual(app.buttons["save-manual-cardio-button"].label, "Save Walk")
         app.buttons["save-manual-cardio-button"].tap()
         XCTAssertTrue(app.staticTexts["History"].waitForExistence(timeout: 4))
         let subtitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "3.00 km")).firstMatch
         XCTAssertTrue(subtitle.waitForExistence(timeout: 4))
-        XCTAssertTrue(app.buttons["history-card-toggle"].firstMatch.label.contains("Walk"))
+        XCTAssertTrue(app.buttons["history-card-toggle"].firstMatch.label.contains("Run"))
+    }
+
+    func testTerrainChipsSelectAndClear() {
+        openRunTab()
+
+        let trail = app.buttons["run-terrain-trail"]
+        XCTAssertTrue(trail.waitForExistence(timeout: 3))
+        trail.tap()
+        XCTAssertTrue(trail.isSelected)
+        // Tapping the active chip clears it again — terrain is optional context.
+        trail.tap()
+        XCTAssertFalse(trail.isSelected)
+    }
+
+    /// The calorie estimate needs a body weight first; once set in Settings,
+    /// the preview shows the ACSM figure for what is typed (5 km in 30 min at
+    /// 70 kg ≈ 387 kcal).
+    func testBodyWeightSettingDrivesTheCaloriePreview() {
+        XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 6))
+        app.buttons["settings-button"].tap()
+        let weightField = app.textFields["body-weight-field"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 4))
+        weightField.tap()
+        weightField.typeText("70")
+        app.buttons["Close settings"].tap()
+
+        openRunTab()
+        typeInto("run-minutes-field", "30")
+        typeInto("run-distance-field", "5")
+        app.buttons["Done"].tap()
+
+        let estimate = app.staticTexts["run-calorie-estimate"]
+        XCTAssertTrue(estimate.waitForExistence(timeout: 3))
+        XCTAssertTrue(estimate.label.contains("387"), "expected the ACSM estimate in '\(estimate.label)'")
     }
 
     func testSuggestedWorkoutWizardStartsWorkoutAndPreventsOverwrite() {

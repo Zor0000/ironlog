@@ -22,12 +22,14 @@ final class SupabaseWireFormatTests: XCTestCase {
         let body = RemoteSessionInsert(
             userID: "u1", muscleGroup: "chest", splitType: "Run", note: "hi",
             activityType: "run", distanceM: 5000, durationS: 1800,
-            route: [RoutePoint(lat: 51.5, lon: -0.12)]
+            route: [RoutePoint(lat: 51.5, lon: -0.12)],
+            elevationGainM: 45, terrain: "trail", calories: 401
         )
         let keys = Set(try json(body).keys)
         XCTAssertEqual(keys, [
             "user_id", "muscle_group", "split_type", "note",
-            "activity_type", "distance_m", "duration_s", "route"
+            "activity_type", "distance_m", "duration_s", "route",
+            "elevation_gain_m", "terrain", "calories"
         ])
     }
 
@@ -100,7 +102,8 @@ final class SupabaseWireFormatTests: XCTestCase {
         let payload = """
         [{"id":"c1","created_at":"2026-08-07T10:00:00Z","muscle_group":null,"split_type":"Run","note":null,
           "activity_type":"run","distance_m":5012.5,"duration_s":1830,
-          "route":[{"lat":51.5,"lon":-0.12},{"lat":51.51,"lon":-0.121}],"session_sets":[]}]
+          "route":[{"lat":51.5,"lon":-0.12},{"lat":51.51,"lon":-0.121}],
+          "elevation_gain_m":38,"terrain":"trail","calories":395,"session_sets":[]}]
         """
         let rows = try decoder.decode([RemoteSession].self, from: Data(payload.utf8))
         let session = try XCTUnwrap(rows.first).localSession(userID: "u1")
@@ -111,7 +114,27 @@ final class SupabaseWireFormatTests: XCTestCase {
         XCTAssertEqual(session.activity?.duration, 1830)
         XCTAssertEqual(session.activity?.route.count, 2)
         XCTAssertEqual(session.activity?.route.first?.lat, 51.5)
+        XCTAssertEqual(session.activity?.elevationGain, 38)
+        XCTAssertEqual(session.activity?.terrain, .trail)
+        XCTAssertEqual(session.activity?.calories, 395)
         XCTAssertTrue(session.exercises.isEmpty)
+    }
+
+    /// Rows written before the calorie columns existed carry no elevation,
+    /// terrain or calories. They must still decode, with the new fields nil.
+    func testCardioSessionWithoutTheCalorieColumnsStillDecodes() throws {
+        let payload = """
+        [{"id":"c1","created_at":"2026-08-07T10:00:00Z","muscle_group":null,"split_type":"Walk","note":null,
+          "activity_type":"walk","distance_m":3200,"duration_s":2400,
+          "route":[],"session_sets":[]}]
+        """
+        let rows = try decoder.decode([RemoteSession].self, from: Data(payload.utf8))
+        let activity = try XCTUnwrap(rows.first).localSession(userID: "u1").activity
+
+        XCTAssertEqual(activity?.kind, .walk)
+        XCTAssertNil(activity?.elevationGain)
+        XCTAssertNil(activity?.terrain)
+        XCTAssertNil(activity?.calories)
     }
 
     func testStrengthSessionHasNoActivity() throws {

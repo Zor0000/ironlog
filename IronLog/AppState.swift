@@ -24,9 +24,6 @@ final class AppState: ObservableObject {
     @Published var showAddExerciseForm = false
     @Published var addExerciseWeighted = false
     @Published var workoutNote = ""
-    /// Last checkpoint of an in-progress run, mirrored into every snapshot so a
-    /// crash mid-activity does not lose it. Owned by `RunTracker`.
-    private var runDraft: RunDraft?
 
     /// Workouts the user saved to run again, oldest first.
     @Published var routines: [SavedRoutine] = []
@@ -38,6 +35,8 @@ final class AppState: ObservableObject {
     @Published var showingAuth = false
     @Published var showingOnboarding = false
     @Published var unitPreference: WeightUnit = .kg
+    /// Canonical KG; drives every run/walk calorie estimate. Nil until set.
+    @Published var bodyWeight: Double?
 
     @Published var timerSecs = 90
     @Published var timerMax = 90
@@ -161,6 +160,8 @@ final class AppState: ObservableObject {
         routines = snapshot.routines ?? []
         unitPreference = snapshot.unitPreference ?? .kg
         currentWeightUnit = unitPreference
+        bodyWeight = snapshot.bodyWeight
+        currentBodyWeight = snapshot.bodyWeight ?? 0
         timerMax = snapshot.timerPreset ?? 90
         timerSecs = timerMax
         hasOnboarded = snapshot.hasOnboarded ?? false
@@ -177,7 +178,6 @@ final class AppState: ObservableObject {
                 selectedTab = .log
             }
         }
-        attachRunTracking(snapshot)
 
         user = supabase.currentUser
         if user != nil {
@@ -690,38 +690,27 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Save a tracked run/walk as its own session. It carries no exercises, so
-    /// it bypasses `finishWorkout`'s set validation entirely; the streak and the
-    /// History timeline pick it up like any other session.
-    /// Wire the tracker's periodic checkpoints into the local store and bring
-    /// back any run the app died in the middle of. Called once from `boot`.
-    func attachRunTracking(_ snapshot: AppSnapshot) {
-        RunTracker.shared.onCheckpoint = { [weak self] draft in
-            guard let self else { return }
-            runDraft = draft
+    /// Body weight drives every run/walk calorie estimate. Stored canonically
+    /// in KG like all weights; nil clears it (estimates then return nil).
+    func setBodyWeight(_ kg: Double?) {
+        guard let kg, kg > 0 else {
+            bodyWeight = nil
+            currentBodyWeight = 0
             persistAll()
-        }
-        // Lock-screen buttons run their intent in this process, so they drive the
-        // very same tracker the in-app buttons do — the two surfaces cannot drift.
-        LiveRunControls.pause = { RunTracker.shared.pause() }
-        LiveRunControls.resume = { RunTracker.shared.resume() }
-        LiveRunControls.finish = { [weak self] in
-            self?.saveRun(RunTracker.shared.finish())
-        }
-        if let draft = snapshot.runDraft {
-            runDraft = draft
-            RunTracker.shared.restore(from: draft)
-            selectedTab = .run
-        }
-    }
-
-    /// `at` is only ever passed by the manual logger, which can back-date a run
-    /// the user did before opening the app.
-    func saveRun(_ activity: CardioActivity?, at date: Date = Date()) {
-        guard let activity else {
-            showToast("Nothing tracked yet — give it a few seconds")
             return
         }
+        // A tenth of a kg is finer than any scale worth owning; beyond that
+        // the digits only hide the estimate's own coarseness.
+        bodyWeight = (kg * 10).rounded() / 10
+        currentBodyWeight = bodyWeight!
+        persistAll()
+    }
+
+    /// Save a run/walk logged by hand as its own session. It carries no
+    /// exercises, so it bypasses `finishWorkout`'s set validation entirely; the
+    /// streak and the History timeline pick it up like any other session.
+    /// `at` can back-date a run the user did before opening the app.
+    func saveRun(_ activity: CardioActivity, at date: Date = Date()) {
         let session = WorkoutSession(
             userID: user?.id,
             createdAt: date,
@@ -1047,8 +1036,8 @@ final class AppState: ObservableObject {
             unitPreference: unitPreference,
             hasOnboarded: hasOnboarded,
             timerPreset: timerMax,
-            runDraft: runDraft,
-            routines: routines
+            routines: routines,
+            bodyWeight: bodyWeight
         )
         let previous = saveTask
         saveTask = Task { [localStore] in
@@ -1133,6 +1122,9 @@ extension AppState {
         // A cloud-signed-in athlete reads better than "Local Athlete" for marketing.
         user = UserProfile(id: "demo", email: "alex@ironlog.app", fullName: "Alex Carter")
         syncMessage = "Synced with Supabase"
+        // Body weight so the Run tab's calorie estimate is populated.
+        bodyWeight = 70
+        currentBodyWeight = 70
 
         let calendar = Calendar.current
         func day(_ offset: Int) -> Date {
@@ -1148,8 +1140,14 @@ extension AppState {
             WorkoutSession(createdAt: day(offset), muscle: muscle, split: split,
                            note: note, exercises: exercises, syncState: .synced)
         }
+        func cardio(_ offset: Int, _ activity: CardioActivity) -> WorkoutSession {
+            WorkoutSession(createdAt: day(offset), split: activity.kind.label,
+                           exercises: [], syncState: .synced, activity: activity)
+        }
 
         sessions = [
+            cardio(0, CardioActivity(kind: .run, duration: 1_800, distance: 5_000, route: [],
+                                     elevationGain: 45, terrain: .trail, calories: 401)),
             session(0, muscle: "chest", split: "PPL", note: "Felt strong on bench today.", [
                 exercise("Barbell Bench Press", [(82.5, 8), (85, 6), (85, 5), (80, 7)]),
                 exercise("Incline Dumbbell Press", [(30, 10), (32, 9), (32, 8)]),
@@ -1223,6 +1221,7 @@ extension AppState {
         switch defaults.string(forKey: "seedTab") {
         case "workouts": selectedTab = .workouts
         case "log": selectedTab = .log
+        case "run": selectedTab = .run
         case "history": selectedTab = .history
         case "stats": selectedTab = .stats
         default: break

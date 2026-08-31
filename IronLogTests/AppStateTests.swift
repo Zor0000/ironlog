@@ -1,6 +1,4 @@
 import XCTest
-import CoreLocation
-import CoreMotion
 @testable import IronLog
 
 @MainActor
@@ -483,6 +481,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(snapshot.unitPreference)
         XCTAssertNil(snapshot.hasOnboarded)
         XCTAssertNil(snapshot.timerPreset)
+        XCTAssertNil(snapshot.bodyWeight)
     }
 
     // MARK: - Account deletion
@@ -1060,60 +1059,97 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(decoded.routines?.first?.exercises.first?.sets, 4)
     }
 
-    // MARK: - Run tracking
+    // MARK: - Manual cardio & calories
 
-    /// Metres north of a base point, as a fix the tracker will accept.
-    private func fix(metresNorth: Double, secondsLater: Double, accuracy: CLLocationAccuracy = 8) -> CLLocation {
-        CLLocation(
-            coordinate: CLLocationCoordinate2D(latitude: 51.5 + metresNorth / 111_320, longitude: -0.12),
-            altitude: 0,
-            horizontalAccuracy: accuracy,
-            verticalAccuracy: 4,
-            timestamp: Date(timeIntervalSince1970: 1_000_000 + secondsLater)
+    /// ACSM running equation on the flat: VO₂ = 0.2·(166.67 m/min) + 3.5 =
+    /// 36.83 mL/kg/min, which for 70 kg over 30 min converts through ~5 kcal
+    /// per litre of O₂ to ≈ 387 kcal.
+    func testRunningCaloriesFollowTheACSMEquation() {
+        XCTAssertEqual(
+            estimateCalories(kind: .run, durationSeconds: 1_800, distanceMetres: 5_000, elevationGainMetres: 0, bodyWeightKg: 70),
+            387
         )
     }
 
-    /// GPS wanders a couple of metres while you stand at a traffic light. Left
-    /// unfiltered that drift is counted as distance and inflates every run.
-    func testSubThresholdDriftIsNotCountedAsDistance() {
-        let anchor = fix(metresNorth: 0, secondsLater: 0)
-        let jitter = fix(metresNorth: 2, secondsLater: 2)
-        XCTAssertEqual(RunTracker.verdict(from: anchor, to: jitter, kind: .run), .noise)
+    /// Climbing is extra work: 45 m over 5 km is a 0.9% grade, which the
+    /// vertical term prices in.
+    func testElevationGainAddsCalories() {
+        XCTAssertEqual(
+            estimateCalories(kind: .run, durationSeconds: 1_800, distanceMetres: 5_000, elevationGainMetres: 45, bodyWeightKg: 70),
+            401
+        )
     }
 
-    /// Crucially, drift must not advance the anchor either — otherwise slow
-    /// walking is discarded one sub-threshold step at a time. Three 2m steps
-    /// away from a kept anchor eventually clear the floor and count once.
-    func testSlowMovementStillAccumulatesAgainstTheKeptAnchor() {
-        let anchor = fix(metresNorth: 0, secondsLater: 0)
-        XCTAssertEqual(RunTracker.verdict(from: anchor, to: fix(metresNorth: 2, secondsLater: 2), kind: .run), .noise)
-        guard case .counted(let metres) = RunTracker.verdict(from: anchor, to: fix(metresNorth: 6, secondsLater: 6), kind: .run) else {
-            return XCTFail("6m from the retained anchor should count")
-        }
-        XCTAssertEqual(metres, 6, accuracy: 0.5)
+    /// The walking equation is cheaper per metre at the same speed.
+    func testWalkingCostsLessThanRunningForTheSameWork() {
+        let run = estimateCalories(kind: .run, durationSeconds: 1_800, distanceMetres: 5_000, elevationGainMetres: 0, bodyWeightKg: 70)
+        let walk = estimateCalories(kind: .walk, durationSeconds: 1_800, distanceMetres: 5_000, elevationGainMetres: 0, bodyWeightKg: 70)
+        XCTAssertEqual(walk, 212)
+        XCTAssertLessThan(walk ?? 0, run ?? 0)
     }
 
-    func testImplausibleSpeedIsRejectedAsAJump() {
-        let anchor = fix(metresNorth: 0, secondsLater: 0)
-        let teleport = fix(metresNorth: 500, secondsLater: 1)
-        XCTAssertEqual(RunTracker.verdict(from: anchor, to: teleport, kind: .run), .jump)
+    /// No distance means no speed for the ACSM equation, so published MET
+    /// values stand in: 9.8 for running, 3.8 for walking.
+    func testTimeOnlyEntriesFallBackToMETValues() {
+        XCTAssertEqual(
+            estimateCalories(kind: .run, durationSeconds: 1_800, distanceMetres: 0, elevationGainMetres: 0, bodyWeightKg: 70),
+            343
+        )
+        XCTAssertEqual(
+            estimateCalories(kind: .walk, durationSeconds: 2_700, distanceMetres: 0, elevationGainMetres: 0, bodyWeightKg: 70),
+            200
+        )
     }
 
-    func testRealStrideIsCounted() {
-        let anchor = fix(metresNorth: 0, secondsLater: 0)
-        guard case .counted(let metres) = RunTracker.verdict(from: anchor, to: fix(metresNorth: 10, secondsLater: 3), kind: .run) else {
-            return XCTFail("10m in 3s is a run, not noise")
-        }
-        XCTAssertEqual(metres, 10, accuracy: 0.5)
+    /// An estimate without a body weight or a duration would be a made-up
+    /// number presented as one — both must refuse.
+    func testCalorieEstimateNeedsABodyWeightAndADuration() {
+        XCTAssertNil(estimateCalories(kind: .run, durationSeconds: 1_800, distanceMetres: 5_000, elevationGainMetres: 0, bodyWeightKg: 0))
+        XCTAssertNil(estimateCalories(kind: .run, durationSeconds: 0, distanceMetres: 5_000, elevationGainMetres: 0, bodyWeightKg: 70))
     }
 
-    func testInaccurateAndStaleFixesAreDistrusted() {
-        let now = Date(timeIntervalSince1970: 1_000_000)
-        // Negative accuracy means CoreLocation has no fix at all.
-        XCTAssertFalse(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: 0, accuracy: -1), now: now))
-        XCTAssertFalse(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: 0, accuracy: 50), now: now))
-        XCTAssertFalse(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: -60), now: now))
-        XCTAssertTrue(RunTracker.isTrustworthy(fix(metresNorth: 0, secondsLater: 0), now: now))
+    /// The manual logger records elevation and terrain and attaches an
+    /// estimate computed from the current body weight.
+    func testManualCardioStoresElevationTerrainAndCalories() {
+        currentWeightUnit = .kg
+        currentBodyWeight = 70
+        let activity = manualCardio(kind: .run, minutes: "30", distance: "5", elevation: "45", terrain: .trail)
+
+        XCTAssertEqual(activity?.elevationGain, 45)
+        XCTAssertEqual(activity?.terrain, .trail)
+        XCTAssertEqual(activity?.calories, 401)
+
+        // Blank elevation and terrain stay nil rather than zeroing, and a
+        // time-only walk prices through the MET fallback (3.8 × 70 kg × ⅓ h).
+        let plain = manualCardio(kind: .walk, minutes: "20", distance: "", elevation: "", terrain: nil)
+        XCTAssertNil(plain?.elevationGain)
+        XCTAssertNil(plain?.terrain)
+        XCTAssertEqual(plain?.calories, 89)
+    }
+
+    /// The Settings field is the only way the estimates learn the user's size;
+    /// it persists and mirrors into the global the helpers read.
+    func testBodyWeightSettingDrivesTheEstimates() {
+        let app = AppState()
+        app.setBodyWeight(70.44)
+        XCTAssertEqual(app.bodyWeight ?? 0, 70.4, accuracy: 0.01)
+        XCTAssertEqual(currentBodyWeight, 70.4, accuracy: 0.01)
+        XCTAssertEqual(
+            manualCardio(kind: .run, minutes: "30", distance: "5")?.calories,
+            estimateCalories(kind: .run, durationSeconds: 1_800, distanceMetres: 5_000, elevationGainMetres: 0, bodyWeightKg: 70.4)
+        )
+
+        app.setBodyWeight(nil)
+        XCTAssertNil(app.bodyWeight)
+        XCTAssertEqual(currentBodyWeight, 0)
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "5")?.calories)
+    }
+
+    func testBodyWeightSurvivesASnapshotRoundTrip() throws {
+        let snapshot = AppSnapshot(bodyWeight: 72.5)
+        let data = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(AppSnapshot.self, from: data)
+        XCTAssertEqual(decoded.bodyWeight, 72.5)
     }
 
     /// A saved run joins the History timeline and the streak, contributes no
@@ -1128,19 +1164,11 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(session.activity?.distance, 5_000)
         XCTAssertEqual(session.split, "Run")
         XCTAssertTrue(session.exercises.isEmpty)
-        // Never queued for backup: the schema has nowhere to put the run.
+        // No account is signed in here, so the session stays local-only.
         XCTAssertEqual(session.syncState, .localOnly)
         XCTAssertEqual(app.stats.sets, 0)
         XCTAssertEqual(app.stats.volume, 0)
         XCTAssertEqual(app.stats.streak, 1)
-    }
-
-    func testFinishingARunWithNothingTrackedSavesNothing() {
-        let app = AppState()
-        app.saveRun(nil)
-
-        XCTAssertTrue(app.sessions.isEmpty)
-        XCTAssertEqual(app.toast, "Nothing tracked yet — give it a few seconds")
     }
 
     func testPaceIsPerDisplayUnitAndGuardsAgainstNonsense() {
@@ -1152,72 +1180,24 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(formatPace(seconds: 0, metres: 5_000), "--:--")
     }
 
+    /// Speed is the treadmill's favourite number and the complement of pace.
+    func testSpeedIsPerDisplayUnit() {
+        currentWeightUnit = .kg
+        XCTAssertEqual(formatSpeed(seconds: 1_800, metres: 5_000), "10.0")
+        XCTAssertEqual(speedUnitLabel, "km/h")
+
+        currentWeightUnit = .lb
+        XCTAssertEqual(formatSpeed(seconds: 1_800, metres: 5_000), "6.2")
+        XCTAssertEqual(speedUnitLabel, "mph")
+        currentWeightUnit = .kg
+
+        XCTAssertEqual(formatSpeed(seconds: 1_800, metres: 3), "--")
+    }
+
     func testElapsedGrowsIntoHours() {
         XCTAssertEqual(formatElapsed(65), "1:05")
         XCTAssertEqual(formatElapsed(1_450), "24:10")
         XCTAssertEqual(formatElapsed(3_862), "1:04:22")
-    }
-
-    /// The speed gate must scale with the activity: a 10 m/s sprint is real
-    /// running but a teleport for a walk, and judging both against one ceiling
-    /// discards real distance silently.
-    func testSpeedGateScalesWithTheActivity() {
-        let anchor = fix(metresNorth: 0, secondsLater: 0)
-        let sprint = fix(metresNorth: 20, secondsLater: 2)
-
-        XCTAssertEqual(RunTracker.verdict(from: anchor, to: sprint, kind: .walk), .jump)
-        guard case .counted(let metres) = RunTracker.verdict(from: anchor, to: sprint, kind: .run) else {
-            return XCTFail("10 m/s is a sprint, not a teleport")
-        }
-        XCTAssertEqual(metres, 20, accuracy: 0.5)
-    }
-
-    /// A brisk 4 m/s is a jog, believable inside a "walk"; 20 m/s is not.
-    func testWalkGateIsTighterThanRunning() {
-        let anchor = fix(metresNorth: 0, secondsLater: 0)
-        guard case .counted = RunTracker.verdict(from: anchor, to: fix(metresNorth: 8, secondsLater: 2), kind: .walk) else {
-            return XCTFail("4 m/s is a jog, not a teleport")
-        }
-        XCTAssertEqual(RunTracker.verdict(from: anchor, to: fix(metresNorth: 40, secondsLater: 2), kind: .walk), .jump)
-    }
-
-    /// A run recovered from disk must come back paused, keeping its distance and
-    /// its elapsed time, and must say why it is paused.
-    func testRestoredRunComesBackPausedAndIntact() {
-        let tracker = RunTracker.shared
-        tracker.discard()
-        defer { tracker.discard() }
-
-        tracker.restore(from: RunDraft(
-            kind: .walk,
-            distance: 12_400,
-            elapsed: 2_640,
-            route: [RoutePoint(lat: 51.5, lon: -0.12), RoutePoint(lat: 51.51, lon: -0.12)],
-            startedAt: Date(timeIntervalSince1970: 1_000_000)
-        ))
-
-        XCTAssertEqual(tracker.phase, .paused)
-        XCTAssertEqual(tracker.interruption, .restored)
-        XCTAssertEqual(tracker.kind, .walk)
-        XCTAssertEqual(tracker.distance, 12_400)
-        XCTAssertEqual(tracker.elapsed, 2_640)
-        XCTAssertEqual(tracker.route.count, 2)
-        // Recovered work is savable straight away.
-        XCTAssertEqual(tracker.activity?.distance, 12_400)
-    }
-
-    /// Discarding must leave nothing behind for the next run to inherit.
-    func testDiscardClearsEverything() {
-        let tracker = RunTracker.shared
-        tracker.restore(from: RunDraft(kind: .run, distance: 500, elapsed: 120, route: [], startedAt: Date()))
-        tracker.discard()
-
-        XCTAssertEqual(tracker.phase, .idle)
-        XCTAssertEqual(tracker.distance, 0)
-        XCTAssertEqual(tracker.elapsed, 0)
-        XCTAssertNil(tracker.interruption)
-        XCTAssertNil(tracker.activity)
-        XCTAssertFalse(tracker.hasActiveRun)
     }
 
     /// Every activity needs its own tile, label and icon in the picker.
@@ -1226,64 +1206,12 @@ final class AppStateTests: XCTestCase {
         for kind in CardioKind.allCases {
             XCTAssertFalse(kind.label.isEmpty)
             XCTAssertFalse(kind.icon.isEmpty)
-            XCTAssertGreaterThan(kind.maxSpeed, 0)
         }
-    }
-
-    /// The indoor case: GPS measured nothing, so the session is time-only. It
-    /// must still be savable — refusing made the tab a dead end on a treadmill,
-    /// with a running clock and no way out but Discard.
-    func testIndoorSessionSavesWithoutGPSDistance() {
-        let tracker = RunTracker.shared
-        defer { tracker.discard() }
-        tracker.restore(from: RunDraft(kind: .run, distance: 0, elapsed: 1_800, route: [], startedAt: Date()))
-
-        let activity = tracker.finish()
-        XCTAssertEqual(activity?.duration, 1_800)
-        XCTAssertEqual(activity?.distance, 0)
-    }
-
-    /// Steps and GPS must never both credit the same metres. One trusted fix
-    /// hands ownership to GPS for the rest of the session; before that, only
-    /// the increment since the last reading counts.
-    func testStepsAndGPSNeverDoubleCount() {
-        // Indoors: the running total advances, only the new part is credited.
-        XCTAssertEqual(RunTracker.stepCredit(cumulative: 400, alreadyCredited: 0, hasGPSFix: false), 400)
-        XCTAssertEqual(RunTracker.stepCredit(cumulative: 950, alreadyCredited: 400, hasGPSFix: false), 550)
-        // Outdoors: GPS owns it, steps add nothing on top.
-        XCTAssertEqual(RunTracker.stepCredit(cumulative: 950, alreadyCredited: 400, hasGPSFix: true), 0)
-        // CoreMotion can revise an estimate down; distance must not shrink.
-        XCTAssertEqual(RunTracker.stepCredit(cumulative: 380, alreadyCredited: 400, hasGPSFix: false), 0)
-    }
-
-    /// A pedometer reading that lands after the run stopped must be ignored.
-    /// Readings arrive asynchronously, so one can turn up after a pause, a
-    /// finish or a discard — and a paused run that keeps gaining metres is
-    /// exactly the bug that makes a saved distance untrustworthy.
-    func testStepReadingsAfterTheRunStopsAreIgnored() {
-        let tracker = RunTracker.shared
-        defer { tracker.discard() }
-
-        // `restore` comes back paused, which is also the post-pause state.
-        tracker.restore(from: RunDraft(kind: .run, distance: 800, elapsed: 300, route: [], startedAt: Date()))
-        tracker.applyStepDistance(5_000)
-        XCTAssertEqual(tracker.distance, 800)
-
-        tracker.discard()
-        tracker.applyStepDistance(5_000)
-        XCTAssertEqual(tracker.distance, 0)
-    }
-
-    /// A run recovered from disk has GPS metres and no fix yet — the same shape
-    /// as an indoor run. It must not claim to be counting steps: nothing was
-    /// step-counted, and the UI would relabel a real outdoor run's distance.
-    func testRestoredRunIsNotMistakenForStepCounting() {
-        let tracker = RunTracker.shared
-        defer { tracker.discard() }
-
-        tracker.restore(from: RunDraft(kind: .run, distance: 4_000, elapsed: 900, route: [], startedAt: Date()))
-        XCTAssertFalse(tracker.stepCounting)
-        XCTAssertEqual(tracker.stepMetres, 0)
+        XCTAssertEqual(CardioTerrain.allCases, [.road, .trail, .treadmill, .track])
+        for terrain in CardioTerrain.allCases {
+            XCTAssertFalse(terrain.label.isEmpty)
+            XCTAssertFalse(terrain.icon.isEmpty)
+        }
     }
 
     /// The manual logger needs a duration and nothing else. Distance is typed
@@ -1332,33 +1260,16 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(activity.kind, .walk)
         XCTAssertEqual(activity.distance, 12_400)
         XCTAssertEqual(activity.duration, 2_640)
+        XCTAssertNil(activity.elevationGain)
+        XCTAssertNil(activity.terrain)
+        XCTAssertNil(activity.calories)
     }
 
-    /// Indoors GPS never gets a fix at all, so "waiting for the first fix" must
-    /// time out into the indoor state — otherwise the UI sits on "Acquiring
-    /// GPS…" for the whole session and never offers a way to enter a distance.
-    func testWaitingForFixTimesOutIntoIndoorMode() {
-        let tracker = RunTracker.shared
-        defer { tracker.discard() }
-
-        tracker.restore(from: RunDraft(kind: .run, distance: 0, elapsed: 900, route: [], startedAt: Date()))
-        XCTAssertTrue(tracker.measuringNothing)
-        XCTAssertFalse(tracker.waitingForFix)
-
-        tracker.discard()
-        tracker.restore(from: RunDraft(kind: .run, distance: 4_000, elapsed: 900, route: [], startedAt: Date()))
-        XCTAssertFalse(tracker.measuringNothing)
-    }
-
-    /// A typed distance fills the gap when GPS measured nothing — and only then.
-    func testManualDistanceOnlyFillsTheGap() {
-        let tracker = RunTracker.shared
-        defer { tracker.discard() }
-
-        tracker.restore(from: RunDraft(kind: .run, distance: 0, elapsed: 600, route: [], startedAt: Date()))
-        XCTAssertEqual(tracker.finish(manualMetres: 5_000)?.distance, 5_000)
-
-        tracker.restore(from: RunDraft(kind: .run, distance: 3_200, elapsed: 600, route: [], startedAt: Date()))
-        XCTAssertEqual(tracker.finish(manualMetres: 5_000)?.distance, 3_200)
+    /// An unknown terrain string must not be able to wipe the snapshot — see
+    /// `CardioTerrain.init(from:)` for the same rationale as `CardioKind`.
+    func testUnknownTerrainStillDecodes() throws {
+        let json = Data(#"{"kind":"run","duration":600,"distance":2000,"route":[],"terrain":"swamp"}"#.utf8)
+        let activity = try JSONDecoder().decode(CardioActivity.self, from: json)
+        XCTAssertEqual(activity.terrain, .road)
     }
 }

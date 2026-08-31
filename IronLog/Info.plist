@@ -22,18 +22,6 @@
   <string>Dark</string>
   <key>NSSupportsLiveActivities</key>
   <true/>
-  <!-- Step counting is how a treadmill run gets measured at all: indoors GPS
-       reports nothing, and the motion coprocessor costs no meaningful battery. -->
-  <key>NSMotionUsageDescription</key>
-  <string>IronLog counts your steps while a run or walk is in progress, so indoor sessions still get a distance when GPS cannot see the sky.</string>
-  <key>NSLocationWhenInUseUsageDescription</key>
-  <string>IronLog uses your location while a run or walk is in progress to measure distance, pace and your route. Nothing is tracked when you are not recording.</string>
-  <!-- Required for the run to keep measuring with the screen locked. Setting
-       CLLocationManager.allowsBackgroundLocationUpdates without this throws. -->
-  <key>UIBackgroundModes</key>
-  <array>
-    <string>location</string>
-  </array>
   <key>UILaunchScreen</key>
   <dict>
     <key>UIColorName</key>

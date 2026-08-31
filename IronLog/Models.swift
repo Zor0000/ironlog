@@ -221,7 +221,7 @@ struct WorkoutSession: Identifiable, Codable, Hashable {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  TRACKED CARDIO  (Run tab)
+//  CARDIO  (Run tab)
 // ─────────────────────────────────────────────────────────────
 
 enum CardioKind: String, Codable, Hashable, CaseIterable {
@@ -259,16 +259,40 @@ enum CardioKind: String, Codable, Hashable, CaseIterable {
         case .walk: "Easy miles still count"
         }
     }
+}
 
-    /// Upper bound on a believable speed, in metres per second.
+/// Where a cardio session happened. Purely context for the history card — the
+/// one behavioural difference is that a treadmill session carries no route.
+enum CardioTerrain: String, Codable, CaseIterable, Hashable {
+    case road, trail, treadmill, track
+
+    /// Unknown raw values decode as a road rather than throwing.
     ///
-    /// This gate exists to throw away GPS teleports, not to police performance,
-    /// so every value is deliberately generous — set it too tight and real
-    /// distance is silently discarded with nothing in the UI to show for it.
-    var maxSpeed: Double {
+    /// Same rationale as `CardioKind`: `LocalStore.load` discards the entire
+    /// snapshot on any decode error, so a session saved under a terrain we
+    /// someday retire must not be able to wipe every workout on upgrade.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = CardioTerrain(rawValue: raw) ?? .road
+    }
+
+    var label: String {
         switch self {
-        case .walk: 5     // 18 km/h — covers breaking into a jog mid-walk
-        case .run: 12     // 43 km/h — quicker than the 100m world record pace
+        case .road: "Road"
+        case .trail: "Trail"
+        case .treadmill: "Treadmill"
+        case .track: "Track"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .road: "road.lanes"
+        case .trail: "figure.hiking"
+        // No "treadmill" symbol ships in SF Symbols, so the closest activity
+        // glyph stands in — the label carries the meaning anyway.
+        case .treadmill: "figure.walk"
+        case .track: "flag.checkered"
         }
     }
 }
@@ -287,40 +311,76 @@ struct CardioActivity: Codable, Hashable {
     /// Metres, accumulated from accuracy-filtered fixes.
     var distance: Double
     var route: [RoutePoint]
+    /// Metres of ascent. Optional so sessions saved before it existed decode —
+    /// see `LocalStore.load`, which wipes the snapshot on any decode error.
+    var elevationGain: Int?
+    /// Optional context for the history card.
+    var terrain: CardioTerrain?
+    /// Kilocalories, either estimated by `estimateCalories` at save time or
+    /// typed over it. Optional: without a body weight there is no estimate.
+    var calories: Int?
+}
+
+/// Kilocalories for a run or walk, from the ACSM metabolic equations.
+///
+/// With a distance the equations for the metabolic cost of level + graded
+/// walking and running apply — speed in m/min and grade as rise over run:
+///   run  VO₂ = 0.2·v + 0.9·v·grade + 3.5
+///   walk VO₂ = 0.1·v + 1.8·v·grade + 3.5
+/// VO₂ in mL/kg/min converts to kcal by multiplying through the body weight
+/// and the duration (→ litres of O₂) and then by ~5 kcal per litre.
+///
+/// Without a distance there is nothing to put a speed on, so published MET
+/// values stand in: 9.8 for running, 3.8 for walking.
+///
+/// Returns nil without a body weight or a duration — an estimate with either
+/// missing would be a made-up number presented as one.
+func estimateCalories(kind: CardioKind, durationSeconds: Int, distanceMetres: Double, elevationGainMetres: Int, bodyWeightKg: Double) -> Int? {
+    guard bodyWeightKg > 0, durationSeconds > 0 else { return nil }
+    let minutes = Double(durationSeconds) / 60
+    guard distanceMetres > 0 else {
+        let met: Double = kind == .run ? 9.8 : 3.8
+        return Int((met * bodyWeightKg * minutes / 60).rounded())
+    }
+    let speed = distanceMetres / minutes
+    let grade = elevationGainMetres > 0 ? Double(elevationGainMetres) / distanceMetres : 0
+    let (linear, vertical): (Double, Double) = kind == .run ? (0.2, 0.9) : (0.1, 1.8)
+    let vo2 = linear * speed + vertical * speed * grade + 3.5
+    let kcal = vo2 * bodyWeightKg * minutes / 1000 * 5
+    return Int(kcal.rounded())
 }
 
 /// Build an activity from what the user typed into the manual logger.
 ///
 /// Returns nil unless there is a real duration: time is the only hard
 /// requirement for a tracked session, so it cannot be optional here either.
-/// Distance is taken in the display unit and may be left blank — a treadmill
-/// that only shows a clock is still a session worth keeping.
-func manualCardio(kind: CardioKind, minutes: String, distance: String) -> CardioActivity? {
+/// Distance and elevation are taken in the display unit and may be left
+/// blank — a treadmill that only shows a clock is still a session worth
+/// keeping. Calories are estimated from the current body weight when there
+/// is one; the logger may override the figure afterwards.
+func manualCardio(kind: CardioKind, minutes: String, distance: String, elevation: String = "", terrain: CardioTerrain? = nil) -> CardioActivity? {
     guard let mins = decimalEntry(minutes), mins > 0 else { return nil }
-    return CardioActivity(
+    var activity = CardioActivity(
         kind: kind,
         duration: Int((mins * 60).rounded()),
         distance: max(decimalEntry(distance).map { $0 * currentDistanceUnit.metres } ?? 0, 0),
-        route: []
+        route: [],
+        elevationGain: decimalEntry(elevation).map { Int(max($0, 0).rounded()) },
+        terrain: terrain
     )
+    activity.calories = estimateCalories(
+        kind: activity.kind,
+        durationSeconds: activity.duration,
+        distanceMetres: activity.distance,
+        elevationGainMetres: activity.elevationGain ?? 0,
+        bodyWeightKg: currentBodyWeight
+    )
+    return activity
 }
 
 /// A typed number, accepting the comma decimal separator most of the world uses.
 func decimalEntry(_ text: String) -> Double? {
     Double(text.replacingOccurrences(of: ",", with: "."))
-}
-
-/// An in-progress run checkpointed to disk, so a crash, a force-quit or an OS
-/// eviction two hours into a ride does not throw the whole thing away.
-struct RunDraft: Codable, Equatable {
-    var kind: CardioKind
-    var distance: Double
-    /// Moving seconds at the moment this checkpoint was written. A restored run
-    /// always comes back **paused** and this is its entire elapsed time: the app
-    /// was not running, so it cannot honestly claim the user kept moving.
-    var elapsed: Int
-    var route: [RoutePoint]
-    var startedAt: Date
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -353,6 +413,19 @@ func formatPace(seconds: Int, metres: Double) -> String {
     let total = Int(perUnit.rounded())
     return "\(total / 60):\(String(format: "%02d", total % 60))"
 }
+
+/// Speed as "10.0 km/h" / "6.2 mph" — the treadmill's favourite number and the
+/// complement of pace. "--" until there is enough distance to mean anything.
+func formatSpeed(seconds: Int, metres: Double) -> String {
+    guard seconds > 0, metres > 20 else { return "--" }
+    let kmh = metres / 1000 / (Double(seconds) / 3600)
+    guard kmh.isFinite else { return "--" }
+    let value = currentDistanceUnit == .km ? kmh : kmh * 0.621371
+    return String(format: "%.1f", value)
+}
+
+/// Unit label that pairs with `formatSpeed`.
+var speedUnitLabel: String { currentDistanceUnit == .km ? "km/h" : "mph" }
 
 /// Elapsed clock for a run — "24:10", or "1:04:22" once past the hour.
 /// (`formatDuration` is the rest-timer's m:ss and never needs hours.)
@@ -387,8 +460,9 @@ struct AppSnapshot: Codable {
     var unitPreference: WeightUnit?
     var hasOnboarded: Bool?
     var timerPreset: Int?
-    var runDraft: RunDraft?
     var routines: [SavedRoutine]?
+    /// Canonical KG; nil until the user sets it, and what calorie estimates need.
+    var bodyWeight: Double?
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -411,6 +485,11 @@ enum WeightUnit: String, Codable {
 /// persisted source of truth) so `formatWeight` stays a zero-context chokepoint
 /// callable from any view helper.
 var currentWeightUnit: WeightUnit = .kg
+
+/// The user's body weight in canonical KG, mirrored from `AppState.bodyWeight`
+/// exactly like `currentWeightUnit`. Zero means "not set" — calorie estimates
+/// then return nil rather than inventing a person.
+var currentBodyWeight: Double = 0
 
 private let kgPerLb = 0.45359237
 
