@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var notificationStatus: UNAuthorizationStatus?
+    @State private var bodyWeightText = ""
+    @FocusState private var bodyWeightFocused: Bool
 
     var body: some View {
         ZStack {
@@ -32,6 +34,7 @@ struct SettingsView: View {
                     }
                     accountCard
                     unitsCard
+                    bodyWeightCard
                     timerCard
                     notificationsCard
                     aboutCard
@@ -129,6 +132,56 @@ struct SettingsView: View {
                 .foregroundStyle(Theme.muted2)
         }
         .cardStyle()
+    }
+
+    // MARK: Body weight
+
+    /// Typed in the display unit (like every other weight in the app) and
+    /// converted back to canonical KG on the keystroke — the same
+    /// display↔storage split `setUnitPreference` documents.
+    private var bodyWeightCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("Body Weight")
+            HStack {
+                TextField("70.0", text: $bodyWeightText)
+                    .keyboardType(.decimalPad)
+                    .font(.system(size: 24, weight: .bold))
+                    .fontWidth(.condensed)
+                    .focused($bodyWeightFocused)
+                    .frame(width: 110)
+                    .accessibilityIdentifier("body-weight-field")
+                Text(currentWeightUnit.label)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted2)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.surface2)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
+            Text("Used to estimate calories for runs and walks.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.muted2)
+        }
+        .cardStyle()
+        .onAppear { bodyWeightText = app.bodyWeight.map(formatWeightValue) ?? "" }
+        .onChange(of: bodyWeightText) { _, text in
+            guard let value = decimalEntry(text), value > 0 else { return }
+            app.setBodyWeight(displayWeightToKg(value))
+        }
+        // The typed text lives in the old display unit after a switch; re-derive
+        // it so the next keystroke does not reinterpret the number.
+        .onChange(of: app.unitPreference) { _, _ in
+            bodyWeightFocused = false
+            bodyWeightText = app.bodyWeight.map(formatWeightValue) ?? ""
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { bodyWeightFocused = false }
+            }
+        }
     }
 
     // MARK: Rest timer default

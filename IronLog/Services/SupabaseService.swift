@@ -191,7 +191,10 @@ final class SupabaseService {
             activityType: session.activity?.kind.rawValue,
             distanceM: session.activity?.distance,
             durationS: session.activity?.duration,
-            route: session.activity?.route
+            route: session.activity?.route,
+            elevationGainM: session.activity?.elevationGain,
+            terrain: session.activity?.terrain?.rawValue,
+            calories: session.activity?.calories
         )
         let rows: [RemoteSessionInsertResult] = try await restPost(path: "/rest/v1/sessions", query: [], body: body, prefer: "return=representation")
         guard let row = rows.first else { throw SupabaseError.emptyResponse }
@@ -418,11 +421,17 @@ struct RemoteSessionInsert: Encodable {
     var muscleGroup: String?
     var splitType: String?
     var note: String?
-    /// Nil for a strength session; a `CardioKind` raw value for a tracked one.
+    /// Nil for a strength session; a `CardioKind` raw value for a logged one.
     var activityType: String?
     var distanceM: Double?
     var durationS: Int?
     var route: [RoutePoint]?
+    /// Metres of ascent, or nil for a strength session / unknown elevation.
+    var elevationGainM: Int?
+    /// `CardioTerrain.rawValue`, or nil when the user did not tag one.
+    var terrain: String?
+    /// Kilocalories, estimated or overridden. Nil without a body weight.
+    var calories: Int?
 }
 
 struct RemoteSessionInsertResult: Codable {
@@ -476,6 +485,9 @@ struct RemoteSession: Codable {
     var distanceM: Double?
     var durationS: Int?
     var route: [RoutePoint]?
+    var elevationGainM: Int?
+    var terrain: String?
+    var calories: Int?
     var sessionSets: [RemoteSessionSet]?
 
     func localSession(userID: String) -> WorkoutSession {
@@ -492,14 +504,17 @@ struct RemoteSession: Codable {
         )
     }
 
-    /// A tracked run or walk, or nil for an ordinary strength session.
+    /// A logged run or walk, or nil for an ordinary strength session.
     private var activity: CardioActivity? {
         guard let kind = activityType.flatMap(CardioKind.init(rawValue:)) else { return nil }
         return CardioActivity(
             kind: kind,
             duration: durationS ?? 0,
             distance: distanceM ?? 0,
-            route: route ?? []
+            route: route ?? [],
+            elevationGain: elevationGainM,
+            terrain: terrain.flatMap(CardioTerrain.init(rawValue:)),
+            calories: calories
         )
     }
 

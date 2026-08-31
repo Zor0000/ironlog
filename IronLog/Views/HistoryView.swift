@@ -238,6 +238,7 @@ struct HistoryCard: View {
                 Spacer()
                 cardioMetric(formatPace(seconds: activity.duration, metres: activity.distance), "/\(currentDistanceUnit.label)")
             }
+            cardioFacts(activity)
             // A two-point "route" is a straight line through nothing — not worth
             // the map tiles.
             if activity.route.count > 2 {
@@ -246,6 +247,35 @@ struct HistoryCard: View {
         }
         .padding(14)
         .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .top)
+    }
+
+    /// Everything beyond distance/time/pace: calories, ascent, terrain and the
+    /// speed figure treadmill runners think in. Collapses away entirely for
+    /// sessions saved before these fields existed.
+    @ViewBuilder
+    private func cardioFacts(_ activity: CardioActivity) -> some View {
+        let hasSpeed = activity.distance > 20
+        if activity.calories != nil || activity.elevationGain != nil || activity.terrain != nil || hasSpeed {
+            VStack(alignment: .leading, spacing: 8) {
+                if let calories = activity.calories {
+                    Label("~\(calories) kcal burned", systemImage: "flame.fill")
+                        .foregroundStyle(Theme.accent)
+                }
+                HStack(spacing: 14) {
+                    if let elevation = activity.elevationGain, elevation > 0 {
+                        Label("\(elevation) m", systemImage: "arrow.up.right")
+                    }
+                    if let terrain = activity.terrain {
+                        Label(terrain.label, systemImage: terrain.icon)
+                    }
+                    if hasSpeed {
+                        Label("\(formatSpeed(seconds: activity.duration, metres: activity.distance)) \(speedUnitLabel)", systemImage: "speedometer")
+                    }
+                }
+                .foregroundStyle(Theme.muted2)
+            }
+            .font(.system(size: 12, weight: .medium))
+        }
     }
 
     private func cardioMetric(_ value: String, _ label: String) -> some View {
