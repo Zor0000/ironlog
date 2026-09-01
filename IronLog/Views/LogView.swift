@@ -1,10 +1,15 @@
 import SwiftUI
 
+private struct PendingDeleteSet: Equatable {
+    let exerciseID: UUID
+    let setID: UUID
+}
+
 struct LogView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
     @State private var pendingDelete: ActiveExercise?
-    @State private var pendingDeleteSet: (exerciseID: UUID, setID: UUID)?
+    @State private var pendingDeleteSet: PendingDeleteSet?
     @State private var showSaveRoutine = false
     @State private var routineName = ""
     @FocusState private var noteFocused: Bool
@@ -99,7 +104,7 @@ struct LogView: View {
             progressCard
 
             ForEach(Array(app.todayExercises.enumerated()), id: \.element.id) { index, exercise in
-                LogExerciseCard(exercise: exercise, onConfirmDelete: { pendingDelete = exercise }, onConfirmDeleteSet: { exerciseID, setID in pendingDeleteSet = (exerciseID, setID) })
+                LogExerciseCard(exercise: exercise, onConfirmDelete: { pendingDelete = exercise }, onConfirmDeleteSet: { exerciseID, setID in pendingDeleteSet = PendingDeleteSet(exerciseID: exerciseID, setID: setID) })
                     .entrance(index)
             }
 
@@ -533,7 +538,7 @@ struct LogExerciseCard: View {
                     .frame(width: 30, height: 34)
                     .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
                     .contentShape(Rectangle())
-                    .onLongPressGesture(minimumDuration: .seconds(0.5)) {
+                    .onLongPressGesture(minimumDuration: 0.5) {
                         NativeFeedback.selection()
                         onConfirmDeleteSet(exercise.id, set.id)
                     }

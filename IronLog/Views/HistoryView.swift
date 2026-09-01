@@ -1,5 +1,10 @@
 import SwiftUI
 
+private struct PendingDeleteSetIndex: Equatable {
+    let exerciseIndex: Int
+    let setIndex: Int
+}
+
 struct HistoryView: View {
     @EnvironmentObject private var app: AppState
     @State private var deleteTarget: WorkoutSession?
@@ -327,7 +332,7 @@ struct EditSessionSheet: View {
     @State private var note: String
     @State private var showAddExercise = false
     @State private var customWeighted = false
-    @State private var pendingDeleteSet: (exerciseIndex: Int, setIndex: Int)?
+    @State private var pendingDeleteSet: PendingDeleteSetIndex?
     @FocusState private var noteFocused: Bool
 
     init(session: WorkoutSession) {
@@ -551,9 +556,9 @@ struct EditSessionSheet: View {
                             .frame(width: 30, height: 34)
                             .foregroundStyle(Theme.muted2)
                             .contentShape(Rectangle())
-                            .onLongPressGesture(minimumDuration: .seconds(0.5)) {
+                            .onLongPressGesture(minimumDuration: 0.5) {
                                 NativeFeedback.selection()
-                                pendingDeleteSet = (
+                                pendingDeleteSet = PendingDeleteSetIndex(
                                     exerciseIndex: exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0,
                                     setIndex: index
                                 )
