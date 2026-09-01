@@ -1,5 +1,5 @@
 import SwiftUI
-import Charts
+import Liveline
 
 struct StatsView: View {
     @EnvironmentObject private var app: AppState
@@ -79,18 +79,11 @@ struct StatsView: View {
                 }
             }
 
-            let points = chartPoints
+            let points = chartPoints.map { LivelinePoint(time: $0.date.timeIntervalSince1970, value: $0.weight) }
+            let latest = points.last?.value ?? 0
             if points.count >= 2 {
-                Chart(points, id: \.date) { point in
-                    LineMark(x: .value("Date", point.date), y: .value("Top set", point.weight))
-                        .foregroundStyle(Theme.accent)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    PointMark(x: .value("Date", point.date), y: .value("Top set", point.weight))
-                        .foregroundStyle(Theme.accent)
-                }
-                .chartYAxisLabel("Top set (\(currentWeightUnit.label))", alignment: .trailing)
-                .chartYScale(domain: .automatic(includesZero: false))
-                .frame(height: 180)
+                LivelineChart(data: points, value: latest, configuration: LivelineChartConfiguration(theme: .automatic))
+                    .frame(height: 180)
             } else {
                 Text(points.count == 1
                      ? "One session logged — one more and the trend line appears."

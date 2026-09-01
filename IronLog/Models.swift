@@ -86,7 +86,7 @@ struct ExerciseTemplate: Identifiable, Codable, Hashable {
 /// working set. Stored as an Optional everywhere: nil is an ordinary set, which
 /// is also how every set logged before this existed decodes.
 enum SetType: String, Codable, Hashable, CaseIterable {
-    case warmup, drop, failure, restPause
+    case warmup, drop, failure, restPause, repsInReserve
 
     var label: String {
         switch self {
@@ -94,6 +94,7 @@ enum SetType: String, Codable, Hashable, CaseIterable {
         case .drop: "Drop set"
         case .failure: "To failure"
         case .restPause: "Rest-pause"
+        case .repsInReserve: "Reps in reserve"
         }
     }
 
@@ -103,6 +104,7 @@ enum SetType: String, Codable, Hashable, CaseIterable {
         case .drop: "arrow.down.right.circle"
         case .failure: "flame"
         case .restPause: "pause.circle"
+        case .repsInReserve: "hand.raised"
         }
     }
 

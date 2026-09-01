@@ -4,6 +4,7 @@ struct LogView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
     @State private var pendingDelete: ActiveExercise?
+    @State private var pendingDeleteSet: (exerciseID: UUID, setID: UUID)?
     @State private var showSaveRoutine = false
     @State private var routineName = ""
     @FocusState private var noteFocused: Bool
@@ -46,6 +47,25 @@ struct LogView: View {
             }
         }
         .animation(AppMotion.quick, value: pendingDelete)
+        .overlay {
+            if let pendingDeleteSet {
+                ConfirmActionModal(
+                    title: "Remove set?",
+                    message: "This set will be removed from the workout.",
+                    confirmTitle: "Remove Set",
+                    cancelTitle: "Keep It",
+                    systemImage: "minus.circle"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        app.removeSet(exerciseID: pendingDeleteSet.exerciseID, setID: pendingDeleteSet.setID)
+                        self.pendingDeleteSet = nil
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) { self.pendingDeleteSet = nil }
+                }
+            }
+        }
+        .animation(AppMotion.quick, value: pendingDeleteSet)
         }
     }
 
@@ -79,7 +99,7 @@ struct LogView: View {
             progressCard
 
             ForEach(Array(app.todayExercises.enumerated()), id: \.element.id) { index, exercise in
-                LogExerciseCard(exercise: exercise, onConfirmDelete: { pendingDelete = exercise })
+                LogExerciseCard(exercise: exercise, onConfirmDelete: { pendingDelete = exercise }, onConfirmDeleteSet: { exerciseID, setID in pendingDeleteSet = (exerciseID, setID) })
                     .entrance(index)
             }
 
@@ -360,6 +380,8 @@ struct LogExerciseCard: View {
     let exercise: ActiveExercise
     /// Called instead of deleting outright when the exercise already has logged work.
     var onConfirmDelete: () -> Void = {}
+    /// Called when the user long-presses the minus-circle button to remove a set.
+    var onConfirmDeleteSet: (UUID, UUID) -> Void = { _, _ in }
 
     var body: some View {
         // Previous-set reference for this exercise (most recent prior session).
@@ -506,20 +528,17 @@ struct LogExerciseCard: View {
                     set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
                 ))
 
-                Button {
-                    NativeFeedback.selection()
-                    withAnimation(AppMotion.quick) {
-                        app.removeSet(exerciseID: exercise.id, setID: set.id)
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 30, height: 34)
+                    .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
+                    .contentShape(Rectangle())
+                    .onLongPressGesture(minimumDuration: .seconds(0.5)) {
+                        NativeFeedback.selection()
+                        onConfirmDeleteSet(exercise.id, set.id)
                     }
-                } label: {
-                    Image(systemName: "minus.circle")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 30, height: 34)
-                        .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
-                }
-                .buttonStyle(TactileButtonStyle())
-                .disabled(exercise.sets.count <= 1)
-                .accessibilityLabel("Remove set")
+                    .disabled(exercise.sets.count <= 1)
+                    .accessibilityLabel("Remove set")
             }
 
             if let subtitle = setSubtitle(set, refSet) {

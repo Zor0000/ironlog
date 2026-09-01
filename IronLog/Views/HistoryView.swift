@@ -326,8 +326,8 @@ struct EditSessionSheet: View {
     @State private var exercises: [ActiveExercise]
     @State private var note: String
     @State private var showAddExercise = false
-    /// View-only, unlike the live log's copy — a saved session has no draft.
     @State private var customWeighted = false
+    @State private var pendingDeleteSet: (exerciseIndex: Int, setIndex: Int)?
     @FocusState private var noteFocused: Bool
 
     init(session: WorkoutSession) {
@@ -421,6 +421,30 @@ struct EditSessionSheet: View {
             }
         }
         .foregroundStyle(Theme.text)
+        .overlay {
+            if let pendingDeleteSet {
+                ConfirmActionModal(
+                    title: "Remove set?",
+                    message: "This set will be removed from the session.",
+                    confirmTitle: "Remove Set",
+                    cancelTitle: "Keep It",
+                    systemImage: "minus.circle"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        let exIdx = pendingDeleteSet.exerciseIndex
+                        let stIdx = pendingDeleteSet.setIndex
+                        exercises[exIdx].sets.remove(at: stIdx)
+                        if exercises[exIdx].sets.isEmpty {
+                            exercises.remove(at: exIdx)
+                        }
+                        self.pendingDeleteSet = nil
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) { self.pendingDeleteSet = nil }
+                }
+            }
+        }
+        .animation(AppMotion.quick, value: pendingDeleteSet)
     }
 
     /// Add a forgotten exercise to an already-saved session. Mirrors the live
@@ -522,23 +546,19 @@ struct EditSessionSheet: View {
                                 : snapReps(value)
                         }
                         SetTypeMenu(type: exercise.sets[index].type)
-                        Button {
-                            NativeFeedback.selection()
-                            withAnimation(AppMotion.quick) {
-                                exercise.wrappedValue.sets.remove(at: index)
-                                // Removing the last set removes the exercise.
-                                if exercise.wrappedValue.sets.isEmpty {
-                                    exercises.removeAll { $0.id == exercise.wrappedValue.id }
-                                }
+                        Image(systemName: "minus.circle")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 30, height: 34)
+                            .foregroundStyle(Theme.muted2)
+                            .contentShape(Rectangle())
+                            .onLongPressGesture(minimumDuration: .seconds(0.5)) {
+                                NativeFeedback.selection()
+                                pendingDeleteSet = (
+                                    exerciseIndex: exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0,
+                                    setIndex: index
+                                )
                             }
-                        } label: {
-                            Image(systemName: "minus.circle")
-                                .font(.system(size: 16, weight: .semibold))
-                                .frame(width: 30, height: 34)
-                                .foregroundStyle(Theme.muted2)
-                        }
-                        .buttonStyle(TactileButtonStyle())
-                        .accessibilityLabel("Remove set")
+                            .accessibilityLabel("Remove set")
                     }
                     if let label = set.type?.label {
                         Text(label)
