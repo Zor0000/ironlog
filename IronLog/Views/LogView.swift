@@ -11,6 +11,7 @@ struct LogView: View {
     @State private var pendingDelete: ActiveExercise?
     @State private var pendingDeleteSet: PendingDeleteSet?
     @State private var showSaveRoutine = false
+    @State private var showFinishConfirmation = false
     @State private var routineName = ""
     @FocusState private var noteFocused: Bool
 
@@ -19,7 +20,7 @@ struct LogView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 TimerCard()
-                if app.todayExercises.isEmpty && !app.showAddExerciseForm {
+                if !app.hasActiveWorkout {
                     emptyState
                 } else {
                     activeLog
@@ -33,43 +34,20 @@ struct LogView: View {
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
         .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
-        .overlay {
-            if let pendingDelete {
-                ConfirmActionModal(
-                    title: "Remove exercise?",
-                    message: "\(pendingDelete.name) and its logged sets will be removed from this workout.",
-                    confirmTitle: "Remove Exercise",
-                    cancelTitle: "Keep It",
-                    systemImage: "trash"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        app.removeExercise(pendingDelete.id)
-                        self.pendingDelete = nil
-                    }
-                } cancel: {
-                    withAnimation(AppMotion.quick) { self.pendingDelete = nil }
-                }
-            }
+        .alert("Remove exercise?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { exercise in
+            Button("Keep It", role: .cancel) { pendingDelete = nil }
+            Button("Remove Exercise", role: .destructive) { app.removeExercise(exercise.id); pendingDelete = nil }
+        } message: { exercise in
+            Text("\(exercise.name) and all its sets will be removed from this workout.")
         }
         .animation(AppMotion.quick, value: pendingDelete)
-        .overlay {
-            if let pendingDeleteSet {
-                ConfirmActionModal(
-                    title: "Remove set?",
-                    message: "This set will be removed from the workout.",
-                    confirmTitle: "Remove Set",
-                    cancelTitle: "Keep It",
-                    systemImage: "minus.circle"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        app.removeSet(exerciseID: pendingDeleteSet.exerciseID, setID: pendingDeleteSet.setID)
-                        self.pendingDeleteSet = nil
-                    }
-                } cancel: {
-                    withAnimation(AppMotion.quick) { self.pendingDeleteSet = nil }
-                }
+        .alert("Remove set?", isPresented: Binding(get: { pendingDeleteSet != nil }, set: { if !$0 { pendingDeleteSet = nil } }), presenting: pendingDeleteSet) { target in
+            Button("Keep It", role: .cancel) { pendingDeleteSet = nil }
+            Button("Remove Set", role: .destructive) {
+                app.removeSet(exerciseID: target.exerciseID, setID: target.setID)
+                pendingDeleteSet = nil
             }
-        }
+        } message: { _ in Text(deleteSetMessage) }
         .animation(AppMotion.quick, value: pendingDeleteSet)
         }
     }
@@ -77,10 +55,10 @@ struct LogView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "dumbbell")
-                .font(.system(size: 46))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.muted)
             Text("No workout started yet.\nGo to Workouts and pick your muscles.")
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Theme.muted2)
             Button {
@@ -118,6 +96,7 @@ struct LogView: View {
                     set: { app.updateWorkoutNote($0) }
                 ))
                     .focused($noteFocused)
+                    .accessibilityLabel("Session note")
                     .frame(minHeight: 72)
                     .scrollContentBackground(.hidden)
                     .padding(8)
@@ -129,15 +108,23 @@ struct LogView: View {
             .id(sessionNoteAnchor)
 
             Button {
-                NativeFeedback.success()
-                Task {
-                    await app.finishWorkout(note: app.workoutNote)
+                if app.todayExercises.contains(where: { $0.sets.contains(where: { !$0.done }) }) {
+                    showFinishConfirmation = true
+                } else {
+                    Task { await app.finishWorkout(note: app.workoutNote) }
                 }
             } label: {
                 Label("Finish & Save Workout", systemImage: "checkmark")
             }
             .buttonStyle(PrimaryButtonStyle())
             .accessibilityIdentifier("finish-workout-button")
+            .disabled(app.validCompletedSetCount == 0)
+
+            Text(app.validCompletedSetCount == 0
+                 ? "Enter reps or duration and mark at least one set done to save. Weighted exercises also need a weight."
+                 : "Only completed sets are saved. Unfinished sets will be left out.")
+                .font(.footnote)
+                .foregroundStyle(Theme.muted2)
 
             if !app.todayExercises.isEmpty {
                 Button {
@@ -154,20 +141,61 @@ struct LogView: View {
                 .accessibilityIdentifier("save-routine-button")
             }
         }
-        .alert("Save as routine", isPresented: $showSaveRoutine) {
-            TextField("e.g. Chris's Leg Day", text: $routineName)
-            Button("Save") {
-                app.saveRoutine(name: routineName)
-                routineName = ""
+        .sheet(isPresented: $showSaveRoutine) {
+            NavigationStack {
+                Form {
+                    Section("Routine name") {
+                        TextField("e.g. Leg Day", text: $routineName)
+                            .accessibilityIdentifier("routine-name-field")
+                    }
+                    Section {
+                        Text(routineExists
+                             ? "Replace the exercises and set counts in the existing routine named \(routineName)?"
+                             : "Keep these \(app.todayExercises.count) exercises to start again from Workouts.")
+                        Button(routineExists ? "Replace Routine" : "Save Routine", role: routineExists ? .destructive : nil) {
+                            app.saveRoutine(name: routineName)
+                            showSaveRoutine = false
+                            routineName = ""
+                        }
+                        .disabled(routineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                .navigationTitle("Save as Routine")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showSaveRoutine = false; routineName = "" }
+                    }
+                }
             }
-            Button("Cancel", role: .cancel) { routineName = "" }
-        } message: {
-            Text("Keeps these \(app.todayExercises.count) exercises so you can start them again in one tap from Workouts.")
+            .keyboardDismissControl()
+            .presentationDetents([.medium, .large])
         }
+        .alert("Finish with unfinished sets?", isPresented: $showFinishConfirmation) {
+            Button("Keep Logging", role: .cancel) { }
+            Button("Save Completed Sets", role: .destructive) {
+                Task { await app.finishWorkout(note: app.workoutNote) }
+            }
+        } message: {
+            Text("Save \(app.validCompletedSetCount) completed sets? Unfinished sets will be discarded.")
+        }
+
+
+    }
+
+    private var routineExists: Bool {
+        app.routines.contains { $0.name.caseInsensitiveCompare(routineName.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame }
+    }
+
+    private var deleteSetMessage: String {
+        guard let target = pendingDeleteSet,
+              let exercise = app.todayExercises.first(where: { $0.id == target.exerciseID }),
+              let index = exercise.sets.firstIndex(where: { $0.id == target.setID }) else { return "Remove this set?" }
+        return "Set \(index + 1) of \(exercise.name) and its entered values will be removed."
     }
 
     private var logHeader: some View {
-        HStack(spacing: 8) {
+        AdaptiveStack(spacing: 8) {
             Text("Today").sectionTitle()
             Pill(text: contextLabel)
             Spacer()
@@ -176,8 +204,8 @@ struct LogView: View {
                 showDiscardConfirmation = true
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 14, weight: .bold))
-                    .frame(width: 36, height: 36)
+                    .font(.subheadline.weight(.bold))
+                    .frame(width: 44, height: 44)
                     .foregroundStyle(Theme.danger)
                     .background(Theme.surface2)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -200,21 +228,21 @@ struct LogView: View {
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(app.validCompletedSetCount)/\(totalSets)")
-                    .font(.system(size: 28, weight: .black))
+                    .font(.title.weight(.black))
                     .fontWidth(.condensed)
                     .foregroundStyle(Theme.accent)
                 Text("valid sets ready to save")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted2)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text("\(app.todayExercises.count)")
-                    .font(.system(size: 28, weight: .black))
+                    .font(.title.weight(.black))
                     .fontWidth(.condensed)
                     .foregroundStyle(Theme.text)
                 Text("exercises")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted2)
             }
         }
@@ -237,7 +265,7 @@ struct LogView: View {
                     }
                 } label: {
                     Label("Add Exercise", systemImage: "plus")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .foregroundStyle(Theme.muted2)
@@ -260,8 +288,8 @@ struct LogView: View {
                     withAnimation(AppMotion.quick) { app.cancelAddingExercise() }
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .frame(width: 30, height: 30)
+                        .font(.caption.weight(.bold))
+                        .frame(width: 44, height: 44)
                         .foregroundStyle(Theme.muted2)
                         .background(Theme.surface2)
                         .clipShape(Circle())
@@ -304,15 +332,15 @@ struct TimerCard: View {
     }
 
     var body: some View {
-        HStack {
+        AdaptiveStack {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Rest Timer")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .tracking(1)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted2)
                 Text(formatDuration(app.timerSecs))
-                    .font(.system(size: 40, weight: .black))
+                    .font(.largeTitle.weight(.black))
                     .fontWidth(.condensed)
                     .tracking(2)
                     .foregroundStyle(Theme.accent)
@@ -350,9 +378,10 @@ struct TimerCard: View {
                     }
                 } label: {
                     Text(formatDuration(app.timerMax))
-                        .font(.system(size: 12, weight: .bold))
+                        .fixedSize(horizontal: true, vertical: false)
+                        .font(.caption.weight(.bold))
                         .padding(.horizontal, 10)
-                        .frame(height: 38)
+                        .frame(minHeight: 44)
                         .background(Theme.surface2)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
@@ -383,7 +412,7 @@ struct TimerCard: View {
 struct LogExerciseCard: View {
     @EnvironmentObject private var app: AppState
     let exercise: ActiveExercise
-    /// Called instead of deleting outright when the exercise already has logged work.
+    /// All exercise removals require an explicit confirmation.
     var onConfirmDelete: () -> Void = {}
     /// Called when the user taps the minus-circle button to remove a set.
     var onConfirmDeleteSet: (UUID, UUID) -> Void = { _, _ in }
@@ -403,7 +432,7 @@ struct LogExerciseCard: View {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
                                 Text(exercise.name)
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.subheadline.weight(.semibold))
                                 if exercise.bodyweight {
                                     SmallBadge("Bodyweight")
                                 }
@@ -412,12 +441,12 @@ struct LogExerciseCard: View {
                                 }
                             }
                             Text("\(exercise.sets.filter(\.done).count)/\(exercise.sets.count) \(exercise.sets.count == 1 ? "set" : "sets") done")
-                                .font(.system(size: 12))
+                                .font(.caption)
                                 .foregroundStyle(Theme.muted2)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(Theme.muted2)
                             .rotationEffect(.degrees(exercise.expanded ? 90 : 0))
                     }
@@ -428,22 +457,17 @@ struct LogExerciseCard: View {
 
                 Button {
                     NativeFeedback.selection()
-                    if exercise.hasLoggedData {
-                        onConfirmDelete()
-                    } else {
-                        withAnimation(AppMotion.quick) {
-                            app.removeExercise(exercise.id)
-                        }
-                    }
+                    onConfirmDelete()
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.muted2)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Remove \(exercise.name)")
+                .accessibilityIdentifier("remove-exercise-button")
             }
             .padding(14)
 
@@ -459,9 +483,10 @@ struct LogExerciseCard: View {
                         }
                     } label: {
                         Label("Add Set", systemImage: "plus")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.caption.weight(.medium))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 9)
+                            .frame(minHeight: 44)
                             .foregroundStyle(Theme.muted2)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [5])))
                     }
@@ -485,39 +510,53 @@ struct LogExerciseCard: View {
         let index = exercise.sets.firstIndex(where: { $0.id == set.id }) ?? 0
         // Same set index from last time, falling back to that session's last set.
         let refSet = reference.map { $0.sets.indices.contains(index) ? $0.sets[index] : $0.sets.last } ?? nil
-        let hasRefWeight = (refSet?.weight ?? 0) > 0
-        // Bodyweight moves hint "BW" — blank keeps the set unloaded, a number loads it.
-        let weightPlaceholder = hasRefWeight
-            ? formatWeightValue(refSet!.weight!)
-            : (exercise.bodyweight ? "BW" : "0")
 
         return VStack(alignment: .leading, spacing: 3) {
-            // No set-number column: the row needs the width for the set-type
-            // button, and the header already counts them ("0/4 sets done").
+            AdaptiveStack {
+                Text("Set \(index + 1)").font(.subheadline.weight(.semibold))
+                Spacer()
+                SetTypeMenu(type: Binding(
+                    get: { set.type },
+                    set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
+                ))
+                Button(role: .destructive) {
+                    onConfirmDeleteSet(exercise.id, set.id)
+                } label: {
+                    Label("Remove", systemImage: "minus.circle")
+                        .font(.subheadline)
+                        .frame(minHeight: 44)
+                }
+                .disabled(exercise.sets.count <= 1)
+                .accessibilityLabel("Remove set \(index + 1) of \(exercise.name)")
+                .accessibilityIdentifier("remove-set-button")
+                .accessibilityHint(exercise.sets.count <= 1 ? "Keep one set, or remove the exercise." : "Asks for confirmation.")
+            }
+            .foregroundStyle(Theme.muted2)
             HStack(alignment: .bottom, spacing: 8) {
                 if !exercise.timed {
                     // Label + reference placeholder follow the display unit;
                     // typed input converts back to kg at the save boundary.
                     // Bodyweight exercises get the field too — walking lunges,
                     // pull-ups and dips are routinely loaded.
-                    SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, placeholder: weightPlaceholder, keyboard: .decimalPad, identifier: "set-weight-input") { value in
+                    SmallInput(label: currentWeightUnit.fieldLabel, value: set.weight, placeholder: exercise.bodyweight ? "BW" : "0", keyboard: .decimalPad, identifier: "set-weight-input", context: "\(exercise.name), set \(index + 1),") { value in
                         app.updateSet(exerciseID: exercise.id, setID: set.id, weight: value)
                     }
                 }
                 // Decimal pad only where halves mean something — a timed set's
                 // field is seconds/minutes, and `updateSet` strips the point.
-                SmallInput(label: index == 0 ? (exercise.timed ? durationFieldLabel(minutes: exercise.usesMinutes) : "REPS") : "", value: set.reps, placeholder: refPlaceholder(refSet), keyboard: exercise.timed ? .numberPad : .decimalPad, identifier: "set-reps-input") { value in
+                SmallInput(label: exercise.timed ? durationFieldLabel(minutes: exercise.usesMinutes) : "REPS", value: set.reps, placeholder: "0", keyboard: exercise.timed ? .numberPad : .decimalPad, identifier: "set-reps-input", context: "\(exercise.name), set \(index + 1),") { value in
                     app.updateSet(exerciseID: exercise.id, setID: set.id, reps: value)
                 }
                 Button {
-                    NativeFeedback.success()
+                    NativeFeedback.selection()
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     withAnimation(AppMotion.quick) {
                         app.toggleDone(exerciseID: exercise.id, setID: set.id)
                     }
                 } label: {
                     Image(systemName: set.done ? "checkmark" : "circle")
-                        .font(.system(size: 15, weight: .bold))
-                        .frame(width: 34, height: 34)
+                        .font(.subheadline.weight(.bold))
+                        .frame(width: 44, height: 44)
                         .foregroundStyle(set.done ? .black : Theme.muted2)
                         .background(set.done ? Theme.success : .clear)
                         .clipShape(Circle())
@@ -526,30 +565,14 @@ struct LogExerciseCard: View {
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityIdentifier("set-done-button")
-                .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
+                .accessibilityLabel("Set \(index + 1) of \(exercise.name), \(set.done ? "mark not done" : "mark done")")
+                .accessibilityValue(set.done ? "Completed" : "Not completed")
 
-                SetTypeMenu(type: Binding(
-                    get: { set.type },
-                    set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
-                ))
-
-                Button {
-                    NativeFeedback.selection()
-                    onConfirmDeleteSet(exercise.id, set.id)
-                } label: {
-                    Image(systemName: "minus.circle")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 30, height: 34)
-                        .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
-                }
-                .buttonStyle(TactileButtonStyle())
-                .disabled(exercise.sets.count <= 1)
-                .accessibilityLabel("Remove set")
             }
 
             if let subtitle = setSubtitle(set, refSet) {
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(set.type == nil ? Theme.muted : Theme.accent.opacity(0.85))
                     .accessibilityIdentifier("set-reference")
             }
@@ -561,14 +584,6 @@ struct LogExerciseCard: View {
     private func setSubtitle(_ set: WorkoutSet, _ refSet: LoggedSet?) -> String? {
         let parts = [set.type?.label, referenceLabel(refSet)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    /// Last time's value pre-filled into the duration/reps field. Stored durations
-    /// are seconds, so a minutes-based move shows them back in minutes.
-    private func refPlaceholder(_ refSet: LoggedSet?) -> String {
-        guard let refSet else { return "0" }
-        guard exercise.timed else { return clean(refSet.reps) }
-        return String(displayDuration(Int(refSet.reps), minutes: exercise.usesMinutes))
     }
 
     /// Muted "Last: …" hint mirroring the web client's `.set-ref` line.
@@ -607,9 +622,9 @@ struct SetTypeMenu: View {
             }
             .pickerStyle(.inline)
         } label: {
-            Image(systemName: type == nil ? "note.text" : "note.text.badge.plus")
-                .font(.system(size: 16, weight: .semibold))
-                .frame(width: 28, height: 34)
+            Label(type?.label ?? "Type", systemImage: "tag")
+                .font(.body.weight(.semibold))
+                .frame(minHeight: 44)
                 .foregroundStyle(type == nil ? Theme.muted2 : Theme.accent)
         }
         .accessibilityIdentifier("set-type-button")
@@ -623,22 +638,25 @@ struct SmallInput: View {
     var placeholder: String = "0"
     var keyboard: UIKeyboardType = .numberPad
     var identifier: String?
+    var context = ""
     let onChange: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            // Empty label = no header row; callers show it on the first set only.
+            // Every input keeps a label, including repeated rows.
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(Theme.muted2)
             }
             TextField(placeholder, text: Binding(get: { value }, set: onChange))
                 .keyboardType(keyboard)
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .padding(8)
+                .frame(minHeight: 44)
+                .accessibilityLabel("\(context) \(label)".trimmingCharacters(in: .whitespaces))
                 .background(Theme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
@@ -666,7 +684,7 @@ struct CustomExerciseField: View {
             HStack(spacing: 8) {
                 Rectangle().fill(Theme.border).frame(height: 1)
                 Text("Or add your own")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.caption2.weight(.semibold))
                     .tracking(1)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted)
@@ -707,10 +725,6 @@ struct CustomExerciseField: View {
                 Label("Add Custom Exercise", systemImage: "plus")
             }
             .buttonStyle(PrimaryButtonStyle())
-            // PrimaryButtonStyle has no disabled look, so dim it here — and the
-            // editor's sheet covers the toast layer, so a blocked tap there
-            // would otherwise give no feedback at all.
-            .opacity(trimmedName.isEmpty ? 0.45 : 1)
             .disabled(trimmedName.isEmpty)
             .animation(AppMotion.quick, value: trimmedName.isEmpty)
             .accessibilityIdentifier("confirm-add-exercise-button")
@@ -733,7 +747,7 @@ struct ExerciseCatalogPicker: View {
     @State private var didPrime = false
     @FocusState private var searchFocused: Bool
 
-    private let resultLimit = 24
+    @State private var resultLimit = 24
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -746,15 +760,17 @@ struct ExerciseCatalogPicker: View {
             }
         }
         .onAppear(perform: prime)
+        .onChange(of: search) { _, _ in resultLimit = 24 }
+        .onChange(of: filter) { _, _ in resultLimit = 24 }
     }
 
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.muted2)
             TextField("Search exercises — e.g. walking lunges", text: $search)
-                .font(.system(size: 14))
+                .font(.subheadline)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -765,7 +781,8 @@ struct ExerciseCatalogPicker: View {
                     search = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
+                        .frame(width: 44, height: 44)
+                        .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                 }
                 .buttonStyle(TactileButtonStyle())
@@ -823,18 +840,19 @@ struct ExerciseCatalogPicker: View {
             if results.isEmpty {
                 VStack(spacing: 4) {
                     Text("No matching exercises")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.text)
                     Text("Try fewer words — search covers the whole library.")
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(Theme.muted2)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
             } else if results.count > resultLimit {
-                Text("+\(results.count - resultLimit) more — keep typing to narrow")
-                    .font(.system(size: 12))
+                Button("Show more exercises (\(results.count - resultLimit) remaining)") { resultLimit += 24 }
+                    .frame(minHeight: 44)
+                    .font(.caption)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 2)
@@ -848,19 +866,19 @@ struct ExerciseCatalogPicker: View {
         let icon = template.timed ? "timer" : (template.bodyweight ? "figure.strengthtraining.functional" : "dumbbell")
         return HStack(spacing: 11) {
             ZStack {
-                Circle().fill(Theme.accentDim).frame(width: 34, height: 34)
+                Circle().fill(Theme.accentDim).frame(width: 44, height: 44)
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.accent)
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(template.name)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.text)
                     if filter == nil {
                         Text(item.muscle.label)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(Theme.muted2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -870,12 +888,12 @@ struct ExerciseCatalogPicker: View {
                     }
                 }
                 Text(meta(template))
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted2)
             }
             Spacer(minLength: 6)
             Image(systemName: "plus.circle.fill")
-                .font(.system(size: 19, weight: .bold))
+                .font(.title3.weight(.bold))
                 .foregroundStyle(Theme.accent)
         }
         .padding(11)
@@ -887,10 +905,10 @@ struct ExerciseCatalogPicker: View {
     private var hint: some View {
         HStack(spacing: 10) {
             Image(systemName: "sparkle.magnifyingglass")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(Theme.accent)
             Text("Search or tap a muscle group to browse the full exercise library.")
-                .font(.system(size: 13))
+                .font(.footnote)
                 .foregroundStyle(Theme.muted2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -933,7 +951,7 @@ struct SmallBadge: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(Theme.blue)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
@@ -946,7 +964,7 @@ struct SmallBadge: View {
 extension View {
     func timerButton(active: Bool = false) -> some View {
         font(.system(size: 15, weight: .bold))
-            .frame(width: 38, height: 38)
+            .frame(width: 44, height: 44)
             .foregroundStyle(active ? .black : Theme.text)
             .background(active ? Theme.accent : Theme.surface2)
             .clipShape(Circle())

@@ -14,6 +14,7 @@ struct RunView: View {
     @State private var terrain: CardioTerrain?
     @State private var calorieOverride = ""
     @State private var date = Date()
+    @State private var distanceUnit = currentDistanceUnit
     @FocusState private var focused: Bool
 
     /// The session as typed, before any calorie override — the auto estimate
@@ -23,14 +24,30 @@ struct RunView: View {
     }
 
     private var overriddenCalories: Int? {
-        guard let value = decimalEntry(calorieOverride), value > 0 else { return nil }
+        guard let value = decimalEntry(calorieOverride), value >= 0, value <= 1_000_000 else { return nil }
         return Int(value.rounded())
     }
 
     private var activity: CardioActivity? {
-        guard var base = baseActivity else { return nil }
+        guard var base = baseActivity, calorieOverride.isEmpty || overriddenCalories != nil else { return nil }
         base.calories = overriddenCalories ?? base.calories
         return base
+    }
+
+    private var validationMessage: String? {
+        guard let duration = decimalEntry(minutes), duration >= 1.0 / 60, duration <= 10_080 else {
+            return minutes.isEmpty ? "Enter a time to save this activity." : "Enter a duration between 1 second and 7 days."
+        }
+        if !distance.isEmpty && decimalEntry(distance).map({ $0 >= 0 && $0 <= 100_000 }) != true {
+            return "Enter a distance from 0 to 100,000 \(currentDistanceUnit.label), or leave it blank."
+        }
+        if !elevation.isEmpty && decimalEntry(elevation).map({ $0 >= 0 && $0 <= 100_000 }) != true {
+            return "Enter an elevation gain from 0 to 100,000 metres, or leave it blank."
+        }
+        if !calorieOverride.isEmpty && overriddenCalories == nil {
+            return "Enter calories from 0 to 1,000,000, or clear the override to use the estimate."
+        }
+        return nil
     }
 
     var body: some View {
@@ -65,10 +82,16 @@ struct RunView: View {
                 caloriesCard
 
                 DatePicker("When", selection: $date, in: ...Date(), displayedComponents: .date)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.muted2)
 
                 previewCard
+
+                if let message = validationMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted2)
+                }
 
                 Button {
                     NativeFeedback.success()
@@ -96,12 +119,13 @@ struct RunView: View {
         .scrollIndicators(.hidden)
         .foregroundStyle(Theme.text)
         .animation(AppMotion.quick, value: kind)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { focused = false }
+        .onChange(of: app.unitPreference) { _, _ in
+            if let value = decimalEntry(distance) {
+                distance = clean(value * distanceUnit.metres / currentDistanceUnit.metres)
             }
+            distanceUnit = currentDistanceUnit
         }
+
     }
 
     // MARK: Kind
@@ -114,24 +138,24 @@ struct RunView: View {
         } label: {
             HStack(spacing: 16) {
                 Image(systemName: candidate.icon)
-                    .font(.system(size: 34, weight: .medium))
+                    .font(.title.weight(.medium))
                     .foregroundStyle(isSelected ? Theme.accent : Theme.muted2)
                     .frame(width: 56)
                     .symbolEffect(.bounce, value: isSelected)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(candidate.label)
-                        .font(.system(size: 20, weight: .black))
+                        .font(.title3.weight(.black))
                         .fontWidth(.condensed)
                         .foregroundStyle(isSelected ? Theme.accent : Theme.text)
                     Text(candidate.blurb)
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(Theme.muted2)
                         .multilineTextAlignment(.leading)
                 }
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
+                        .font(.title3)
                         .foregroundStyle(Theme.accent)
                         .transition(.scale.combined(with: .opacity))
                 }
@@ -162,10 +186,11 @@ struct RunView: View {
             terrain = isSelected ? nil : candidate
         } label: {
             Label(candidate.label, systemImage: candidate.icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(isSelected ? Theme.accent : Theme.muted2)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
+                .frame(minHeight: 44)
                 .background(isSelected ? Theme.accentDim : Theme.surface2)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSelected ? Theme.accent.opacity(0.5) : Theme.border))
@@ -183,14 +208,14 @@ struct RunView: View {
             HStack(alignment: .firstTextBaseline) {
                 if let calories = activity?.calories {
                     Text("~\(calories) kcal")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.title.weight(.bold))
                         .fontWidth(.condensed)
                         .foregroundStyle(Theme.accent)
                         .contentTransition(.numericText())
                         .accessibilityIdentifier("run-calorie-estimate")
                 } else {
                     Text("Add your body weight in Settings to estimate calories.")
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(Theme.muted2)
                 }
                 Spacer()
@@ -198,13 +223,13 @@ struct RunView: View {
             if baseActivity != nil {
                 HStack(spacing: 8) {
                     Text("Override")
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .tracking(0.5)
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.muted2)
                     TextField("kcal", text: $calorieOverride)
                         .keyboardType(.decimalPad)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.subheadline.weight(.bold))
                         .fontWidth(.condensed)
                         .frame(width: 70)
                         .padding(.horizontal, 10)
@@ -213,13 +238,16 @@ struct RunView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                         .accessibilityIdentifier("run-calorie-override")
+                        .accessibilityLabel("Calories override in kilocalories")
+                        .focused($focused)
+                        .frame(minHeight: 44)
                     if overriddenCalories != nil {
                         Button {
                             NativeFeedback.selection()
                             calorieOverride = ""
                         } label: {
                             Text("Use estimate")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(Theme.accent)
                         }
                         .buttonStyle(TactileButtonStyle())
@@ -250,11 +278,11 @@ struct RunView: View {
     private func cardioMetric(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 22, weight: .bold))
+                .font(.title2.weight(.bold))
                 .fontWidth(.condensed)
                 .contentTransition(.numericText())
             Text(label)
-                .font(.system(size: 10))
+                .font(.caption2)
                 .tracking(0.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted2)
@@ -268,7 +296,7 @@ struct RunView: View {
                     ? "\(formatDistance(activity.distance)) \(currentDistanceUnit.label) · "
                     : ""
                 Text("Last \(activity.kind.label.lowercased()): \(measured)\(formatElapsed(activity.duration)) · \(session.createdAt.displayDay)")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
         }
@@ -280,12 +308,13 @@ struct RunView: View {
             HStack {
                 TextField(placeholder, text: text)
                     .keyboardType(.decimalPad)
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.title2.weight(.bold))
                     .fontWidth(.condensed)
                     .focused($focused)
                     .accessibilityIdentifier(identifier)
+                    .accessibilityLabel("\(label), \(unit)")
                 Text(unit)
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted2)
             }
             .padding(.horizontal, 12)

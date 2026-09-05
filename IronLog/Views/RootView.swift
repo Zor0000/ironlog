@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var app: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -20,7 +21,7 @@ struct RootView: View {
                 VStack {
                     Spacer()
                     Text(toast)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.footnote.weight(.medium))
                         .foregroundStyle(Theme.text)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
@@ -29,12 +30,16 @@ struct RootView: View {
                         .overlay(Capsule().stroke(Theme.border))
                         .shadow(color: .black.opacity(0.24), radius: 20, y: 12)
                         .padding(.bottom, 72)
+                        .allowsHitTesting(false)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.96)))
             }
         }
         .foregroundStyle(Theme.text)
-        .sensoryFeedback(.success, trigger: app.toast)
+        .onChange(of: app.toast) { _, message in
+            if let message { UIAccessibility.post(notification: .announcement, argument: message) }
+        }
+        .transaction { if reduceMotion { $0.animation = nil; $0.disablesAnimations = true } }
         .animation(AppMotion.smooth, value: app.toast)
         .animation(AppMotion.screen, value: app.showingAuth)
         .animation(AppMotion.screen, value: app.showingOnboarding)
@@ -64,10 +69,11 @@ struct OnboardingView: View {
                     NativeFeedback.selection()
                     app.finishOnboarding(createAccount: false)
                 }
-                .font(.system(size: 13, weight: .medium))
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(Theme.muted2)
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("onboarding-skip-button")
             }
 
@@ -75,13 +81,13 @@ struct OnboardingView: View {
                 ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
                     VStack(spacing: 18) {
                         Image(systemName: card.icon)
-                            .font(.system(size: 56))
+                            .font(.largeTitle)
                             .foregroundStyle(Theme.accent)
                         Text(card.title)
-                            .font(.system(size: 30, weight: .black))
+                            .font(.title.weight(.black))
                             .fontWidth(.condensed)
                         Text(card.text)
-                            .font(.system(size: 14))
+                            .font(.subheadline)
                             .foregroundStyle(Theme.muted2)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 40)
@@ -134,55 +140,60 @@ struct AuthView: View {
     @State private var password = ""
 
     var body: some View {
+        ScrollView {
         VStack(spacing: 22) {
             Spacer()
             VStack(spacing: 4) {
                 Text("IronLog")
-                    .font(.system(size: 52, weight: .black))
+                    .font(.largeTitle.weight(.black))
                     .fontWidth(.condensed)
                     .tracking(4)
                     .foregroundStyle(Theme.accent)
                 Text("Track your gains. Own your progress.")
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .foregroundStyle(Theme.muted2)
             }
 
             VStack(spacing: 14) {
-                Picker("", selection: $mode) {
+                Picker("Account action", selection: $mode) {
                     Text("Sign In").tag(AuthMode.signIn)
                     Text("Sign Up").tag(AuthMode.signUp)
                 }
                 .pickerStyle(.segmented)
+                .disabled(app.isBusy)
                 .tint(Theme.accent)
                 .animation(AppMotion.quick, value: mode)
 
                 if let message = app.authMessage {
                     Text(message)
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(message.contains("created") ? Theme.success : Theme.danger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if mode == .signUp {
-                    TextField("", text: $name)
+                    TextField("Your name", text: $name)
+                        .accessibilityLabel("Your name")
                         .textContentType(.name)
                         .fieldStyle()
-                        .placeholderText("Your name", visible: name.isEmpty)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                TextField("", text: $email)
+                TextField("Email address", text: $email)
+                    .accessibilityLabel("Email address")
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .fieldStyle()
-                    .placeholderText("Email address", visible: email.isEmpty)
-                SecureField("", text: $password)
+                if mode == .signUp {
+                    Text("Use at least 6 characters for your password.").font(.footnote).foregroundStyle(Theme.muted2)
+                }
+                SecureField("Password", text: $password)
+                    .accessibilityLabel("Password")
                     .textContentType(mode == .signIn ? .password : .newPassword)
                     .fieldStyle()
-                    .placeholderText("Password (min 6 chars)", visible: password.isEmpty)
 
-                Button(mode == .signIn ? "Sign In" : "Create Account") {
+                Button(app.isBusy ? "Please wait…" : mode == .signIn ? "Sign In" : "Create Account") {
                     NativeFeedback.light()
                     Task {
                         if mode == .signIn {
@@ -196,7 +207,7 @@ struct AuthView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(app.isBusy || email.isEmpty || password.count < 6 || (mode == .signUp && name.isEmpty))
+                .disabled(app.isBusy || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || (mode == .signUp && (password.count < 6 || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)))
                 .opacity(app.isBusy ? 0.6 : 1)
 
                 Button {
@@ -206,6 +217,7 @@ struct AuthView: View {
                     Text("Continue locally")
                 }
                 .buttonStyle(SecondaryButtonStyle())
+                .disabled(app.isBusy)
             }
             .cardStyle(radius: 18)
             .padding(.horizontal, 28)
@@ -213,26 +225,29 @@ struct AuthView: View {
             .entrance()
             Spacer()
         }
+        }
+        .keyboardDismissControl()
     }
 }
 
 struct AppShellView: View {
     @EnvironmentObject private var app: AppState
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Namespace private var tabSelection
     @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            TabView(selection: $app.selectedTab) {
-                WorkoutsView().tag(WorkoutTab.workouts)
-                LogView().tag(WorkoutTab.log)
-                RunView().tag(WorkoutTab.run)
-                HistoryView().tag(WorkoutTab.history)
-                StatsView().tag(WorkoutTab.stats)
+            ZStack {
+                tabContent(.workouts) { WorkoutsView() }
+                tabContent(.log) { LogView() }
+                tabContent(.run) { RunView() }
+                tabContent(.history) { HistoryView() }
+                tabContent(.stats) { StatsView() }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(AppMotion.screen, value: app.selectedTab)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
 
             HStack {
                 navButton(.workouts, "Workouts", "list.bullet")
@@ -257,31 +272,43 @@ struct AppShellView: View {
             }
             .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .top)
         }
+        .keyboardDismissControl()
+    }
+
+    private func tabContent<Content: View>(_ tab: WorkoutTab, @ViewBuilder content: () -> Content) -> some View {
+        content()
+            .opacity(app.selectedTab == tab ? 1 : 0)
+            .allowsHitTesting(app.selectedTab == tab)
+            .accessibilityHidden(app.selectedTab != tab)
     }
 
     private var header: some View {
         HStack {
             Text("IronLog")
-                .font(.system(size: 28, weight: .black))
+                .font(.title.weight(.black))
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .fontWidth(.condensed)
                 .tracking(2)
                 .foregroundStyle(Theme.accent)
             Spacer()
+            if !typeSize.isAccessibilitySize {
             VStack(alignment: .trailing, spacing: 1) {
                 Text(Date().formatted(.dateTime.weekday(.wide)))
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.footnote.weight(.bold))
                 Text(Date().formatted(.dateTime.month(.abbreviated).day().year()))
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(Theme.muted2)
+            }
             }
             Button {
                 NativeFeedback.selection()
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .foregroundStyle(Theme.muted2)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
             }
             .buttonStyle(TactileButtonStyle())
@@ -317,14 +344,16 @@ struct AppShellView: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.title3.weight(.medium))
                     .scaleEffect(isActive ? 1.08 : 1)
                     .symbolEffect(.bounce, value: isActive)
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .background {
                 if isActive {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -336,13 +365,16 @@ struct AppShellView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(TactileButtonStyle())
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityShowsLargeContentViewer { Label(label, systemImage: icon) }
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
 
 extension View {
     func fieldStyle() -> some View {
         textFieldStyle(.plain)
-            .font(.system(size: 15))
+            .font(.subheadline)
             .padding(13)
             .foregroundStyle(Theme.text)
             .background(Theme.surface2)
@@ -350,17 +382,4 @@ extension View {
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
     }
 
-    /// Legible placeholder overlay — the system placeholder is nearly invisible on the dark
-    /// surface. Pass "" to the field itself and drive `visible` off its emptiness. Apply after
-    /// `fieldStyle()` so the 13pt inset lines up with the field's text.
-    func placeholderText(_ text: String, visible: Bool) -> some View {
-        overlay(alignment: .leading) {
-            Text(text)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.muted2)
-                .padding(.horizontal, 13)
-                .allowsHitTesting(false)
-                .opacity(visible ? 1 : 0)
-        }
-    }
 }

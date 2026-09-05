@@ -361,7 +361,9 @@ func estimateCalories(kind: CardioKind, durationSeconds: Int, distanceMetres: Do
 /// keeping. Calories are estimated from the current body weight when there
 /// is one; the logger may override the figure afterwards.
 func manualCardio(kind: CardioKind, minutes: String, distance: String, elevation: String = "", terrain: CardioTerrain? = nil) -> CardioActivity? {
-    guard let mins = decimalEntry(minutes), mins > 0 else { return nil }
+    guard let mins = decimalEntry(minutes), mins >= 1.0 / 60, mins <= 60 * 24 * 7 else { return nil }
+    guard distance.isEmpty || decimalEntry(distance).map({ $0 >= 0 && $0 <= 100_000 }) == true,
+          elevation.isEmpty || decimalEntry(elevation).map({ $0 >= 0 && $0 <= 100_000 }) == true else { return nil }
     var activity = CardioActivity(
         kind: kind,
         duration: Int((mins * 60).rounded()),
@@ -382,7 +384,8 @@ func manualCardio(kind: CardioKind, minutes: String, distance: String, elevation
 
 /// A typed number, accepting the comma decimal separator most of the world uses.
 func decimalEntry(_ text: String) -> Double? {
-    Double(text.replacingOccurrences(of: ",", with: "."))
+    guard let value = Double(text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")), value.isFinite else { return nil }
+    return value
 }
 
 // ─────────────────────────────────────────────────────────────

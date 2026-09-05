@@ -1,14 +1,15 @@
 import SwiftUI
 
 private struct PendingDeleteSetIndex: Equatable {
-    let exerciseIndex: Int
-    let setIndex: Int
+    let exerciseID: UUID
+    let setID: UUID
 }
 
 struct HistoryView: View {
     @EnvironmentObject private var app: AppState
     @State private var deleteTarget: WorkoutSession?
     @State private var editTarget: WorkoutSession?
+    @State private var deleteError: String?
 
     var body: some View {
         ScrollView {
@@ -16,7 +17,7 @@ struct HistoryView: View {
                 TitleBlock(title: "History", subtitle: "All your past sessions")
                 HStack(spacing: 10) {
                     Text(app.syncMessage)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(Theme.muted2)
                     Spacer()
                     Button {
@@ -24,9 +25,10 @@ struct HistoryView: View {
                         Task { await app.syncNow() }
                     } label: {
                         Label(app.user?.isLocal == true ? "Set Up Sync" : "Sync Now", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.caption.weight(.semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
+                            .frame(minHeight: 44)
                             .foregroundStyle(Theme.text)
                             .background(Theme.surface2)
                             .clipShape(Capsule())
@@ -50,26 +52,20 @@ struct HistoryView: View {
         .scrollIndicators(.hidden)
         .animation(AppMotion.quick, value: app.sessions)
         .animation(AppMotion.quick, value: deleteTarget)
-        .overlay {
-            if let target = deleteTarget {
-                ConfirmActionModal(
-                    title: "Delete this session?",
-                    message: "\(target.createdAt.displayDay) will be permanently removed from your history\(target.cloudID != nil ? " and the cloud" : ""). This can't be undone.",
-                    confirmTitle: "Delete Session",
-                    cancelTitle: "Keep It",
-                    systemImage: "trash"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        deleteTarget = nil
-                    }
-                    Task { await app.deleteSession(target.id) }
-                } cancel: {
-                    withAnimation(AppMotion.quick) {
-                        deleteTarget = nil
-                    }
+        .alert("Delete this session?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), presenting: deleteTarget) { target in
+            Button("Keep It", role: .cancel) { deleteTarget = nil }
+            Button("Delete Session", role: .destructive) {
+                deleteTarget = nil
+                Task {
+                    if !(await app.deleteSession(target.id)) { deleteError = app.toast ?? "Could not delete this session. Try again." }
                 }
             }
+        } message: { target in
+            Text("\(target.createdAt.displayDay) will be permanently removed from history\(target.cloudID != nil ? " and the cloud" : ""). This cannot be undone.")
         }
+        .alert("Session kept", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+            Button("OK", role: .cancel) { deleteError = nil }
+        } message: { Text(deleteError ?? "") }
         .sheet(item: $editTarget) { session in
             EditSessionSheet(session: session)
         }
@@ -78,10 +74,10 @@ struct HistoryView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "calendar")
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.muted)
             Text("No sessions yet.\nComplete your first workout.")
-                .font(.system(size: 13))
+                .font(.footnote)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Theme.muted2)
         }
@@ -109,9 +105,9 @@ struct HistoryCard: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(session.createdAt.displayDay)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                             Text(subtitle)
-                                .font(.system(size: 11))
+                                .font(.caption)
                                 .foregroundStyle(Theme.muted2)
                         }
                         Spacer()
@@ -119,7 +115,7 @@ struct HistoryCard: View {
                             Pill(text: muscle.label)
                         }
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(Theme.muted2)
                             .rotationEffect(.degrees(expanded ? 90 : 0))
                     }
@@ -138,8 +134,8 @@ struct HistoryCard: View {
                         editTarget = session
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.system(size: 14))
-                            .frame(width: 30, height: 30)
+                            .font(.subheadline)
+                            .frame(width: 44, height: 44)
                             .foregroundStyle(Theme.muted2)
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                     }
@@ -155,13 +151,14 @@ struct HistoryCard: View {
                     }
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 14))
-                        .frame(width: 30, height: 30)
+                        .font(.subheadline)
+                        .frame(width: 44, height: 44)
                         .foregroundStyle(Theme.muted2)
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Delete session from \(session.createdAt.displayDay)")
+                .disabled(app.isMutatingSession)
             }
             .padding(14)
 
@@ -173,7 +170,7 @@ struct HistoryCard: View {
                     ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, exercise in
                         HStack(alignment: .top) {
                             Text(exercise.name)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.footnote.weight(.medium))
                             Spacer(minLength: 12)
                             // One line per set, not a comma-joined run-on: a set
                             // tag ("Warm-up · 60 kg x 10") makes that string long
@@ -181,7 +178,7 @@ struct HistoryCard: View {
                             VStack(alignment: .trailing, spacing: 3) {
                                 ForEach(exercise.sets) { set in
                                     Text(setLabel(set, in: exercise))
-                                        .font(.system(size: 12))
+                                        .font(.caption)
                                         .foregroundStyle(set.type == nil ? Theme.muted2 : Theme.accent.opacity(0.85))
                                 }
                             }
@@ -189,6 +186,7 @@ struct HistoryCard: View {
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
+                    .frame(minHeight: 44)
                         .overlay(Rectangle().fill(Theme.border).frame(height: 1), alignment: .top)
                         .entrance(index, offset: 8)
                     }
@@ -198,7 +196,7 @@ struct HistoryCard: View {
                             Image(systemName: "note.text")
                             Text(note)
                         }
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(Theme.muted2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -279,17 +277,17 @@ struct HistoryCard: View {
                 }
                 .foregroundStyle(Theme.muted2)
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(.caption.weight(.medium))
         }
     }
 
     private func cardioMetric(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 22, weight: .bold))
+                .font(.title2.weight(.bold))
                 .fontWidth(.condensed)
             Text(label)
-                .font(.system(size: 10))
+                .font(.caption2)
                 .tracking(0.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted2)
@@ -299,7 +297,7 @@ struct HistoryCard: View {
     private var syncText: String {
         switch session.syncState {
         case .synced: "synced"
-        case .failed: "local"
+        case .failed: "backup failed"
         case .pending: "pending"
         case .localOnly: "local"
         }
@@ -334,6 +332,15 @@ struct EditSessionSheet: View {
     @State private var customWeighted = false
     @State private var pendingDeleteSet: PendingDeleteSetIndex?
     @FocusState private var noteFocused: Bool
+    @State private var originalExercises: [ActiveExercise] = []
+    @State private var originalNote = ""
+    @State private var didCaptureOriginal = false
+    @State private var showDiscardEdits = false
+    @State private var isSaving = false
+    @State private var saveError: String?
+
+    private var hasChanges: Bool { exercises != originalExercises || note != originalNote }
+    private var validationMessage: String? { app.sessionValidationMessage(exercises) }
 
     init(session: WorkoutSession) {
         sessionID = session.id
@@ -372,11 +379,11 @@ struct EditSessionSheet: View {
                         Spacer()
                         Button {
                             NativeFeedback.selection()
-                            dismiss()
+                            if hasChanges { showDiscardEdits = true } else { dismiss() }
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .frame(width: 30, height: 30)
+                                .font(.caption.weight(.bold))
+                                .frame(width: 44, height: 44)
                                 .foregroundStyle(Theme.muted2)
                                 .background(Theme.surface2)
                                 .clipShape(Circle())
@@ -397,6 +404,7 @@ struct EditSessionSheet: View {
                             .cardLabel()
                         TextEditor(text: $note)
                             .focused($noteFocused)
+                            .accessibilityLabel("Session note")
                             .frame(minHeight: 72)
                             .scrollContentBackground(.hidden)
                             .padding(8)
@@ -407,49 +415,65 @@ struct EditSessionSheet: View {
                     .cardStyle()
                     .id(sessionNoteAnchor)
 
+                    if let message = validationMessage ?? saveError {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.danger)
+                            .accessibilityIdentifier("session-validation-message")
+                    }
                     Button {
-                        NativeFeedback.success()
+                        isSaving = true
                         Task {
-                            await app.updateSession(id: sessionID, exercises: exercises, note: note)
-                            dismiss()
+                            let saved = await app.updateSession(id: sessionID, exercises: exercises, note: note)
+                            isSaving = false
+                            if saved { dismiss() } else { saveError = app.toast ?? "Could not save changes. Try again." }
                         }
                     } label: {
-                        Label("Save Changes", systemImage: "checkmark")
+                        Label(isSaving ? "Saving…" : "Save Changes", systemImage: "checkmark")
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("save-session-edits-button")
+                    .disabled(isSaving || validationMessage != nil)
                 }
                 .padding(18)
             }
             .scrollIndicators(.hidden)
             .keepsNoteVisible(proxy, focused: noteFocused, text: note)
+            .keyboardDismissControl()
             }
         }
         .foregroundStyle(Theme.text)
-        .overlay {
-            if let pendingDeleteSet {
-                ConfirmActionModal(
-                    title: "Remove set?",
-                    message: "This set will be removed from the session.",
-                    confirmTitle: "Remove Set",
-                    cancelTitle: "Keep It",
-                    systemImage: "minus.circle"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        let exIdx = pendingDeleteSet.exerciseIndex
-                        let stIdx = pendingDeleteSet.setIndex
-                        exercises[exIdx].sets.remove(at: stIdx)
-                        if exercises[exIdx].sets.isEmpty {
-                            exercises.remove(at: exIdx)
-                        }
-                        self.pendingDeleteSet = nil
-                    }
-                } cancel: {
-                    withAnimation(AppMotion.quick) { self.pendingDeleteSet = nil }
+        .alert("Remove set?", isPresented: Binding(get: { pendingDeleteSet != nil }, set: { if !$0 { pendingDeleteSet = nil } }), presenting: pendingDeleteSet) { target in
+            Button("Keep It", role: .cancel) { pendingDeleteSet = nil }
+            Button("Remove Set", role: .destructive) {
+                if let index = exercises.firstIndex(where: { $0.id == target.exerciseID }) {
+                    exercises[index].sets.removeAll { $0.id == target.setID }
+                    if exercises[index].sets.isEmpty { exercises.remove(at: index) }
                 }
+                pendingDeleteSet = nil
             }
-        }
+        } message: { _ in Text(deleteSetMessage) }
         .animation(AppMotion.quick, value: pendingDeleteSet)
+        .interactiveDismissDisabled(hasChanges || isSaving)
+        .onAppear {
+            guard !didCaptureOriginal else { return }
+            originalExercises = exercises
+            originalNote = note
+            didCaptureOriginal = true
+        }
+        .alert("Discard unsaved changes?", isPresented: $showDiscardEdits) {
+            Button("Keep Editing", role: .cancel) { }
+            Button("Discard Changes", role: .destructive) { dismiss() }
+        } message: {
+            Text("Your saved session will stay as it was before these edits.")
+        }
+    }
+
+    private var deleteSetMessage: String {
+        guard let target = pendingDeleteSet,
+              let exercise = exercises.first(where: { $0.id == target.exerciseID }),
+              let index = exercise.sets.firstIndex(where: { $0.id == target.setID }) else { return "Remove this set?" }
+        return "Remove set \(index + 1) of \(exercise.name)?" + (exercise.sets.count == 1 ? " This is its last set, so the exercise will also be removed. Changes take effect when you save." : " Changes take effect when you save.")
     }
 
     /// Add a forgotten exercise to an already-saved session. Mirrors the live
@@ -466,8 +490,8 @@ struct EditSessionSheet: View {
                         withAnimation(AppMotion.quick) { showAddExercise = false }
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .frame(width: 30, height: 30)
+                            .font(.caption.weight(.bold))
+                            .frame(width: 44, height: 44)
                             .foregroundStyle(Theme.muted2)
                             .background(Theme.surface2)
                             .clipShape(Circle())
@@ -501,7 +525,7 @@ struct EditSessionSheet: View {
                 withAnimation(AppMotion.quick) { showAddExercise = true }
             } label: {
                 Label("Add Exercise", systemImage: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .foregroundStyle(Theme.muted2)
@@ -530,45 +554,49 @@ struct EditSessionSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(exercise.wrappedValue.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                 if exercise.wrappedValue.bodyweight { SmallBadge("Bodyweight") }
                 if exercise.wrappedValue.timed { SmallBadge("Timed") }
                 Spacer()
             }
             ForEach(Array(exercise.wrappedValue.sets.enumerated()), id: \.element.id) { index, set in
-                // Mirrors the live log's row: no set-number column, so the
-                // set-type button has the width it needs.
+                // Keep actions above the labeled entry fields, as in the live log.
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .bottom, spacing: 8) {
-                        if !exercise.wrappedValue.timed {
-                            SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
-                                exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
-                            }
-                        }
-                        SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input") { value in
-                            exercise.wrappedValue.sets[index].reps = exercise.wrappedValue.timed
-                                ? value.filter(\.isNumber)
-                                : snapReps(value)
-                        }
+                    AdaptiveStack {
+                        Text("Set \(index + 1)").font(.subheadline.weight(.semibold))
+                        Spacer()
                         SetTypeMenu(type: exercise.sets[index].type)
                         Button {
                             NativeFeedback.selection()
                             pendingDeleteSet = PendingDeleteSetIndex(
-                                exerciseIndex: exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0,
-                                setIndex: index
+                                exerciseID: exercise.wrappedValue.id,
+                                setID: set.id
                             )
                         } label: {
-                            Image(systemName: "minus.circle")
-                                .font(.system(size: 16, weight: .semibold))
-                                .frame(width: 30, height: 34)
+                            Label("Remove", systemImage: "minus.circle")
+                                .font(.subheadline)
+                                .frame(minHeight: 44)
                                 .foregroundStyle(Theme.muted2)
                         }
                         .buttonStyle(TactileButtonStyle())
-                        .accessibilityLabel("Remove set")
+                        .accessibilityLabel("Remove set \(index + 1) of \(exercise.wrappedValue.name)")
+                    }
+                    HStack(alignment: .bottom, spacing: 8) {
+                        if !exercise.wrappedValue.timed {
+                            SmallInput(label: currentWeightUnit.fieldLabel, value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input", context: "\(exercise.wrappedValue.name), set \(index + 1),") { value in
+                                exercise.wrappedValue.sets[index].weight = value.replacingOccurrences(of: ",", with: ".")
+                            }
+                        }
+                        SmallInput(label: exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input", context: "\(exercise.wrappedValue.name), set \(index + 1),") { value in
+                            exercise.wrappedValue.sets[index].reps = exercise.wrappedValue.timed
+                                ? value.filter(\.isNumber)
+                                : snapReps(value)
+                        }
+
                     }
                     if let label = set.type?.label {
                         Text(label)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(Theme.accent.opacity(0.85))
                     }
                 }
@@ -581,9 +609,10 @@ struct EditSessionSheet: View {
                 }
             } label: {
                 Label("Add Set", systemImage: "plus")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
+                    .frame(minHeight: 44)
                     .foregroundStyle(Theme.muted2)
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, style: StrokeStyle(lineWidth: 1, dash: [5])))
             }

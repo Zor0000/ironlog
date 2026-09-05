@@ -3,6 +3,59 @@ import XCTest
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    func testCommaDecimalWeightIsNotMultipliedByTen() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+        let exercise = app.todayExercises[0]
+        app.updateSet(exerciseID: exercise.id, setID: exercise.sets[0].id, weight: "60,5", reps: "8")
+        XCTAssertEqual(app.todayExercises[0].sets[0].weight, "60.5")
+    }
+
+    func testEditorRejectsInvalidRowWithoutLosingSavedSets() async {
+        let app = AppState()
+        let session = WorkoutSession(userID: nil, createdAt: Date(), muscle: nil, split: nil, note: "original", exercises: [
+            LoggedExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [LoggedSet(weight: nil, reps: 12)])
+        ], syncState: .localOnly)
+        app.sessions = [session]
+        let edited = [ActiveExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [
+            WorkoutSet(reps: "15", done: true), WorkoutSet(reps: "", done: true)
+        ])]
+        let saved = await app.updateSession(id: session.id, exercises: edited, note: "changed")
+        XCTAssertFalse(saved)
+        XCTAssertEqual(app.sessions[0].note, "original")
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 12)
+        XCTAssertTrue(app.sessionValidationMessage(edited)?.contains("set 2") == true)
+    }
+
+    func testEditorRejectsMalformedOptionalWeight() {
+        let app = AppState()
+        let edited = [ActiveExercise(name: "Pull Ups", bodyweight: true, timed: false, sets: [
+            WorkoutSet(weight: "12..5", reps: "8", done: true)
+        ])]
+        XCTAssertNotNil(app.sessionValidationMessage(edited))
+    }
+
+    func testManualCardioRejectsMalformedOptionalValuesAndNonfiniteNumbers() {
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "abc"))
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "-5"))
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "", elevation: "-1"))
+        XCTAssertNil(manualCardio(kind: .run, minutes: "1e300", distance: ""))
+        XCTAssertNil(decimalEntry("nan"))
+        XCTAssertNil(decimalEntry("inf"))
+        XCTAssertNotNil(manualCardio(kind: .walk, minutes: "30,5", distance: ""))
+    }
+
+    func testCancelledToastDoesNotClearNewerMessage() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(name: "")
+        app.saveRoutine(name: "")
+        try? await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(app.toast, "Name the routine first")
+    }
+
     func testBlankBodyweightSetCannotBeCompleted() {
         let app = AppState()
         app.startFreeWorkout()
