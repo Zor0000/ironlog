@@ -39,6 +39,47 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.validCompletedSetCount, 1)
     }
 
+    func testCommaDecimalWeightIsNormalizedAndSavedWithoutChangingItsValue() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.setAddExerciseWeighted(true)
+        app.addExercise(name: "Bench Press")
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, weight: "60,5", reps: "8")
+
+        XCTAssertEqual(app.todayExercises[0].sets[0].weight, "60.5")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].weight, 60.5)
+    }
+
+    func testCustomSetRemarkIsTrimmedAndSaved() async {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(name: "Push Ups")
+
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "12")
+        app.setRemark(exerciseID: exerciseID, setID: setID, to: "  Slow eccentric  ")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        await app.finishWorkout(note: "")
+
+        XCTAssertEqual(app.sessions[0].exercises[0].sets[0].remark, "Slow eccentric")
+    }
+
+    func testOnlyCompletelyEmptySetSkipsDeletionConfirmation() {
+        XCTAssertFalse(WorkoutSet().hasEnteredData)
+        XCTAssertFalse(WorkoutSet(done: true).hasEnteredData)
+        XCTAssertFalse(WorkoutSet(remark: "   ").hasEnteredData)
+        XCTAssertTrue(WorkoutSet(weight: "20").hasEnteredData)
+        XCTAssertTrue(WorkoutSet(type: .warmup).hasEnteredData)
+        XCTAssertTrue(WorkoutSet(remark: "Form broke").hasEnteredData)
+    }
+
     func testClearingValueOnCompletedSetUnmarksItDone() {
         let app = AppState()
         app.startFreeWorkout()
@@ -486,7 +527,7 @@ final class AppStateTests: XCTestCase {
 
     // MARK: - Account deletion
 
-    func testDeleteAccountWipesLocalStateAndReturnsToAuthChoice() async {
+    func testDeleteWorkoutDataWipesWorkoutStateAndKeepsCurrentProfile() async {
         let app = AppState()
         app.continueLocally()
         app.startFreeWorkout()
@@ -500,14 +541,15 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.sessions.count, 1)
         XCTAssertFalse(app.personalRecords.isEmpty)
 
-        let deleted = await app.deleteAccount()
+        let deleted = await app.deleteWorkoutData()
 
         XCTAssertTrue(deleted)
         XCTAssertTrue(app.sessions.isEmpty)
         XCTAssertTrue(app.personalRecords.isEmpty)
         XCTAssertTrue(app.waterByDay.isEmpty)
         XCTAssertFalse(app.hasActiveWorkout)
-        XCTAssertTrue(app.showingAuth)
+        XCTAssertFalse(app.showingAuth)
+        XCTAssertEqual(app.user?.id, "local")
     }
 
     // MARK: - Rest notification

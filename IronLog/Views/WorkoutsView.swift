@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkoutsView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
+    @State private var routineToDelete: SavedRoutine?
 
     var body: some View {
         ScrollView {
@@ -45,6 +46,18 @@ struct WorkoutsView: View {
         .animation(AppMotion.screen, value: app.workoutStep)
         .animation(AppMotion.quick, value: app.hasActiveWorkout)
         .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
+        .alert("Delete routine?", isPresented: Binding(
+            get: { routineToDelete != nil },
+            set: { if !$0 { routineToDelete = nil } }
+        ), presenting: routineToDelete) { routine in
+            Button("Delete Routine", role: .destructive) {
+                app.deleteRoutine(routine.id)
+                routineToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { routineToDelete = nil }
+        } message: { routine in
+            Text("\(routine.name) will be permanently removed. Your saved workout history will not be affected.")
+        }
     }
 
     private var splitStep: some View {
@@ -58,9 +71,14 @@ struct WorkoutsView: View {
                     Label("Workout library unavailable", systemImage: "exclamationmark.triangle")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.danger)
-                    Text("The bundled exercise data could not be loaded. Reinstall the app or rebuild the release package.")
+                    Text("Built-in plans couldn’t load. You can still start a Free Workout above.")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
+                    Link(destination: URL(string: "mailto:neerajchormale39@gmail.com?subject=IronLog%20workout%20library")!) {
+                        Label("Contact Support", systemImage: "envelope")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.text)
+                    }
                 }
                 .cardStyle()
             } else {
@@ -106,43 +124,52 @@ struct WorkoutsView: View {
                     .cardLabel()
                     .padding(.top, 4)
                 ForEach(Array(app.routines.enumerated()), id: \.element.id) { index, routine in
-                    Button {
-                        NativeFeedback.light()
-                        withAnimation(AppMotion.smooth) {
-                            app.startRoutine(routine)
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "bookmark.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(routine.name)
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text(exerciseCount(routine))
-                                    .font(.system(size: 12))
+                    HStack(spacing: 0) {
+                        Button {
+                            NativeFeedback.light()
+                            withAnimation(AppMotion.smooth) {
+                                app.startRoutine(routine)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "bookmark.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Theme.accent)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(routine.name)
+                                        .font(.system(size: 14, weight: .semibold))
+                                    Text(exerciseCount(routine))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Theme.muted2)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(Theme.muted2)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Theme.muted2)
+                            .padding(.leading, 18)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 12)
-                        .background(Theme.surface2)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
-                    }
-                    .foregroundStyle(Theme.text)
-                    .buttonStyle(TactileButtonStyle())
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            app.deleteRoutine(routine.id)
+                        .foregroundStyle(Theme.text)
+                        .buttonStyle(TactileButtonStyle())
+
+                        Button {
+                            NativeFeedback.selection()
+                            routineToDelete = routine
                         } label: {
-                            Label("Delete Routine", systemImage: "trash")
+                            Image(systemName: "trash")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.danger)
+                                .padding(14)
                         }
+                        .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Delete \(routine.name)")
+                        .accessibilityIdentifier("delete-routine-button")
                     }
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
                     .entrance(index + 1)
                 }
             }

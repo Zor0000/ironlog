@@ -143,7 +143,7 @@ final class SupabaseService {
                         bodyweight: exercise.bodyweight,
                         timed: exercise.timed,
                         usesMinutes: exercise.usesMinutes,
-                        setType: set.type?.rawValue
+                        setType: encodeSetMetadata(type: set.type, remark: set.remark)
                     )
                 }
             }.filter { !$0.exerciseID.isEmpty }
@@ -163,10 +163,10 @@ final class SupabaseService {
         try await restDelete(path: "/rest/v1/sessions", query: [URLQueryItem(name: "id", value: "eq.\(cloudID)")])
     }
 
-    /// Deletes every row the user owns (App Store account-deletion rule).
+    /// Deletes every workout row the user owns while keeping the Auth identity.
     /// `session_sets` has no user_id column, so those go first via the
     /// session ids; RLS scopes everything to the signed-in user anyway.
-    func deleteAccount() async throws {
+    func deleteWorkoutData() async throws {
         guard let user = currentUser else { throw SupabaseError.notAuthenticated }
         let userFilter = URLQueryItem(name: "user_id", value: "eq.\(user.id)")
         let sessions: [RemoteSessionInsertResult] = try await restGet(
@@ -180,6 +180,19 @@ final class SupabaseService {
         try await restDelete(path: "/rest/v1/sessions", query: [userFilter])
         try await restDelete(path: "/rest/v1/personal_records", query: [userFilter])
         try await restDelete(path: "/rest/v1/routines", query: [userFilter])
+    }
+
+    /// The service-role key stays inside this authenticated Edge Function. The
+    /// app sends only its user JWT and never receives administrative credentials.
+    func deleteAccount() async throws {
+        guard isAuthenticated else { throw SupabaseError.notAuthenticated }
+        var request = URLRequest(url: apiURL("/functions/v1/delete-account"))
+        request.httpMethod = "POST"
+        addRestHeaders(to: &request)
+        request.httpBody = Data("{}".utf8)
+        let _: [EmptyResponse] = try await decodeWithAuthRetry(request, emptyValue: [])
+        auth = nil
+        KeychainStore.delete(service: sessionService, account: sessionAccount)
     }
 
     private func insertSession(_ session: WorkoutSession, userID: String) async throws -> RemoteSessionInsertResult {
@@ -451,8 +464,41 @@ struct RemoteSetInsert: Encodable {
     var bodyweight: Bool
     var timed: Bool
     var usesMinutes: Bool
-    /// `SetType.rawValue`, or nil for an ordinary working set.
+    /// Backward-compatible set metadata. Old rows contain `SetType.rawValue`;
+    /// rows with a custom remark use the versioned representation below.
     var setType: String?
+}
+
+private let setMetadataPrefix = "ironlog:v1:"
+
+struct StoredSetMetadata: Codable, Equatable {
+    var type: SetType?
+    var remark: String?
+}
+
+/// Keep custom remarks in the existing text column so current Supabase
+/// projects do not need a schema migration. Plain set-type values written by
+/// older app versions still decode unchanged.
+func encodeSetMetadata(type: SetType?, remark: String?) -> String? {
+    let cleanRemark = normalizedRemark(remark)
+    guard cleanRemark != nil else { return type?.rawValue }
+    let metadata = StoredSetMetadata(type: type, remark: cleanRemark)
+    guard let data = try? JSONEncoder().encode(metadata) else { return type?.rawValue }
+    return setMetadataPrefix + data.base64EncodedString()
+}
+
+func decodeSetMetadata(_ value: String?) -> StoredSetMetadata {
+    guard let value else { return StoredSetMetadata(type: nil, remark: nil) }
+    guard value.hasPrefix(setMetadataPrefix) else {
+        return StoredSetMetadata(type: SetType(rawValue: value), remark: nil)
+    }
+    let encoded = String(value.dropFirst(setMetadataPrefix.count))
+    guard let data = Data(base64Encoded: encoded),
+          var metadata = try? JSONDecoder().decode(StoredSetMetadata.self, from: data) else {
+        return StoredSetMetadata(type: nil, remark: nil)
+    }
+    metadata.remark = normalizedRemark(metadata.remark)
+    return metadata
 }
 
 struct RemotePRInsert: Encodable {
@@ -535,8 +581,9 @@ struct RemoteSession: Codable {
             let sets = grouped[name] ?? []
             let logged = sets.compactMap { set -> LoggedSet? in
                 guard let reps = set.reps else { return nil }
+                let metadata = decodeSetMetadata(set.setType)
                 return LoggedSet(weight: set.weightKg, reps: reps,
-                                 type: set.setType.flatMap(SetType.init(rawValue:)))
+                                 type: metadata.type, remark: metadata.remark)
             }
             guard !logged.isEmpty else { return nil }
             return LoggedExercise(

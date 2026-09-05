@@ -242,18 +242,36 @@ final class AppState: ObservableObject {
         authMessage = nil
     }
 
-    /// App Store account deletion: remove the user's cloud rows, wipe local
-    /// state, sign out and land on the auth/local choice screen. Returns false
-    /// when the cloud delete fails — local data is left untouched in that case.
+    /// Remove workout records while keeping the current sign-in profile.
+    @discardableResult
+    func deleteWorkoutData() async -> Bool {
+        await deleteUserData(removingAccount: false)
+    }
+
+    /// Delete the authenticated identity and all associated workout data.
     @discardableResult
     func deleteAccount() async -> Bool {
+        await deleteUserData(removingAccount: true)
+    }
+
+    private func deleteUserData(removingAccount: Bool) async -> Bool {
         isBusy = true
         defer { isBusy = false }
+        guard !removingAccount || supabase.isAuthenticated else {
+            showToast("Sign in again before deleting your account")
+            return false
+        }
         if supabase.isAuthenticated {
             do {
-                try await supabase.deleteAccount()
+                if removingAccount {
+                    try await supabase.deleteAccount()
+                } else {
+                    try await supabase.deleteWorkoutData()
+                }
             } catch {
-                showToast("Couldn't delete cloud data. Check your connection and try again.")
+                showToast(removingAccount
+                    ? "Couldn't delete your account. Check your connection and try again."
+                    : "Couldn't delete cloud data. Check your connection and try again.")
                 return false
             }
         }
@@ -261,23 +279,26 @@ final class AppState: ObservableObject {
         personalRecords = [:]
         waterByDay = [:]
         routines = []
+        bodyWeight = nil
+        currentBodyWeight = 0
         resetActiveWorkout()
-        hasOnboarded = false
         updateLiveActivity(clearedDraft: true)
-        // Chain the wipe onto the save queue so an in-flight persistAll can't
-        // re-write the snapshot after it is cleared.
-        let previous = saveTask
-        saveTask = Task { [localStore] in
-            await previous?.value
-            await localStore.clear()
-        }
+        // Persist the cleared state through the same serialized queue so an
+        // older in-flight save cannot restore deleted workout data afterward.
+        persistAll(clearDraft: true)
         await saveTask?.value
-        supabase.signOut()
-        user = nil
-        showingAuth = true
-        authMessage = nil
-        syncMessage = "Local first"
         selectedTab = .workouts
+        if removingAccount {
+            supabase.signOut()
+            user = nil
+            showingAuth = true
+            authMessage = nil
+            syncMessage = "Local first"
+            showToast("Account deleted")
+        } else {
+            syncMessage = supabase.isAuthenticated ? "Backed up to Supabase" : "Saved on this iPhone"
+            showToast("Workout data deleted")
+        }
         return true
     }
 
@@ -298,7 +319,7 @@ final class AppState: ObservableObject {
         currentWeightUnit = unit
         for ei in todayExercises.indices {
             for si in todayExercises[ei].sets.indices {
-                guard let value = Double(todayExercises[ei].sets[si].weight), value > 0 else { continue }
+                guard let value = decimalEntry(todayExercises[ei].sets[si].weight), value > 0 else { continue }
                 let kg = displayWeightToKg(value, in: oldUnit)
                 todayExercises[ei].sets[si].weight = clean(displayWeight(kg, in: unit))
             }
@@ -505,7 +526,7 @@ final class AppState: ObservableObject {
         guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
               let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
         if let weight {
-            todayExercises[ei].sets[si].weight = sanitizeDecimal(weight)
+            todayExercises[ei].sets[si].weight = sanitizeDecimalInput(weight)
         }
         if let reps {
             // Timed work types seconds/minutes, which have no halves.
@@ -529,6 +550,14 @@ final class AppState: ObservableObject {
         guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
               let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
         todayExercises[ei].sets[si].type = type
+        persistDraft()
+    }
+
+    /// Add, edit, or clear the note attached to one set.
+    func setRemark(exerciseID: ActiveExercise.ID, setID: WorkoutSet.ID, to remark: String?) {
+        guard let ei = todayExercises.firstIndex(where: { $0.id == exerciseID }),
+              let si = todayExercises[ei].sets.firstIndex(where: { $0.id == setID }) else { return }
+        todayExercises[ei].sets[si].remark = normalizedRemark(remark)
         persistDraft()
     }
 
@@ -971,7 +1000,7 @@ final class AppState: ObservableObject {
 
     private func beats(_ pr: PersonalRecord, _ set: WorkoutSet) -> Bool {
         guard set.type?.countsAsVolume ?? true,
-              let reps = Double(set.reps), reps > 0 else { return false }
+              let reps = decimalEntry(set.reps), reps > 0 else { return false }
         let weight = typedWeightKg(set) ?? 0
         return weight > pr.weight || (weight == pr.weight && reps > pr.reps)
     }
@@ -983,21 +1012,21 @@ final class AppState: ObservableObject {
     /// weighted pull-ups and dips log a weight; leaving the field blank keeps
     /// the set bodyweight. Timed sets have no weight field at all.
     private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
-        guard set.done, let reps = Double(set.reps), reps > 0 else { return nil }
+        guard set.done, let reps = decimalEntry(set.reps), reps > 0 else { return nil }
         if exercise.timed {
             // Durations are stored in seconds; cardio machines type minutes.
             let seconds = displayDurationToSeconds(Int(reps), minutes: exercise.usesMinutes)
-            return LoggedSet(weight: nil, reps: Double(seconds), type: set.type)
+            return LoggedSet(weight: nil, reps: Double(seconds), type: set.type, remark: normalizedRemark(set.remark))
         }
         guard let weight = typedWeightKg(set) else {
-            return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps, type: set.type) : nil
+            return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps, type: set.type, remark: normalizedRemark(set.remark)) : nil
         }
-        return LoggedSet(weight: weight, reps: reps, type: set.type)
+        return LoggedSet(weight: weight, reps: reps, type: set.type, remark: normalizedRemark(set.remark))
     }
 
     /// Typed weight in canonical KG, or nil when the field is blank/invalid.
     private func typedWeightKg(_ set: WorkoutSet) -> Double? {
-        guard let weight = Double(set.weight), weight >= 0 else { return nil }
+        guard let weight = decimalEntry(set.weight), weight >= 0 else { return nil }
         return displayWeightToKg(weight)
     }
 
@@ -1069,20 +1098,6 @@ final class AppState: ObservableObject {
         selectedSplit = nil
         workoutStep = .split
         resetTimer()
-    }
-
-    private func sanitizeDecimal(_ value: String) -> String {
-        var output = ""
-        var didUseDecimal = false
-        for character in value {
-            if character.isNumber {
-                output.append(character)
-            } else if character == ".", !didUseDecimal {
-                output.append(character)
-                didUseDecimal = true
-            }
-        }
-        return output
     }
 
     private func showToast(_ message: String) {
