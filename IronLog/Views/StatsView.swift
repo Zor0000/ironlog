@@ -3,7 +3,6 @@ import Liveline
 
 struct StatsView: View {
     @EnvironmentObject private var app: AppState
-    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var chartExercise: String?
     @State private var showAllRecords = false
 
@@ -11,7 +10,7 @@ struct StatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 TitleBlock(title: "Your Stats", subtitle: "Keep grinding, \(app.user?.displayName ?? "athlete")")
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 9) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                     StatCard(value: "\(app.sessions.count)", label: "Sessions")
                         .entrance(0)
                     StatCard(value: "\(app.stats.streak)", label: "Day Streak")
@@ -64,15 +63,14 @@ struct StatsView: View {
                     } label: {
                         HStack(spacing: 5) {
                             Text(selectedExercise ?? "")
-                                .font(.caption.weight(.semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(1)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.caption2.weight(.bold))
+                                .font(.system(size: 9, weight: .bold))
                         }
                         .foregroundStyle(Theme.text)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .frame(minHeight: 44)
                         .background(Theme.surface2)
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Theme.border))
@@ -86,14 +84,11 @@ struct StatsView: View {
             if points.count >= 2 {
                 LivelineChart(data: points, value: latest, color: Theme.accent, configuration: LivelineChartConfiguration(theme: .automatic))
                     .frame(height: 180)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(selectedExercise ?? "Exercise") progress")
-                    .accessibilityValue(chartPoints.map { "\($0.date.formatted(date: .abbreviated, time: .omitted)): \(clean($0.weight)) \(currentWeightUnit.label)" }.joined(separator: "; "))
             } else {
                 Text(points.count == 1
                      ? "One session logged — one more and the trend line appears."
                      : "Log weighted sets to see progress over time.")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundStyle(Theme.muted2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 12)
@@ -150,13 +145,12 @@ struct StatsView: View {
                         .scaleEffect(x: completed ? 1 : 0.96, y: completed ? 1 : 0.92)
                         .shadow(color: Theme.accent.opacity(completed ? 0.16 : 0), radius: 8)
                         .entrance(index, offset: 8)
-                        .accessibilityLabel("\(date.formatted(date: .abbreviated, time: .omitted)): \(completed ? "workout logged" : "no workout")")
                 }
             }
             HStack {
-                ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, label in
+                ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { label in
                     Text(label)
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity)
                 }
@@ -169,19 +163,35 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Water Intake Today")
                 .cardLabel()
-            Stepper(value: Binding(
-                get: { app.waterToday },
-                set: { value in
-                    app.setWater(index: value > app.waterToday ? value - 1 : value)
+            HStack {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 5), count: 8), spacing: 5) {
+                    ForEach(0..<8, id: \.self) { index in
+                        Button {
+                            NativeFeedback.selection()
+                            withAnimation(AppMotion.quick) {
+                                app.setWater(index: index)
+                            }
+                        } label: {
+                            Image(systemName: index < app.waterToday ? "drop.fill" : "drop")
+                                .font(.system(size: 14, weight: .bold))
+                                .frame(width: 30, height: 30)
+                                .foregroundStyle(Theme.blue)
+                                .background(index < app.waterToday ? Theme.blue.opacity(0.18) : Theme.surface2)
+                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(index < app.waterToday ? Theme.blue : Theme.border, lineWidth: 1.5))
+                                .scaleEffect(index < app.waterToday ? 1 : 0.96)
+                                .symbolEffect(.bounce, value: index < app.waterToday)
+                        }
+                        .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Glass \(index + 1)")
+                        .accessibilityValue(index < app.waterToday ? "Filled" : "Empty")
+                    }
                 }
-            ), in: 0...8) {
-                Label("\(app.waterToday)/8 glasses", systemImage: "drop.fill")
-                    .font(.body)
-                    .foregroundStyle(Theme.blue)
+                Spacer()
+                Text("\(app.waterToday)/8 glasses")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.muted2)
             }
-            .accessibilityLabel("Water intake today")
-            .accessibilityValue("\(app.waterToday) of 8 glasses")
-
         }
         .cardStyle()
     }
@@ -196,7 +206,7 @@ struct StatsView: View {
 
             if app.personalRecords.isEmpty {
                 Text("Complete workouts to see your PRs.")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundStyle(Theme.muted2)
             } else {
                 let sorted = app.personalRecords.values.sorted { $0.exerciseName < $1.exerciseName }
@@ -204,10 +214,10 @@ struct StatsView: View {
                 ForEach(Array(shown.enumerated()), id: \.element.id) { index, record in
                     HStack {
                         Text(record.exerciseName)
-                            .font(.footnote.weight(.medium))
+                            .font(.system(size: 13, weight: .medium))
                         Spacer()
                         Text(record.weight > 0 ? "\(formatWeight(record.weight)) x \(clean(record.reps)) reps" : "BW x \(clean(record.reps))")
-                            .font(.footnote.weight(.semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                     }
                     .padding(.vertical, 7)
@@ -220,11 +230,10 @@ struct StatsView: View {
                         withAnimation(AppMotion.quick) { showAllRecords.toggle() }
                     } label: {
                         Text(showAllRecords ? "Show less" : "Show all \(sorted.count)")
-                            .font(.caption.weight(.semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 4)
-                            .frame(minHeight: 44)
                     }
                     .buttonStyle(TactileButtonStyle())
                 }
@@ -252,12 +261,12 @@ struct StatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(value)
-                .font(.largeTitle.weight(.black))
+                .font(.system(size: 36, weight: .black))
                 .fontWidth(.condensed)
                 .foregroundStyle(Theme.accent)
                 .contentTransition(.numericText())
             Text(label)
-                .font(.caption)
+                .font(.system(size: 11))
                 .tracking(0.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted2)

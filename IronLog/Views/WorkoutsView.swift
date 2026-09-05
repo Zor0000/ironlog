@@ -3,7 +3,6 @@ import SwiftUI
 struct WorkoutsView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
-    @State private var deleteRoutineTarget: SavedRoutine?
 
     var body: some View {
         ScrollView {
@@ -46,12 +45,6 @@ struct WorkoutsView: View {
         .animation(AppMotion.screen, value: app.workoutStep)
         .animation(AppMotion.quick, value: app.hasActiveWorkout)
         .discardWorkoutOverlay(isPresented: $showDiscardConfirmation)
-        .alert("Delete routine?", isPresented: Binding(get: { deleteRoutineTarget != nil }, set: { if !$0 { deleteRoutineTarget = nil } }), presenting: deleteRoutineTarget) { routine in
-            Button("Keep Routine", role: .cancel) { deleteRoutineTarget = nil }
-            Button("Delete Routine", role: .destructive) { app.deleteRoutine(routine.id); deleteRoutineTarget = nil }
-        } message: { routine in
-            Text("Remove \(routine.name) from My Routines? Your current workout and saved history will be kept.")
-        }
     }
 
     private var splitStep: some View {
@@ -63,10 +56,10 @@ struct WorkoutsView: View {
             if app.library.splits.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Workout library unavailable", systemImage: "exclamationmark.triangle")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.danger)
-                    Text("You can still start a free workout and add your own exercises. Contact Support in Settings if the library stays unavailable.")
-                        .font(.caption)
+                    Text("The bundled exercise data could not be loaded. Reinstall the app or rebuild the release package.")
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
                 .cardStyle()
@@ -83,10 +76,10 @@ struct WorkoutsView: View {
                                 Text(split)
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.bold))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(Theme.muted2)
                             }
-                            .font(.subheadline.weight(.medium))
+                            .font(.system(size: 14, weight: .medium))
                             .padding(.horizontal, 18)
                             .padding(.vertical, 14)
                             .background(Theme.surface2)
@@ -113,7 +106,6 @@ struct WorkoutsView: View {
                     .cardLabel()
                     .padding(.top, 4)
                 ForEach(Array(app.routines.enumerated()), id: \.element.id) { index, routine in
-                    HStack(spacing: 8) {
                     Button {
                         NativeFeedback.light()
                         withAnimation(AppMotion.smooth) {
@@ -122,18 +114,18 @@ struct WorkoutsView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "bookmark.fill")
-                                .font(.footnote.weight(.semibold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Theme.accent)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(routine.name)
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(.system(size: 14, weight: .semibold))
                                 Text(exerciseCount(routine))
-                                    .font(.caption)
+                                    .font(.system(size: 12))
                                     .foregroundStyle(Theme.muted2)
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(Theme.muted2)
                         }
                         .padding(.horizontal, 18)
@@ -144,15 +136,12 @@ struct WorkoutsView: View {
                     }
                     .foregroundStyle(Theme.text)
                     .buttonStyle(TactileButtonStyle())
-                    Menu {
-                        Button(role: .destructive) { deleteRoutineTarget = routine } label: {
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            app.deleteRoutine(routine.id)
+                        } label: {
                             Label("Delete Routine", systemImage: "trash")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Actions for \(routine.name)")
                     }
                     .entrance(index + 1)
                 }
@@ -177,22 +166,22 @@ struct WorkoutsView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "bolt.fill")
-                    .font(.body.weight(.bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.black)
                     .frame(width: 40, height: 40)
                     .background(Theme.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Free Workout")
-                        .font(.body.weight(.bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Theme.text)
                     Text("Start empty — add any exercise on the fly")
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
                 Spacer()
                 Image(systemName: "arrow.right")
-                    .font(.footnote.weight(.bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.accent)
             }
             .padding(14)
@@ -225,10 +214,10 @@ struct WorkoutsView: View {
                         Text(day.day)
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Theme.muted2)
                     }
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 15, weight: .medium))
                     .padding(.horizontal, 18)
                     .padding(.vertical, 15)
                     .background(Theme.surface2)
@@ -270,10 +259,10 @@ struct WorkoutsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 7) {
                         Image(systemName: muscle.systemImage)
-                            .font(.footnote.weight(.semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.accent)
                         Text(muscle.label)
-                            .font(.body.weight(.bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(Theme.text)
                     }
                     .padding(.top, 4)
@@ -309,13 +298,13 @@ struct CurrentWorkoutBanner: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "bolt.circle.fill")
-                    .font(.title2.weight(.semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Workout in progress")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 15, weight: .semibold))
                     Text(summary)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
                 Spacer()
@@ -336,7 +325,7 @@ struct CurrentWorkoutBanner: View {
                     showDiscardConfirmation = true
                 } label: {
                     Image(systemName: "trash")
-                        .font(.subheadline.weight(.bold))
+                        .font(.system(size: 14, weight: .bold))
                         .frame(width: 46, height: 46)
                         .foregroundStyle(Theme.danger)
                         .background(Theme.surface2)
@@ -377,15 +366,15 @@ struct ExerciseSuggestionCard: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(exercise.name)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.system(size: 15, weight: .semibold))
                         Text(meta)
-                            .font(.caption)
+                            .font(.system(size: 12))
                             .foregroundStyle(Theme.muted2)
                     }
                     Spacer()
                     if record != nil {
                         Label("PR", systemImage: "trophy")
-                            .font(.caption2.weight(.bold))
+                            .font(.system(size: 10, weight: .bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .foregroundStyle(.black)
@@ -395,7 +384,7 @@ struct ExerciseSuggestionCard: View {
                 }
                 if showTip {
                     Text(exercise.tip)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.accent)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -429,7 +418,7 @@ struct TitleBlock: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).sectionTitle()
             Text(subtitle)
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.muted2)
         }
     }
@@ -442,7 +431,7 @@ struct BackButton: View {
     var body: some View {
         Button(action: action) {
             Label(label, systemImage: "chevron.left")
-                .font(.footnote.weight(.medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.muted2)
                 .padding(.vertical, 4)
         }

@@ -10,7 +10,7 @@ enum Theme {
     static let accentDim = Color(red: 0.831, green: 1.0, blue: 0.29).opacity(0.12)
     static let text = Color(red: 0.937, green: 0.937, blue: 0.937)
     // Kept above ~4.5:1 contrast on bg/surface2 — don't darken below this.
-    static let muted = Color(red: 0.56, green: 0.56, blue: 0.56)
+    static let muted = Color(red: 0.48, green: 0.48, blue: 0.48)
     static let muted2 = Color(red: 0.64, green: 0.64, blue: 0.64)
     static let success = Color(red: 0.29, green: 0.87, blue: 0.50)
     static let danger = Color(red: 1.0, green: 0.267, blue: 0.267)
@@ -110,7 +110,7 @@ extension View {
     }
 
     func sectionTitle() -> some View {
-        font(.title2.weight(.black))
+        font(.system(size: 22, weight: .black))
             .fontWidth(.condensed)
             .textCase(.uppercase)
             .tracking(1)
@@ -119,7 +119,7 @@ extension View {
 
     /// Small uppercase label heading a card section ("Weight Unit", "Session Note").
     func cardLabel() -> some View {
-        font(.caption.weight(.semibold))
+        font(.system(size: 11, weight: .semibold))
             .tracking(1.5)
             .textCase(.uppercase)
             .foregroundStyle(Theme.muted)
@@ -173,10 +173,9 @@ private struct EntranceModifier: ViewModifier {
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body.weight(.bold))
+            .font(.system(size: 15, weight: .bold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .foregroundStyle(.black)
@@ -185,7 +184,6 @@ struct PrimaryButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .shadow(color: Theme.accent.opacity(configuration.isPressed ? 0.08 : 0.2), radius: configuration.isPressed ? 8 : 18, y: configuration.isPressed ? 3 : 9)
             .animation(AppMotion.tap, value: configuration.isPressed)
-            .opacity(isEnabled ? 1 : 0.45)
     }
 }
 
@@ -193,12 +191,11 @@ struct PrimaryButtonStyle: ButtonStyle {
 /// action" counterpart to `PrimaryButtonStyle` (Continue locally, modal cancel,
 /// settings rows). `tint` colors the label; pass `Theme.danger` for destructive.
 struct SecondaryButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
     var tint: Color = Theme.text
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
+            .font(.system(size: 14, weight: .semibold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
             .foregroundStyle(tint)
@@ -207,7 +204,6 @@ struct SecondaryButtonStyle: ButtonStyle {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(AppMotion.tap, value: configuration.isPressed)
-            .opacity(isEnabled ? 1 : 0.45)
     }
 }
 
@@ -228,7 +224,7 @@ struct Pill: View {
     var body: some View {
         HStack(spacing: 5) {
             if let icon {
-                Image(systemName: icon).font(.caption.weight(.semibold))
+                Image(systemName: icon).font(.system(size: 11, weight: .semibold))
             }
             Text(text)
         }
@@ -236,53 +232,9 @@ struct Pill: View {
         .foregroundStyle(isActive ? .black : Theme.text)
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
-        .frame(minHeight: 44)
         .background(isActive ? Theme.accent : Theme.surface2)
         .clipShape(Capsule())
         .overlay(Capsule().stroke(isActive ? Theme.accent : Theme.border))
         .animation(AppMotion.quick, value: isActive)
-    }
-}
-
-struct KeyboardDismissModifier: ViewModifier {
-    @State private var keyboardVisible = false
-
-    func body(content: Content) -> some View {
-        content
-            .scrollDismissesKeyboard(.interactively)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if keyboardVisible {
-                    HStack {
-                        Spacer()
-                        Button("Done") {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        }
-                        .font(.body.weight(.semibold))
-                        .frame(minWidth: 60, minHeight: 44)
-                    }
-                    .padding(.horizontal, 18)
-                    .background(Theme.surface)
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
-    }
-}
-
-extension View {
-    func keyboardDismissControl() -> some View { modifier(KeyboardDismissModifier()) }
-}
-
-/// Dense horizontal groups become vertical at accessibility text sizes.
-struct AdaptiveStack<Content: View>: View {
-    @Environment(\.dynamicTypeSize) private var typeSize
-    var spacing: CGFloat = 8
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        let layout = typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
-            : AnyLayout(HStackLayout(spacing: spacing))
-        layout { content() }
     }
 }

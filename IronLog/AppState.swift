@@ -9,7 +9,6 @@ final class AppState: ObservableObject {
     @Published var authMessage: String?
     @Published var toast: String?
     @Published var isBusy = false
-    @Published private(set) var isMutatingSession = false
 
     @Published var selectedSplit: String?
     @Published var selectedDay: String?
@@ -262,8 +261,6 @@ final class AppState: ObservableObject {
         personalRecords = [:]
         waterByDay = [:]
         routines = []
-        bodyWeight = nil
-        currentBodyWeight = 0
         resetActiveWorkout()
         hasOnboarded = false
         updateLiveActivity(clearedDraft: true)
@@ -735,35 +732,21 @@ final class AppState: ObservableObject {
         }
     }
 
-    @discardableResult
-    func deleteSession(_ id: WorkoutSession.ID) async -> Bool {
-        guard !isMutatingSession, let session = sessions.first(where: { $0.id == id }) else { return false }
-        isMutatingSession = true
-        defer { isMutatingSession = false }
-        if let cloudID = session.cloudID {
-            do { try await supabase.deleteCloudSession(cloudID) }
-            catch {
-                showToast("Could not delete the cloud copy. Your session is unchanged. Check your connection and try again.")
-                return false
-            }
-        }
+    func deleteSession(_ id: WorkoutSession.ID) async {
+        guard let session = sessions.first(where: { $0.id == id }) else { return }
         sessions.removeAll { $0.id == id }
         recalculateRecords()
         persistAll()
-        showToast("Session deleted")
-        return true
+        if let cloudID = session.cloudID {
+            try? await supabase.deleteCloudSession(cloudID)
+        }
     }
 
     /// Save an edited past session. Sets pass through the same `loggedSet`
     /// validation as a live workout, PRs are recomputed (an edit can raise or
     /// lower one), and the session re-enters the existing pending-sync queue.
-    @discardableResult
-    func updateSession(id: WorkoutSession.ID, exercises: [ActiveExercise], note: String) async -> Bool {
-        guard !isMutatingSession, sessions.contains(where: { $0.id == id }) else { return false }
-        if let message = sessionValidationMessage(exercises) {
-            showToast(message)
-            return false
-        }
+    func updateSession(id: WorkoutSession.ID, exercises: [ActiveExercise], note: String) async {
+        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         let logged = exercises.compactMap { exercise -> LoggedExercise? in
             let sets = exercise.sets.compactMap { loggedSet(for: exercise, set: $0) }
             guard !sets.isEmpty else { return nil }
@@ -771,19 +754,10 @@ final class AppState: ObservableObject {
         }
         guard !logged.isEmpty else {
             showToast("Keep at least one valid set")
-            return false
+            return
         }
-        isMutatingSession = true
-        defer { isMutatingSession = false }
-        if let oldCloudID = sessions.first(where: { $0.id == id })?.cloudID {
-            do { try await supabase.deleteCloudSession(oldCloudID) }
-            catch {
-                showToast("Could not update the cloud copy. Your edits are still here. Check your connection and try again.")
-                return false
-            }
-        }
-        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return false }
         var session = sessions[index]
+        let oldCloudID = session.cloudID
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         session.exercises = logged
         session.note = trimmedNote.isEmpty ? nil : trimmedNote
@@ -793,8 +767,13 @@ final class AppState: ObservableObject {
         recalculateRecords()
         persistAll()
         showToast("Session updated")
-        Task { await syncPending() }
-        return true
+        // Replace-in-cloud = delete the old row, let the pending queue re-insert.
+        // ponytail: if the delete fails offline the stale copy can resurface on
+        // the next pull (same ceiling as deleteSession); a tombstone queue fixes both.
+        if let oldCloudID {
+            try? await supabase.deleteCloudSession(oldCloudID)
+        }
+        await syncPending()
     }
 
     func setWater(index: Int) {
@@ -1000,30 +979,16 @@ final class AppState: ObservableObject {
     /// Input→storage boundary: typed weight strings are in the display unit;
     /// convert to canonical KG here, the one place drafts become LoggedSets.
     ///
-    /// The editor must never silently drop an invalid row from a saved session.
-    func sessionValidationMessage(_ exercises: [ActiveExercise]) -> String? {
-        guard !exercises.isEmpty, exercises.contains(where: { !$0.sets.isEmpty }) else {
-            return "Keep at least one valid set."
-        }
-        for exercise in exercises {
-            for (index, set) in exercise.sets.enumerated() {
-                if loggedSet(for: exercise, set: set) == nil {
-                    return "\(exercise.name), set \(index + 1): enter valid \(exercise.timed ? "duration" : exercise.bodyweight ? "reps and an optional weight" : "weight and reps"), or remove this set."
-                }
-            }
-        }
-        return nil
-    }
-
-    /// Bodyweight exercises allow an optional load; timed sets have no weight.
+    /// `bodyweight` means weight is *optional*, not forbidden — loaded lunges,
+    /// weighted pull-ups and dips log a weight; leaving the field blank keeps
+    /// the set bodyweight. Timed sets have no weight field at all.
     private func loggedSet(for exercise: ActiveExercise, set: WorkoutSet) -> LoggedSet? {
-        guard set.done, let reps = decimalEntry(set.reps), reps > 0, reps < Double(Int.max / 60) else { return nil }
+        guard set.done, let reps = Double(set.reps), reps > 0 else { return nil }
         if exercise.timed {
             // Durations are stored in seconds; cardio machines type minutes.
             let seconds = displayDurationToSeconds(Int(reps), minutes: exercise.usesMinutes)
             return LoggedSet(weight: nil, reps: Double(seconds), type: set.type)
         }
-        guard set.weight.isEmpty || typedWeightKg(set) != nil else { return nil }
         guard let weight = typedWeightKg(set) else {
             return exercise.bodyweight ? LoggedSet(weight: nil, reps: reps, type: set.type) : nil
         }
@@ -1032,7 +997,7 @@ final class AppState: ObservableObject {
 
     /// Typed weight in canonical KG, or nil when the field is blank/invalid.
     private func typedWeightKg(_ set: WorkoutSet) -> Double? {
-        guard let weight = decimalEntry(set.weight), weight >= 0 else { return nil }
+        guard let weight = Double(set.weight), weight >= 0 else { return nil }
         return displayWeightToKg(weight)
     }
 
@@ -1112,8 +1077,8 @@ final class AppState: ObservableObject {
         for character in value {
             if character.isNumber {
                 output.append(character)
-            } else if (character == "." || character == ","), !didUseDecimal {
-                output.append(".")
+            } else if character == ".", !didUseDecimal {
+                output.append(character)
                 didUseDecimal = true
             }
         }
@@ -1124,8 +1089,7 @@ final class AppState: ObservableObject {
         toast = message
         toastTask?.cancel()
         toastTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(5))
-            guard !Task.isCancelled else { return }
+            try? await Task.sleep(for: .seconds(2))
             await MainActor.run {
                 self?.toast = nil
             }

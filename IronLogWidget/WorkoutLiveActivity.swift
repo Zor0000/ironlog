@@ -172,7 +172,6 @@ private struct LockScreenView: View {
                     navIcon("chevron.left")
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Previous exercise")
                 .disabled(isFirst)
                 .opacity(isFirst ? 0.4 : 1)
             }
@@ -194,7 +193,6 @@ private struct LockScreenView: View {
                     navIcon("chevron.right")
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Next exercise")
                 .disabled(isLast)
                 .opacity(isLast ? 0.4 : 1)
             }
@@ -306,8 +304,6 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
             HStack(spacing: 0) {
                 Button(intent: down) { stepIcon("minus") }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Decrease \(label)")
-                    .accessibilityValue(value)
                 Spacer(minLength: 4)
                 Text(value)
                     .font(.system(size: 22, weight: .bold))
@@ -318,8 +314,6 @@ private struct StepperTile<Down: AppIntent, Up: AppIntent>: View {
                 Spacer(minLength: 4)
                 Button(intent: up) { stepIcon("plus") }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Increase \(label)")
-                    .accessibilityValue(value)
             }
         }
         .padding(.vertical, size.vPadding)
@@ -458,7 +452,6 @@ private struct ExpandedControls: View {
                             .background(WidgetPalette.secondaryButton, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Undo last completed set")
                 } else {
                     Button(intent: LogSetIntent()) {
                         Image(systemName: "checkmark")
@@ -468,7 +461,6 @@ private struct ExpandedControls: View {
                             .background(WidgetPalette.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Log current set")
                 }
             }
             .padding(.top, 2)

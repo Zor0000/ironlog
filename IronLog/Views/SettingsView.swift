@@ -4,9 +4,7 @@ import UserNotifications
 struct SettingsView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     @State private var showDeleteConfirmation = false
-    @State private var deletionError: String?
     @State private var notificationStatus: UNAuthorizationStatus?
     @State private var bodyWeightText = ""
     @FocusState private var bodyWeightFocused: Bool
@@ -24,8 +22,8 @@ struct SettingsView: View {
                             dismiss()
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.caption.weight(.bold))
-                                .frame(width: 44, height: 44)
+                                .font(.system(size: 12, weight: .bold))
+                                .frame(width: 30, height: 30)
                                 .foregroundStyle(Theme.muted2)
                                 .background(Theme.surface2)
                                 .clipShape(Circle())
@@ -33,7 +31,6 @@ struct SettingsView: View {
                         }
                         .buttonStyle(TactileButtonStyle())
                         .accessibilityLabel("Close settings")
-                        .disabled(app.isBusy)
                     }
                     accountCard
                     unitsCard
@@ -45,32 +42,32 @@ struct SettingsView: View {
                 .padding(18)
             }
             .scrollIndicators(.hidden)
-            .keyboardDismissControl()
 
-
-        }
-        .alert("Delete workout data?", isPresented: $showDeleteConfirmation) {
-            Button("Keep My Data", role: .cancel) { }
-            Button("Delete Workout Data", role: .destructive) {
-                Task {
-                    if await app.deleteAccount() { dismiss() }
-                    else { deletionError = app.toast ?? "Could not delete data. Try again." }
+            if showDeleteConfirmation {
+                ConfirmActionModal(
+                    title: "Delete account?",
+                    message: "This permanently deletes your workouts, records and account data from this iPhone and the cloud. This cannot be undone.",
+                    confirmTitle: "Delete Everything",
+                    cancelTitle: "Keep My Data",
+                    systemImage: "trash"
+                ) {
+                    withAnimation(AppMotion.smooth) {
+                        showDeleteConfirmation = false
+                    }
+                    Task {
+                        if await app.deleteAccount() {
+                            dismiss()
+                        }
+                    }
+                } cancel: {
+                    withAnimation(AppMotion.quick) {
+                        showDeleteConfirmation = false
+                    }
                 }
             }
-        } message: {
-            Text("This permanently deletes your workout data from this iPhone and, if signed in, the cloud. Your sign-in account remains. This cannot be undone.")
         }
-        .alert("Could not delete data", isPresented: Binding(get: { deletionError != nil }, set: { if !$0 { deletionError = nil } })) {
-            Button("OK", role: .cancel) { deletionError = nil }
-        } message: { Text(deletionError ?? "") }
-        .interactiveDismissDisabled(app.isBusy)
         .foregroundStyle(Theme.text)
         .animation(AppMotion.quick, value: showDeleteConfirmation)
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                Task { notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus }
-            }
-        }
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         }
@@ -83,13 +80,13 @@ struct SettingsView: View {
             sectionLabel("Account")
             HStack(spacing: 10) {
                 Image(systemName: isCloudUser ? "person.crop.circle.badge.checkmark" : "iphone")
-                    .font(.title3)
+                    .font(.system(size: 20))
                     .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(isCloudUser ? (app.user?.email ?? "") : "Local — saved on this iPhone")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.system(size: 15, weight: .semibold))
                     Text(app.syncMessage)
-                        .font(.caption)
+                        .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
                 }
             }
@@ -104,15 +101,11 @@ struct SettingsView: View {
                     app.showAuth()
                 }
             }
-            settingsButton(app.isBusy ? "Deleting Data…" : "Delete Workout Data", systemImage: "trash", tint: Theme.danger) {
+            settingsButton("Delete Account & Data", systemImage: "trash", tint: Theme.danger) {
                 showDeleteConfirmation = true
             }
             .accessibilityIdentifier("delete-account-button")
             .disabled(app.isBusy)
-            if isCloudUser {
-                Text("Deleting workout data keeps your sign-in account. Contact Support below to request account deletion.")
-                    .font(.footnote).foregroundStyle(Theme.muted2)
-            }
         }
         .cardStyle()
     }
@@ -126,7 +119,7 @@ struct SettingsView: View {
     private var unitsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionLabel("Weight Unit")
-            Picker("Weight unit", selection: Binding(
+            Picker("", selection: Binding(
                 get: { app.unitPreference },
                 set: { app.setUnitPreference($0) }
             )) {
@@ -135,7 +128,7 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             Text("Weights are stored in kg and converted for display, so switching is always safe.")
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.muted2)
         }
         .cardStyle()
@@ -152,14 +145,13 @@ struct SettingsView: View {
             HStack {
                 TextField("70.0", text: $bodyWeightText)
                     .keyboardType(.decimalPad)
-                    .font(.title2.weight(.bold))
+                    .font(.system(size: 24, weight: .bold))
                     .fontWidth(.condensed)
                     .focused($bodyWeightFocused)
                     .frame(width: 110)
                     .accessibilityIdentifier("body-weight-field")
-                    .accessibilityLabel("Body weight in \(currentWeightUnit.label)")
                 Text(currentWeightUnit.label)
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.muted2)
                 Spacer()
             }
@@ -168,18 +160,13 @@ struct SettingsView: View {
             .background(Theme.surface2)
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
-            if !bodyWeightText.isEmpty && (decimalEntry(bodyWeightText).map { $0 > 0 } != true) {
-                Text("Enter a weight greater than zero, or clear the field to remove it.")
-                    .font(.footnote).foregroundStyle(Theme.danger)
-            }
-            Text("Used to estimate calories for runs and walks. Clear the field to remove your weight.")
-                .font(.caption)
+            Text("Used to estimate calories for runs and walks.")
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.muted2)
         }
         .cardStyle()
         .onAppear { bodyWeightText = app.bodyWeight.map(formatWeightValue) ?? "" }
         .onChange(of: bodyWeightText) { _, text in
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { app.setBodyWeight(nil); return }
             guard let value = decimalEntry(text), value > 0 else { return }
             app.setBodyWeight(displayWeightToKg(value))
         }
@@ -189,7 +176,12 @@ struct SettingsView: View {
             bodyWeightFocused = false
             bodyWeightText = app.bodyWeight.map(formatWeightValue) ?? ""
         }
-
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { bodyWeightFocused = false }
+            }
+        }
     }
 
     // MARK: Rest timer default
@@ -197,7 +189,7 @@ struct SettingsView: View {
     private var timerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionLabel("Rest Timer Default")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 80))], spacing: 8) {
+            HStack(spacing: 8) {
                 ForEach(restTimerPresets, id: \.self) { value in
                     Button {
                         NativeFeedback.selection()
@@ -220,10 +212,10 @@ struct SettingsView: View {
             sectionLabel("Rest Notifications")
             HStack(spacing: 8) {
                 Circle()
-                    .fill(notificationStatus == .denied ? Theme.danger : notificationStatus == .notDetermined || notificationStatus == nil ? Theme.muted2 : Theme.success)
+                    .fill(notificationStatus == .denied ? Theme.danger : Theme.success)
                     .frame(width: 8, height: 8)
                 Text(notificationStatusText)
-                    .font(.footnote)
+                    .font(.system(size: 13))
                     .foregroundStyle(Theme.muted2)
             }
             if notificationStatus == .denied {
@@ -252,10 +244,10 @@ struct SettingsView: View {
             sectionLabel("About")
             HStack {
                 Text("Version")
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                 Spacer()
                 Text(appVersion)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.muted2)
             }
             Link(destination: URL(string: "https://zor0000.github.io/ironlog/privacy.html")!) {
@@ -275,14 +267,13 @@ struct SettingsView: View {
     private func aboutRow(_ title: String, systemImage: String) -> some View {
         HStack {
             Label(title, systemImage: systemImage)
-                .font(.subheadline)
+                .font(.system(size: 14))
             Spacer()
             Image(systemName: "arrow.up.right")
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.muted2)
         }
         .foregroundStyle(Theme.text)
-        .frame(minHeight: 44)
     }
 
     // MARK: Shared bits
