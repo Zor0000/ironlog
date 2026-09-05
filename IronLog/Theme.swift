@@ -9,8 +9,8 @@ enum Theme {
     static let accent = Color(red: 0.831, green: 1.0, blue: 0.29)
     static let accentDim = Color(red: 0.831, green: 1.0, blue: 0.29).opacity(0.12)
     static let text = Color(red: 0.937, green: 0.937, blue: 0.937)
-    // Kept above ~4.5:1 contrast on bg/surface2 — don't darken below this.
-    static let muted = Color(red: 0.48, green: 0.48, blue: 0.48)
+    // Just over 4.5:1 on surface2: readable without competing with body text.
+    static let muted = Color(red: 0.52, green: 0.52, blue: 0.52)
     static let muted2 = Color(red: 0.64, green: 0.64, blue: 0.64)
     static let success = Color(red: 0.29, green: 0.87, blue: 0.50)
     static let danger = Color(red: 1.0, green: 0.267, blue: 0.267)
@@ -173,17 +173,21 @@ private struct EntranceModifier: ViewModifier {
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 15, weight: .bold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .foregroundStyle(.black)
-            .background(Theme.accent.opacity(configuration.isPressed ? 0.85 : 1))
+            .background(Theme.accent.opacity(configuration.isPressed && isEnabled ? 0.85 : 1))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .shadow(color: Theme.accent.opacity(configuration.isPressed ? 0.08 : 0.2), radius: configuration.isPressed ? 8 : 18, y: configuration.isPressed ? 3 : 9)
+            .scaleEffect(configuration.isPressed && isEnabled ? 0.97 : 1)
+            .shadow(color: Theme.accent.opacity(isEnabled ? (configuration.isPressed ? 0.08 : 0.2) : 0), radius: configuration.isPressed ? 8 : 18, y: configuration.isPressed ? 3 : 9)
+            .opacity(isEnabled ? 1 : 0.45)
             .animation(AppMotion.tap, value: configuration.isPressed)
+            .animation(AppMotion.quick, value: isEnabled)
     }
 }
 
@@ -191,6 +195,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 /// action" counterpart to `PrimaryButtonStyle` (Continue locally, modal cancel,
 /// settings rows). `tint` colors the label; pass `Theme.danger` for destructive.
 struct SecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     var tint: Color = Theme.text
 
     func makeBody(configuration: Configuration) -> some View {
@@ -202,17 +207,23 @@ struct SecondaryButtonStyle: ButtonStyle {
             .background(Theme.surface2)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed && isEnabled ? 0.97 : 1)
+            .opacity(isEnabled ? 1 : 0.45)
             .animation(AppMotion.tap, value: configuration.isPressed)
+            .animation(AppMotion.quick, value: isEnabled)
     }
 }
 
 struct TactileButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.955 : 1)
-            .brightness(configuration.isPressed ? -0.04 : 0)
+            .scaleEffect(configuration.isPressed && isEnabled ? 0.955 : 1)
+            .brightness(configuration.isPressed && isEnabled ? -0.04 : 0)
+            .opacity(isEnabled ? 1 : 0.45)
             .animation(AppMotion.tap, value: configuration.isPressed)
+            .animation(AppMotion.quick, value: isEnabled)
     }
 }
 

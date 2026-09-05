@@ -428,22 +428,15 @@ struct LogExerciseCard: View {
 
                 Button {
                     NativeFeedback.selection()
-                    if exercise.hasLoggedData {
-                        onConfirmDelete()
-                    } else {
-                        withAnimation(AppMotion.quick) {
-                            app.removeExercise(exercise.id)
-                        }
-                    }
+                    onConfirmDelete()
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.muted2)
-                        .frame(width: 30, height: 30)
-                        .contentShape(Rectangle())
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Remove \(exercise.name)")
+                .accessibilityIdentifier("remove-exercise-button")
             }
             .padding(14)
 
@@ -528,23 +521,35 @@ struct LogExerciseCard: View {
                 .accessibilityIdentifier("set-done-button")
                 .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
 
-                SetTypeMenu(type: Binding(
-                    get: { set.type },
-                    set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
-                ))
+                SetTypeMenu(
+                    type: Binding(
+                        get: { set.type },
+                        set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
+                    ),
+                    remark: Binding(
+                        get: { set.remark },
+                        set: { app.setRemark(exerciseID: exercise.id, setID: set.id, to: $0) }
+                    )
+                )
 
                 Button {
                     NativeFeedback.selection()
-                    onConfirmDeleteSet(exercise.id, set.id)
+                    if set.hasEnteredData {
+                        onConfirmDeleteSet(exercise.id, set.id)
+                    } else {
+                        withAnimation(AppMotion.quick) {
+                            app.removeSet(exerciseID: exercise.id, setID: set.id)
+                        }
+                    }
                 } label: {
                     Image(systemName: "minus.circle")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 30, height: 34)
                         .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
                 }
                 .buttonStyle(TactileButtonStyle())
                 .disabled(exercise.sets.count <= 1)
                 .accessibilityLabel("Remove set")
+                .accessibilityIdentifier("remove-set-button")
             }
 
             if let subtitle = setSubtitle(set, refSet) {
@@ -559,7 +564,7 @@ struct LogExerciseCard: View {
     /// The set's tag and last time's numbers share one line, so a tag costs no
     /// vertical space in a row that already had none to give.
     private func setSubtitle(_ set: WorkoutSet, _ refSet: LoggedSet?) -> String? {
-        let parts = [set.type?.label, referenceLabel(refSet)].compactMap { $0 }
+        let parts = [set.type?.label, normalizedRemark(set.remark), referenceLabel(refSet)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -590,6 +595,9 @@ struct LogExerciseCard: View {
 /// and the session editor (which writes into its own draft) share one menu.
 struct SetTypeMenu: View {
     @Binding var type: SetType?
+    @Binding var remark: String?
+    @State private var remarkDraft = ""
+    @State private var showRemarkEditor = false
 
     var body: some View {
         Menu {
@@ -606,14 +614,42 @@ struct SetTypeMenu: View {
                 }
             }
             .pickerStyle(.inline)
+            Divider()
+            Button {
+                remarkDraft = remark ?? ""
+                showRemarkEditor = true
+            } label: {
+                Label(normalizedRemark(remark) == nil ? "Add Custom Remark" : "Edit Custom Remark", systemImage: "square.and.pencil")
+            }
         } label: {
-            Image(systemName: type == nil ? "note.text" : "note.text.badge.plus")
+            Image(systemName: type == nil && normalizedRemark(remark) == nil ? "note.text" : "note.text.badge.plus")
                 .font(.system(size: 16, weight: .semibold))
                 .frame(width: 28, height: 34)
-                .foregroundStyle(type == nil ? Theme.muted2 : Theme.accent)
+                .foregroundStyle(type == nil && normalizedRemark(remark) == nil ? Theme.muted2 : Theme.accent)
         }
         .accessibilityIdentifier("set-type-button")
-        .accessibilityLabel(type.map { "Set type: \($0.label)" } ?? "Set type")
+        .accessibilityLabel(accessibilityLabel)
+        .alert("Set remark", isPresented: $showRemarkEditor) {
+            TextField("e.g. Slow eccentric", text: $remarkDraft)
+            Button("Save") {
+                remark = normalizedRemark(remarkDraft)
+                remarkDraft = ""
+            }
+            if normalizedRemark(remark) != nil {
+                Button("Remove Remark", role: .destructive) {
+                    remark = nil
+                    remarkDraft = ""
+                }
+            }
+            Button("Cancel", role: .cancel) { remarkDraft = "" }
+        } message: {
+            Text("Add a short note about form, tempo, effort, or anything you want to remember.")
+        }
+    }
+
+    private var accessibilityLabel: String {
+        let values = [type?.label, normalizedRemark(remark)].compactMap { $0 }
+        return values.isEmpty ? "Set details" : "Set details: \(values.joined(separator: ", "))"
     }
 }
 

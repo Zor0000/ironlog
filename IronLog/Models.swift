@@ -123,6 +123,15 @@ struct WorkoutSet: Identifiable, Codable, Hashable {
     /// Optional — synthesized `Decodable` has no default-value fallback, so a
     /// plain value would fail to decode drafts written before set types existed.
     var type: SetType?
+    /// Free-text context for the set, such as tempo, form, pain, or effort.
+    /// Optional keeps workout drafts written before remarks backward-compatible.
+    var remark: String?
+
+    /// A set can be removed immediately only when it contains no user-entered
+    /// values. A type or remark counts even when the numeric fields are blank.
+    var hasEnteredData: Bool {
+        !weight.isEmpty || !reps.isEmpty || type != nil || normalizedRemark(remark) != nil
+    }
 }
 
 struct ActiveExercise: Identifiable, Codable, Hashable {
@@ -185,6 +194,8 @@ struct LoggedSet: Identifiable, Codable, Hashable {
     /// See `WorkoutSet.type` — Optional for the same decode reason, which here
     /// guards saved history rather than a draft.
     var type: SetType?
+    /// Optional custom note carried with this specific set.
+    var remark: String?
 
     /// Volume and personal records both skip anything that is not real work.
     var isWorkingSet: Bool { type?.countsAsVolume ?? true }
@@ -382,7 +393,37 @@ func manualCardio(kind: CardioKind, minutes: String, distance: String, elevation
 
 /// A typed number, accepting the comma decimal separator most of the world uses.
 func decimalEntry(_ text: String) -> Double? {
-    Double(text.replacingOccurrences(of: ",", with: "."))
+    let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: ",", with: ".")
+    guard !normalized.isEmpty,
+          let value = Double(normalized),
+          value.isFinite else { return nil }
+    return value
+}
+
+/// Keeps one locale-independent decimal separator while the user types. Both
+/// comma and period keyboards produce the same stored draft string.
+func sanitizeDecimalInput(_ input: String) -> String {
+    var output = ""
+    var didUseDecimal = false
+    for character in input {
+        if character.isNumber {
+            output.append(character)
+        } else if (character == "." || character == ","), !didUseDecimal {
+            output.append(".")
+            didUseDecimal = true
+        }
+    }
+    return output
+}
+
+/// Remarks remain short enough to scan in a workout row and safe to encode in
+/// the existing cloud metadata column. Whitespace-only input removes a remark.
+func normalizedRemark(_ remark: String?) -> String? {
+    guard let remark else { return nil }
+    let trimmed = remark.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return String(trimmed.prefix(120))
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -3,6 +3,30 @@ import XCTest
 final class IronLogUITests: XCTestCase {
     private var app: XCUIApplication!
 
+    private func waitUntilStable(_ element: XCUIElement, timeout: TimeInterval = 3) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var previousFrame: CGRect?
+        var stableSamples = 0
+
+        while Date() < deadline {
+            if element.exists, element.isHittable {
+                let frame = element.frame
+                if frame == previousFrame {
+                    stableSamples += 1
+                    if stableSamples >= 2 { return true }
+                } else {
+                    stableSamples = 0
+                    previousFrame = frame
+                }
+            } else {
+                stableSamples = 0
+                previousFrame = nil
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return false
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
@@ -39,13 +63,112 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Push Ups"].waitForExistence(timeout: 3))
     }
 
+    func testExerciseAndSetDeletionUseTheRequestedConfirmationRules() {
+        XCTAssertTrue(app.buttons["Today"].waitForExistence(timeout: 6))
+        app.buttons["Today"].tap()
+        XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
+        app.buttons["start-free-workout-button"].tap()
+        let exerciseField = app.textFields["new-exercise-name-field"]
+        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        exerciseField.tap()
+        exerciseField.typeText("Push Ups")
+        app.buttons["confirm-add-exercise-button"].tap()
+
+        // Exercise removal always asks, even before any set is filled in.
+        let removeExercise = app.buttons["remove-exercise-button"].firstMatch
+        XCTAssertTrue(waitUntilStable(removeExercise))
+        removeExercise.tap()
+        XCTAssertTrue(app.staticTexts["Remove exercise?"].waitForExistence(timeout: 2))
+        app.buttons["Keep It"].tap()
+
+        // A newly added empty set disappears directly.
+        let addSet = app.buttons["Add Set"]
+        XCTAssertTrue(waitUntilStable(addSet))
+        addSet.tap()
+        let repsFields = app.textFields.matching(identifier: "set-reps-input")
+        XCTAssertTrue(repsFields.element(boundBy: 1).waitForExistence(timeout: 2))
+        let removeSet = app.buttons.matching(identifier: "remove-set-button").element(boundBy: 1)
+        XCTAssertTrue(waitUntilStable(removeSet))
+        removeSet.tap()
+        XCTAssertFalse(repsFields.element(boundBy: 1).waitForExistence(timeout: 1))
+        XCTAssertFalse(app.staticTexts["Remove set?"].exists)
+
+        // Once the set has content, the same action requires confirmation.
+        addSet.tap()
+        let secondReps = app.textFields.matching(identifier: "set-reps-input").element(boundBy: 1)
+        secondReps.tap()
+        secondReps.typeText("8")
+        XCTAssertTrue(waitUntilStable(removeSet))
+        removeSet.tap()
+        XCTAssertTrue(app.staticTexts["Remove set?"].waitForExistence(timeout: 2))
+    }
+
+    func testCustomRemarkCanBeTypedForASet() {
+        XCTAssertTrue(app.buttons["Today"].waitForExistence(timeout: 6))
+        app.buttons["Today"].tap()
+        XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
+        app.buttons["start-free-workout-button"].tap()
+        let exerciseField = app.textFields["new-exercise-name-field"]
+        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        exerciseField.tap()
+        exerciseField.typeText("Push Ups")
+        app.buttons["confirm-add-exercise-button"].tap()
+
+        app.buttons["set-type-button"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Add Custom Remark"].waitForExistence(timeout: 2))
+        app.buttons["Add Custom Remark"].tap()
+        let remarkField = app.textFields["e.g. Slow eccentric"]
+        XCTAssertTrue(remarkField.waitForExistence(timeout: 2))
+        remarkField.tap()
+        remarkField.typeText("Pause at the bottom")
+        app.buttons["Save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Pause at the bottom"].waitForExistence(timeout: 2))
+    }
+
+    func testRoutineDeletionIsVisibleAndRequiresConfirmation() {
+        XCTAssertTrue(app.buttons["Today"].waitForExistence(timeout: 6))
+        app.buttons["Today"].tap()
+        XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
+        app.buttons["start-free-workout-button"].tap()
+        let exerciseField = app.textFields["new-exercise-name-field"]
+        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        exerciseField.tap()
+        exerciseField.typeText("Push Ups")
+        app.buttons["confirm-add-exercise-button"].tap()
+
+        let saveRoutine = app.buttons["save-routine-button"]
+        XCTAssertTrue(saveRoutine.waitForExistence(timeout: 3))
+        saveRoutine.tap()
+        let routineName = app.textFields["e.g. Chris's Leg Day"]
+        XCTAssertTrue(routineName.waitForExistence(timeout: 2))
+        routineName.tap()
+        routineName.typeText("Quick Push")
+        app.buttons["Save"].tap()
+
+        app.buttons["Discard workout"].tap()
+        XCTAssertTrue(app.buttons["Discard Workout"].waitForExistence(timeout: 2))
+        app.buttons["Discard Workout"].tap()
+
+        let deleteRoutine = app.buttons["delete-routine-button"]
+        XCTAssertTrue(deleteRoutine.waitForExistence(timeout: 3))
+        deleteRoutine.tap()
+        XCTAssertTrue(app.staticTexts["Delete routine?"].waitForExistence(timeout: 2))
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Quick Push"].exists)
+
+        deleteRoutine.tap()
+        app.buttons["Delete Routine"].tap()
+        XCTAssertFalse(app.staticTexts["Quick Push"].waitForExistence(timeout: 1))
+    }
+
     func testSettingsOpensFromGearAndShowsAccountControls() {
         XCTAssertTrue(app.buttons["settings-button"].waitForExistence(timeout: 6))
         app.buttons["settings-button"].tap()
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Local — saved on this iPhone"].exists)
-        XCTAssertTrue(app.buttons["delete-account-button"].exists)
+        XCTAssertTrue(app.buttons["delete-workout-data-button"].exists)
         XCTAssertTrue(app.buttons["Pounds (lb)"].exists)
 
         // Unit toggle flips the log screen's weight field label.
