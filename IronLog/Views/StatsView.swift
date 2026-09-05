@@ -82,7 +82,7 @@ struct StatsView: View {
             let points = chartPoints.map { LivelinePoint(time: $0.date.timeIntervalSince1970, value: $0.weight) }
             let latest = points.last?.value ?? 0
             if points.count >= 2 {
-                LivelineChart(data: points, value: latest, configuration: LivelineChartConfiguration(theme: .automatic))
+                LivelineChart(data: points, value: latest, color: Theme.accent, configuration: LivelineChartConfiguration(theme: .automatic))
                     .frame(height: 180)
             } else {
                 Text(points.count == 1

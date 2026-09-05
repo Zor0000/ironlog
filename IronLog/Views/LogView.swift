@@ -385,7 +385,7 @@ struct LogExerciseCard: View {
     let exercise: ActiveExercise
     /// Called instead of deleting outright when the exercise already has logged work.
     var onConfirmDelete: () -> Void = {}
-    /// Called when the user long-presses the minus-circle button to remove a set.
+    /// Called when the user taps the minus-circle button to remove a set.
     var onConfirmDeleteSet: (UUID, UUID) -> Void = { _, _ in }
 
     var body: some View {
@@ -533,17 +533,18 @@ struct LogExerciseCard: View {
                     set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
                 ))
 
-                Image(systemName: "minus.circle")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 30, height: 34)
-                    .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
-                    .contentShape(Rectangle())
-                    .onLongPressGesture(minimumDuration: 0.5) {
-                        NativeFeedback.selection()
-                        onConfirmDeleteSet(exercise.id, set.id)
-                    }
-                    .disabled(exercise.sets.count <= 1)
-                    .accessibilityLabel("Remove set")
+                Button {
+                    NativeFeedback.selection()
+                    onConfirmDeleteSet(exercise.id, set.id)
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 30, height: 34)
+                        .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
+                }
+                .buttonStyle(TactileButtonStyle())
+                .disabled(exercise.sets.count <= 1)
+                .accessibilityLabel("Remove set")
             }
 
             if let subtitle = setSubtitle(set, refSet) {

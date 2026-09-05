@@ -551,19 +551,20 @@ struct EditSessionSheet: View {
                                 : snapReps(value)
                         }
                         SetTypeMenu(type: exercise.sets[index].type)
-                        Image(systemName: "minus.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 30, height: 34)
-                            .foregroundStyle(Theme.muted2)
-                            .contentShape(Rectangle())
-                            .onLongPressGesture(minimumDuration: 0.5) {
-                                NativeFeedback.selection()
-                                pendingDeleteSet = PendingDeleteSetIndex(
-                                    exerciseIndex: exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0,
-                                    setIndex: index
-                                )
-                            }
-                            .accessibilityLabel("Remove set")
+                        Button {
+                            NativeFeedback.selection()
+                            pendingDeleteSet = PendingDeleteSetIndex(
+                                exerciseIndex: exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0,
+                                setIndex: index
+                            )
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 30, height: 34)
+                                .foregroundStyle(Theme.muted2)
+                        }
+                        .buttonStyle(TactileButtonStyle())
+                        .accessibilityLabel("Remove set")
                     }
                     if let label = set.type?.label {
                         Text(label)
