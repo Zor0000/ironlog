@@ -6,7 +6,7 @@ A simple, free gym tracker: a **native iOS app** (SwiftUI) backed by Supabase. N
 
 - **Exercise catalog** — 80+ exercises across 7 muscle groups, each with sets, reps, and form tips
 - **Splits** — Full Body, PPL, Upper/Lower, Bro Split, with multi-muscle days
-- **Set logger** — log weight + reps per set, mark sets done
+- **Set logger** — log weight + reps, set types, and custom remarks per set
 - **Custom exercises** — add anything mid-workout (reps only, or weight + reps)
 - **Rest timer** — restarts from the preset each time you complete a set
 - **Lock-screen Live Activity** (iOS) — log sets from the Lock Screen / Dynamic Island without unlocking
@@ -32,7 +32,16 @@ A simple, free gym tracker: a **native iOS app** (SwiftUI) backed by Supabase. N
    - `sessions` — one row per workout
    - `session_sets` — one row per set
    - `personal_records` — best weight per exercise per user
+   - `routines` — user-created reusable workouts
 3. From **Settings → API**, copy your **Project URL** and **anon / public key** for the next step.
+4. Link the Supabase CLI to your project and deploy the authenticated account-deletion function:
+
+   ```bash
+   supabase link --project-ref YOUR_PROJECT_REF
+   supabase functions deploy delete-account
+   ```
+
+   Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the function. Keep the service-role key server-side; never add it to the iOS app.
 
 ## 2. Configure Your Keys
 
@@ -71,6 +80,7 @@ The [script header](scripts/install_iphone.sh) lists the one-time setup (sign in
 IronLog/            SwiftUI app (Views/, Services/, Live/ = Live Activity)
 IronLogWidget/      Lock-screen Live Activity widget extension
 IronLogTests/       Unit tests
+supabase/           Authenticated account-deletion Edge Function
 scripts/            build_ios_release.sh, upload_testflight.sh, install_iphone.sh
 .github/workflows/  supabase-keepalive.yml (daily ping so the free tier never pauses)
 ```

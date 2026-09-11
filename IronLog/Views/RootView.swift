@@ -155,6 +155,7 @@ struct AuthView: View {
                 .pickerStyle(.segmented)
                 .tint(Theme.accent)
                 .animation(AppMotion.quick, value: mode)
+                .disabled(app.isBusy)
 
                 if let message = app.authMessage {
                     Text(message)
@@ -180,24 +181,37 @@ struct AuthView: View {
                 SecureField("", text: $password)
                     .textContentType(mode == .signIn ? .password : .newPassword)
                     .fieldStyle()
-                    .placeholderText("Password (min 6 chars)", visible: password.isEmpty)
+                    .placeholderText(mode == .signIn ? "Password" : "Password (6+ characters)", visible: password.isEmpty)
+                if mode == .signUp {
+                    Text("Use at least 6 characters.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.muted2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-                Button(mode == .signIn ? "Sign In" : "Create Account") {
+                Button {
                     NativeFeedback.light()
                     Task {
                         if mode == .signIn {
                             await app.signIn(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
                         } else {
-                            let didCreateAccount = await app.signUp(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password, name: name)
+                            let didCreateAccount = await app.signUp(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password, name: name.trimmingCharacters(in: .whitespacesAndNewlines))
                             if didCreateAccount {
                                 mode = .signIn
                             }
                         }
                     }
+                } label: {
+                    HStack(spacing: 8) {
+                        if app.isBusy {
+                            ProgressView()
+                                .tint(.black)
+                        }
+                        Text(authButtonTitle)
+                    }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(app.isBusy || email.isEmpty || password.count < 6 || (mode == .signUp && name.isEmpty))
-                .opacity(app.isBusy ? 0.6 : 1)
+                .disabled(!canSubmit)
 
                 Button {
                     NativeFeedback.selection()
@@ -206,6 +220,7 @@ struct AuthView: View {
                     Text("Continue locally")
                 }
                 .buttonStyle(SecondaryButtonStyle())
+                .disabled(app.isBusy)
             }
             .cardStyle(radius: 18)
             .padding(.horizontal, 28)
@@ -213,6 +228,23 @@ struct AuthView: View {
             .entrance()
             Spacer()
         }
+    }
+
+    private var canSubmit: Bool {
+        guard !app.isBusy,
+              !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !password.isEmpty else { return false }
+        if mode == .signUp {
+            return password.count >= 6 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return true
+    }
+
+    private var authButtonTitle: String {
+        if app.isBusy {
+            return mode == .signIn ? "Signing In…" : "Creating Account…"
+        }
+        return mode == .signIn ? "Sign In" : "Create Account"
     }
 }
 

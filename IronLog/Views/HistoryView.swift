@@ -182,7 +182,7 @@ struct HistoryCard: View {
                                 ForEach(exercise.sets) { set in
                                     Text(setLabel(set, in: exercise))
                                         .font(.system(size: 12))
-                                        .foregroundStyle(set.type == nil ? Theme.muted2 : Theme.accent.opacity(0.85))
+                                        .foregroundStyle(set.type == nil && normalizedRemark(set.remark) == nil ? Theme.muted2 : Theme.accent.opacity(0.85))
                                 }
                             }
                             .multilineTextAlignment(.trailing)
@@ -308,7 +308,8 @@ struct HistoryCard: View {
     private func setLabel(_ set: LoggedSet, in exercise: LoggedExercise) -> String {
         // A timed set's `reps` are seconds, not repetitions — showing "BW x 1800"
         // for a 30-minute ride reads as nonsense.
-        let tag = set.type.map { "\($0.label) · " } ?? ""
+        let details = [set.type?.label, normalizedRemark(set.remark)].compactMap { $0 }
+        let tag = details.isEmpty ? "" : details.joined(separator: " · ") + " · "
         if exercise.timed {
             return tag + formatLoggedDuration(Int(set.reps), minutes: exercise.usesMinutes)
         }
@@ -353,7 +354,8 @@ struct EditSessionSheet: View {
                             ? String(displayDuration(Int(set.reps), minutes: exercise.usesMinutes))
                             : clean(set.reps),
                         done: true,
-                        type: set.type
+                        type: set.type,
+                        remark: set.remark
                     )
                 }
             )
@@ -438,10 +440,7 @@ struct EditSessionSheet: View {
                     withAnimation(AppMotion.smooth) {
                         let exIdx = pendingDeleteSet.exerciseIndex
                         let stIdx = pendingDeleteSet.setIndex
-                        exercises[exIdx].sets.remove(at: stIdx)
-                        if exercises[exIdx].sets.isEmpty {
-                            exercises.remove(at: exIdx)
-                        }
+                        removeSet(exerciseIndex: exIdx, setIndex: stIdx)
                         self.pendingDeleteSet = nil
                     }
                 } cancel: {
@@ -542,7 +541,7 @@ struct EditSessionSheet: View {
                     HStack(alignment: .bottom, spacing: 8) {
                         if !exercise.wrappedValue.timed {
                             SmallInput(label: index == 0 ? currentWeightUnit.fieldLabel : "", value: set.weight, keyboard: .decimalPad, identifier: "edit-weight-input") { value in
-                                exercise.wrappedValue.sets[index].weight = value.filter { $0.isNumber || $0 == "." }
+                                exercise.wrappedValue.sets[index].weight = sanitizeDecimalInput(value)
                             }
                         }
                         SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input") { value in
@@ -550,24 +549,29 @@ struct EditSessionSheet: View {
                                 ? value.filter(\.isNumber)
                                 : snapReps(value)
                         }
-                        SetTypeMenu(type: exercise.sets[index].type)
+                        SetTypeMenu(type: exercise.sets[index].type, remark: exercise.sets[index].remark)
                         Button {
                             NativeFeedback.selection()
-                            pendingDeleteSet = PendingDeleteSetIndex(
-                                exerciseIndex: exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0,
-                                setIndex: index
-                            )
+                            let exerciseIndex = exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) ?? 0
+                            if set.hasEnteredData {
+                                pendingDeleteSet = PendingDeleteSetIndex(exerciseIndex: exerciseIndex, setIndex: index)
+                            } else {
+                                withAnimation(AppMotion.quick) {
+                                    removeSet(exerciseIndex: exerciseIndex, setIndex: index)
+                                }
+                            }
                         } label: {
                             Image(systemName: "minus.circle")
                                 .font(.system(size: 16, weight: .semibold))
-                                .frame(width: 30, height: 34)
                                 .foregroundStyle(Theme.muted2)
                         }
                         .buttonStyle(TactileButtonStyle())
                         .accessibilityLabel("Remove set")
+                        .accessibilityIdentifier("edit-remove-set-button")
                     }
-                    if let label = set.type?.label {
-                        Text(label)
+                    let details = [set.type?.label, normalizedRemark(set.remark)].compactMap { $0 }
+                    if !details.isEmpty {
+                        Text(details.joined(separator: " · "))
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.accent.opacity(0.85))
                     }
@@ -590,5 +594,14 @@ struct EditSessionSheet: View {
             .buttonStyle(TactileButtonStyle())
         }
         .cardStyle()
+    }
+
+    private func removeSet(exerciseIndex: Int, setIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex),
+              exercises[exerciseIndex].sets.indices.contains(setIndex) else { return }
+        exercises[exerciseIndex].sets.remove(at: setIndex)
+        if exercises[exerciseIndex].sets.isEmpty {
+            exercises.remove(at: exerciseIndex)
+        }
     }
 }

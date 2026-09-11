@@ -1,4 +1,7 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+private let exerciseReorderType = UTType.data
 
 private struct PendingDeleteSet: Equatable {
     let exerciseID: UUID
@@ -12,6 +15,7 @@ struct LogView: View {
     @State private var pendingDeleteSet: PendingDeleteSet?
     @State private var showSaveRoutine = false
     @State private var routineName = ""
+    @State private var draggingExerciseID: ActiveExercise.ID?
     @FocusState private var noteFocused: Bool
 
     var body: some View {
@@ -29,6 +33,10 @@ struct LogView: View {
         }
         .background(Color.clear)
         .scrollIndicators(.hidden)
+        .onDrop(
+            of: [exerciseReorderType],
+            delegate: ExerciseDropCompletionDelegate(draggingExerciseID: $draggingExerciseID)
+        )
         .keepsNoteVisible(proxy, focused: noteFocused, text: app.workoutNote)
         .animation(AppMotion.quick, value: app.todayExercises)
         .animation(AppMotion.quick, value: app.showAddExerciseForm)
@@ -104,8 +112,28 @@ struct LogView: View {
             progressCard
 
             ForEach(Array(app.todayExercises.enumerated()), id: \.element.id) { index, exercise in
-                LogExerciseCard(exercise: exercise, onConfirmDelete: { pendingDelete = exercise }, onConfirmDeleteSet: { exerciseID, setID in pendingDeleteSet = PendingDeleteSet(exerciseID: exerciseID, setID: setID) })
+                LogExerciseCard(
+                    exercise: exercise,
+                    position: index,
+                    exerciseCount: app.todayExercises.count,
+                    isBeingDragged: draggingExerciseID == exercise.id,
+                    onDragStarted: { beginDragging(exercise) },
+                    onMove: { destination in moveExercise(exercise.id, to: destination) },
+                    onConfirmDelete: { pendingDelete = exercise },
+                    onConfirmDeleteSet: { exerciseID, setID in
+                        pendingDeleteSet = PendingDeleteSet(exerciseID: exerciseID, setID: setID)
+                    }
+                )
                     .entrance(index)
+                    .zIndex(draggingExerciseID == exercise.id ? 1 : 0)
+                    .onDrop(
+                        of: [exerciseReorderType],
+                        delegate: ExerciseDropDelegate(
+                            destinationID: exercise.id,
+                            app: app,
+                            draggingExerciseID: $draggingExerciseID
+                        )
+                    )
             }
 
             addExerciseBlock
@@ -164,6 +192,31 @@ struct LogView: View {
         } message: {
             Text("Keeps these \(app.todayExercises.count) exercises so you can start them again in one tap from Workouts.")
         }
+    }
+
+    private func beginDragging(_ exercise: ActiveExercise) -> NSItemProvider {
+        draggingExerciseID = exercise.id
+        NativeFeedback.medium()
+
+        let provider = NSItemProvider()
+        provider.suggestedName = exercise.name
+        provider.registerDataRepresentation(
+            forTypeIdentifier: exerciseReorderType.identifier,
+            visibility: .ownProcess
+        ) { completion in
+            completion(Data(exercise.id.uuidString.utf8), nil)
+            return nil
+        }
+        return provider
+    }
+
+    private func moveExercise(_ exerciseID: ActiveExercise.ID, to destination: Int) {
+        guard app.todayExercises.indices.contains(destination),
+              app.todayExercises.firstIndex(where: { $0.id == exerciseID }) != destination else { return }
+        withAnimation(AppMotion.smooth) {
+            app.moveExercise(exerciseID, to: destination)
+        }
+        NativeFeedback.selection()
     }
 
     private var logHeader: some View {
@@ -383,6 +436,11 @@ struct TimerCard: View {
 struct LogExerciseCard: View {
     @EnvironmentObject private var app: AppState
     let exercise: ActiveExercise
+    var position = 0
+    var exerciseCount = 1
+    var isBeingDragged = false
+    var onDragStarted: () -> NSItemProvider = { NSItemProvider() }
+    var onMove: (Int) -> Void = { _ in }
     /// Called instead of deleting outright when the exercise already has logged work.
     var onConfirmDelete: () -> Void = {}
     /// Called when the user taps the minus-circle button to remove a set.
@@ -393,6 +451,8 @@ struct LogExerciseCard: View {
         let reference = app.lastPerformance(exerciseName: exercise.name)
         return VStack(spacing: 0) {
             HStack(spacing: 8) {
+                reorderHandle
+
                 Button {
                     NativeFeedback.selection()
                     withAnimation(AppMotion.quick) {
@@ -425,25 +485,24 @@ struct LogExerciseCard: View {
                 }
                 .foregroundStyle(Theme.text)
                 .buttonStyle(TactileButtonStyle())
+                // The grip makes reordering discoverable, while the generous
+                // title area still supports the natural "hold the exercise"
+                // gesture without stealing long presses from set inputs.
+                .onDrag(onDragStarted) {
+                    dragPreview
+                }
 
                 Button {
                     NativeFeedback.selection()
-                    if exercise.hasLoggedData {
-                        onConfirmDelete()
-                    } else {
-                        withAnimation(AppMotion.quick) {
-                            app.removeExercise(exercise.id)
-                        }
-                    }
+                    onConfirmDelete()
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.muted2)
-                        .frame(width: 30, height: 30)
-                        .contentShape(Rectangle())
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Remove \(exercise.name)")
+                .accessibilityIdentifier("remove-exercise-button")
             }
             .padding(14)
 
@@ -478,7 +537,56 @@ struct LogExerciseCard: View {
         .background(Theme.surface2)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(exercise.expanded ? Theme.accent.opacity(0.24) : Theme.border))
+        .scaleEffect(isBeingDragged ? 1.018 : 1)
+        .opacity(isBeingDragged ? 0.72 : 1)
+        .shadow(color: .black.opacity(isBeingDragged ? 0.42 : 0), radius: 18, y: 10)
         .animation(AppMotion.quick, value: exercise.expanded)
+        .animation(AppMotion.tap, value: isBeingDragged)
+    }
+
+    private var reorderHandle: some View {
+        Image(systemName: "line.3.horizontal")
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(isBeingDragged ? Theme.accent : Theme.muted2)
+            .frame(width: 30, height: 42)
+            .contentShape(Rectangle())
+            .onDrag(onDragStarted) {
+                dragPreview
+            }
+            .accessibilityElement()
+            .accessibilityLabel("Reorder \(exercise.name)")
+            .accessibilityValue("Position \(position + 1) of \(exerciseCount)")
+            .accessibilityHint("Touch and hold, then drag up or down")
+            .accessibilityAction(named: Text("Move up")) {
+                guard position > 0 else { return }
+                onMove(position - 1)
+            }
+            .accessibilityAction(named: Text("Move down")) {
+                guard position < exerciseCount - 1 else { return }
+                onMove(position + 1)
+            }
+            .accessibilityIdentifier("exercise-reorder-handle")
+    }
+
+    private var dragPreview: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(Theme.accent)
+            Text(exercise.name)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+            Spacer(minLength: 12)
+            Text("\(position + 1)")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.muted2)
+        }
+        .foregroundStyle(Theme.text)
+        .padding(.horizontal, 14)
+        .frame(width: 280, height: 52)
+        .background(Theme.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.accent.opacity(0.5)))
+        .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
     }
 
     private func setRow(_ set: WorkoutSet, reference: LoggedExercise?) -> some View {
@@ -528,23 +636,35 @@ struct LogExerciseCard: View {
                 .accessibilityIdentifier("set-done-button")
                 .accessibilityLabel(set.done ? "Mark set not done" : "Mark set done")
 
-                SetTypeMenu(type: Binding(
-                    get: { set.type },
-                    set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
-                ))
+                SetTypeMenu(
+                    type: Binding(
+                        get: { set.type },
+                        set: { app.setType(exerciseID: exercise.id, setID: set.id, to: $0) }
+                    ),
+                    remark: Binding(
+                        get: { set.remark },
+                        set: { app.setRemark(exerciseID: exercise.id, setID: set.id, to: $0) }
+                    )
+                )
 
                 Button {
                     NativeFeedback.selection()
-                    onConfirmDeleteSet(exercise.id, set.id)
+                    if set.hasEnteredData {
+                        onConfirmDeleteSet(exercise.id, set.id)
+                    } else {
+                        withAnimation(AppMotion.quick) {
+                            app.removeSet(exerciseID: exercise.id, setID: set.id)
+                        }
+                    }
                 } label: {
                     Image(systemName: "minus.circle")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 30, height: 34)
                         .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
                 }
                 .buttonStyle(TactileButtonStyle())
                 .disabled(exercise.sets.count <= 1)
                 .accessibilityLabel("Remove set")
+                .accessibilityIdentifier("remove-set-button")
             }
 
             if let subtitle = setSubtitle(set, refSet) {
@@ -559,7 +679,7 @@ struct LogExerciseCard: View {
     /// The set's tag and last time's numbers share one line, so a tag costs no
     /// vertical space in a row that already had none to give.
     private func setSubtitle(_ set: WorkoutSet, _ refSet: LoggedSet?) -> String? {
-        let parts = [set.type?.label, referenceLabel(refSet)].compactMap { $0 }
+        let parts = [set.type?.label, normalizedRemark(set.remark), referenceLabel(refSet)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -582,6 +702,53 @@ struct LogExerciseCard: View {
     }
 }
 
+private struct ExerciseDropDelegate: DropDelegate {
+    let destinationID: ActiveExercise.ID
+    let app: AppState
+    @Binding var draggingExerciseID: ActiveExercise.ID?
+
+    func dropEntered(info: DropInfo) {
+        guard info.hasItemsConforming(to: [exerciseReorderType]),
+              let draggingExerciseID,
+              draggingExerciseID != destinationID,
+              let destinationIndex = app.todayExercises.firstIndex(where: { $0.id == destinationID }) else { return }
+
+        withAnimation(AppMotion.smooth) {
+            app.moveExercise(draggingExerciseID, to: destinationIndex)
+        }
+        NativeFeedback.selection()
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard info.hasItemsConforming(to: [exerciseReorderType]) else { return false }
+        draggingExerciseID = nil
+        NativeFeedback.light()
+        return true
+    }
+}
+
+/// Accepting the internal drag on the surrounding workout lets a drop between
+/// cards (or below the final card) finish cleanly instead of leaving lift state
+/// behind. Row delegates still own the actual reordering.
+private struct ExerciseDropCompletionDelegate: DropDelegate {
+    @Binding var draggingExerciseID: ActiveExercise.ID?
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard info.hasItemsConforming(to: [exerciseReorderType]) else { return false }
+        draggingExerciseID = nil
+        NativeFeedback.light()
+        return true
+    }
+}
+
 /// Tag a set as a warm-up, drop set and so on. A `Picker` inside the menu
 /// checkmarks the current choice and carries "Normal set" as the way back, so
 /// there is no separate clear action to find.
@@ -590,6 +757,9 @@ struct LogExerciseCard: View {
 /// and the session editor (which writes into its own draft) share one menu.
 struct SetTypeMenu: View {
     @Binding var type: SetType?
+    @Binding var remark: String?
+    @State private var remarkDraft = ""
+    @State private var showRemarkEditor = false
 
     var body: some View {
         Menu {
@@ -606,14 +776,42 @@ struct SetTypeMenu: View {
                 }
             }
             .pickerStyle(.inline)
+            Divider()
+            Button {
+                remarkDraft = remark ?? ""
+                showRemarkEditor = true
+            } label: {
+                Label(normalizedRemark(remark) == nil ? "Add Custom Remark" : "Edit Custom Remark", systemImage: "square.and.pencil")
+            }
         } label: {
-            Image(systemName: type == nil ? "note.text" : "note.text.badge.plus")
+            Image(systemName: type == nil && normalizedRemark(remark) == nil ? "note.text" : "note.text.badge.plus")
                 .font(.system(size: 16, weight: .semibold))
                 .frame(width: 28, height: 34)
-                .foregroundStyle(type == nil ? Theme.muted2 : Theme.accent)
+                .foregroundStyle(type == nil && normalizedRemark(remark) == nil ? Theme.muted2 : Theme.accent)
         }
         .accessibilityIdentifier("set-type-button")
-        .accessibilityLabel(type.map { "Set type: \($0.label)" } ?? "Set type")
+        .accessibilityLabel(accessibilityLabel)
+        .alert("Set remark", isPresented: $showRemarkEditor) {
+            TextField("e.g. Slow eccentric", text: $remarkDraft)
+            Button("Save") {
+                remark = normalizedRemark(remarkDraft)
+                remarkDraft = ""
+            }
+            if normalizedRemark(remark) != nil {
+                Button("Remove Remark", role: .destructive) {
+                    remark = nil
+                    remarkDraft = ""
+                }
+            }
+            Button("Cancel", role: .cancel) { remarkDraft = "" }
+        } message: {
+            Text("Add a short note about form, tempo, effort, or anything you want to remember.")
+        }
+    }
+
+    private var accessibilityLabel: String {
+        let values = [type?.label, normalizedRemark(remark)].compactMap { $0 }
+        return values.isEmpty ? "Set details" : "Set details: \(values.joined(separator: ", "))"
     }
 }
 

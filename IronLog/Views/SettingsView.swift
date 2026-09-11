@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
+    @State private var dataDeletionError: String?
     @State private var notificationStatus: UNAuthorizationStatus?
     @State private var bodyWeightText = ""
     @FocusState private var bodyWeightFocused: Bool
@@ -43,31 +44,28 @@ struct SettingsView: View {
             }
             .scrollIndicators(.hidden)
 
-            if showDeleteConfirmation {
-                ConfirmActionModal(
-                    title: "Delete account?",
-                    message: "This permanently deletes your workouts, records and account data from this iPhone and the cloud. This cannot be undone.",
-                    confirmTitle: "Delete Everything",
-                    cancelTitle: "Keep My Data",
-                    systemImage: "trash"
-                ) {
-                    withAnimation(AppMotion.smooth) {
-                        showDeleteConfirmation = false
-                    }
-                    Task {
-                        if await app.deleteAccount() {
-                            dismiss()
-                        }
-                    }
-                } cancel: {
-                    withAnimation(AppMotion.quick) {
-                        showDeleteConfirmation = false
+        }
+        .foregroundStyle(Theme.text)
+        .alert(deleteConfirmationTitle, isPresented: $showDeleteConfirmation) {
+            Button(deleteActionTitle, role: .destructive) {
+                dataDeletionError = nil
+                Task {
+                    let deleted = isCloudUser
+                        ? await app.deleteAccount()
+                        : await app.deleteWorkoutData()
+                    if deleted {
+                        dismiss()
+                    } else {
+                        dataDeletionError = isCloudUser
+                            ? "Couldn’t delete your account. Check your connection and try again. Your local data was kept."
+                            : "Couldn’t delete workout data. Check your connection and try again. Nothing was removed from this iPhone."
                     }
                 }
             }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(deleteConfirmationMessage)
         }
-        .foregroundStyle(Theme.text)
-        .animation(AppMotion.quick, value: showDeleteConfirmation)
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         }
@@ -101,17 +99,39 @@ struct SettingsView: View {
                     app.showAuth()
                 }
             }
-            settingsButton("Delete Account & Data", systemImage: "trash", tint: Theme.danger) {
+            settingsButton(deleteActionTitle, systemImage: "trash", tint: Theme.danger) {
+                dataDeletionError = nil
                 showDeleteConfirmation = true
             }
-            .accessibilityIdentifier("delete-account-button")
+            .accessibilityIdentifier(isCloudUser ? "delete-account-button" : "delete-workout-data-button")
             .disabled(app.isBusy)
+            if let dataDeletionError {
+                Label(dataDeletionError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.danger)
+                    .accessibilityIdentifier("data-deletion-error")
+            }
         }
         .cardStyle()
     }
 
     private var isCloudUser: Bool {
         app.user?.isLocal == false
+    }
+
+    private var deleteActionTitle: String {
+        isCloudUser ? "Delete Account & Data" : "Delete Workout Data"
+    }
+
+    private var deleteConfirmationTitle: String {
+        isCloudUser ? "Delete account?" : "Delete workout data?"
+    }
+
+    private var deleteConfirmationMessage: String {
+        if isCloudUser {
+            return "This permanently deletes your sign-in account, workouts, personal records, routines, body weight, and water history from this iPhone and the cloud. This cannot be undone."
+        }
+        return "This permanently deletes your workouts, personal records, routines, body weight, and water history from this iPhone. This cannot be undone."
     }
 
     // MARK: Units

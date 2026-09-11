@@ -58,6 +58,17 @@ final class SupabaseWireFormatTests: XCTestCase {
         ])
     }
 
+    func testSetMetadataKeepsLegacyTypesAndRoundTripsCustomRemarks() {
+        XCTAssertEqual(encodeSetMetadata(type: .warmup, remark: nil), "warmup")
+        XCTAssertEqual(decodeSetMetadata("drop"), StoredSetMetadata(type: .drop, remark: nil))
+
+        let encoded = encodeSetMetadata(type: .restPause, remark: "Slow eccentric")
+        XCTAssertEqual(
+            decodeSetMetadata(encoded),
+            StoredSetMetadata(type: .restPause, remark: "Slow eccentric")
+        )
+    }
+
     func testRoutineInsertSendsExercisesAsANestedDocument() throws {
         let routine = SavedRoutine(
             name: "Anshul's Leg Day",
