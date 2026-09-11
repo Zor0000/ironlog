@@ -3,6 +3,42 @@ import XCTest
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    func testExerciseCanMoveUpAndDownWithoutLosingItsLoggedWork() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(name: "Squat")
+        app.addExercise(name: "Bench Press")
+        app.addExercise(name: "Deadlift")
+
+        let squatID = app.todayExercises[0].id
+        let squatSetID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: squatID, setID: squatSetID, reps: "5")
+
+        app.moveExercise(squatID, to: 2)
+
+        XCTAssertEqual(app.todayExercises.map(\.name), ["Bench Press", "Deadlift", "Squat"])
+        XCTAssertEqual(app.todayExercises[2].id, squatID)
+        XCTAssertEqual(app.todayExercises[2].sets[0].id, squatSetID)
+        XCTAssertEqual(app.todayExercises[2].sets[0].reps, "5")
+
+        app.moveExercise(squatID, to: 0)
+        XCTAssertEqual(app.todayExercises.map(\.name), ["Squat", "Bench Press", "Deadlift"])
+    }
+
+    func testExerciseMoveClampsDestinationAndIgnoresUnknownExercise() {
+        let app = AppState()
+        app.startFreeWorkout()
+        app.addExercise(name: "Pull Ups")
+        app.addExercise(name: "Dips")
+        let pullUpID = app.todayExercises[0].id
+
+        app.moveExercise(pullUpID, to: 99)
+        XCTAssertEqual(app.todayExercises.map(\.name), ["Dips", "Pull Ups"])
+
+        app.moveExercise(UUID(), to: 0)
+        XCTAssertEqual(app.todayExercises.map(\.name), ["Dips", "Pull Ups"])
+    }
+
     func testBlankBodyweightSetCannotBeCompleted() {
         let app = AppState()
         app.startFreeWorkout()

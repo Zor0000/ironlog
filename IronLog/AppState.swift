@@ -608,6 +608,21 @@ final class AppState: ObservableObject {
         persistDraft()
     }
 
+    /// Repositions an exercise in the active workout. `destinationIndex` is the
+    /// final index the exercise should occupy, which keeps both drag-hover moves
+    /// and VoiceOver's move up/down actions predictable.
+    func moveExercise(_ exerciseID: ActiveExercise.ID, to destinationIndex: Int) {
+        guard todayExercises.count > 1,
+              let sourceIndex = todayExercises.firstIndex(where: { $0.id == exerciseID }) else { return }
+
+        let clampedDestination = min(max(destinationIndex, 0), todayExercises.count - 1)
+        guard sourceIndex != clampedDestination else { return }
+
+        let exercise = todayExercises.remove(at: sourceIndex)
+        todayExercises.insert(exercise, at: clampedDestination)
+        persistDraft()
+    }
+
     func removeExercise(_ exerciseID: ActiveExercise.ID) {
         guard let exercise = todayExercises.first(where: { $0.id == exerciseID }) else { return }
         todayExercises.removeAll { $0.id == exerciseID }

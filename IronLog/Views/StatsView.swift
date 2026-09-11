@@ -43,8 +43,8 @@ struct StatsView: View {
     }
 
     // MARK: Per-exercise progress chart
-    // Plots top-set weight (not est. 1RM): it's what the user actually lifted,
-    // needs no formula caveats, and matches the numbers they see in History.
+    // Shows the lightest-to-heaviest working-set weight in each session. Warm-ups
+    // stay out of the range so they do not pull the lower boundary down.
 
     private var progressCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -79,15 +79,50 @@ struct StatsView: View {
                 }
             }
 
-            let points = chartPoints.map { LivelinePoint(time: $0.date.timeIntervalSince1970, value: $0.weight) }
-            let latest = points.last?.value ?? 0
-            if points.count >= 2 {
-                LivelineChart(data: points, value: latest, color: Theme.accent, configuration: LivelineChartConfiguration(theme: .automatic))
+            let points = chartRangePoints.map {
+                LivelineRangePoint(
+                    time: $0.date.timeIntervalSince1970,
+                    lower: $0.lower,
+                    upper: $0.upper
+                )
+            }
+            if !points.isEmpty {
+                HStack(spacing: 7) {
+                    Capsule()
+                        .fill(Theme.accent.opacity(0.2))
+                        .overlay(Capsule().stroke(Theme.accent, lineWidth: 1.5))
+                        .frame(width: 24, height: 8)
+                    Text("Lightest–heaviest working set · \(currentWeightUnit.label)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.muted2)
+                }
+
+                LivelineChart(
+                    range: points,
+                    color: Theme.accent,
+                    style: LivelineRangeStyle(
+                        fillOpacity: 0.2,
+                        boundaryLineWidth: 2,
+                        showsCenterLine: true,
+                        centerLineWidth: 1
+                    ),
+                    configuration: LivelineChartConfiguration(
+                        theme: .automatic,
+                        window: chartWindow,
+                        badge: false,
+                        pulse: false,
+                        autoDetectMomentum: false,
+                        formatValue: { "\(clean($0)) \(currentWeightUnit.label)" },
+                        formatTime: {
+                            Date(timeIntervalSince1970: $0).formatted(
+                                .dateTime.month(.abbreviated).day()
+                            )
+                        }
+                    )
+                )
                     .frame(height: 180)
             } else {
-                Text(points.count == 1
-                     ? "One session logged — one more and the trend line appears."
-                     : "Log weighted sets to see progress over time.")
+                Text("Log weighted working sets to see your range over time.")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.muted2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -97,12 +132,14 @@ struct StatsView: View {
         .cardStyle()
     }
 
-    /// Exercises that have at least one weighted set in history, most recent first.
+    /// Exercises that have at least one weighted working set in history, most recent first.
     private var chartableExercises: [String] {
         var seen = Set<String>()
         var names: [String] = []
         for session in app.sessions {
-            for exercise in session.exercises where exercise.sets.contains(where: { ($0.weight ?? 0) > 0 }) {
+            for exercise in session.exercises where exercise.sets.contains(where: {
+                $0.isWorkingSet && ($0.weight ?? 0) > 0
+            }) {
                 if seen.insert(exercise.name).inserted {
                     names.append(exercise.name)
                 }
@@ -118,18 +155,27 @@ struct StatsView: View {
         return chartableExercises.first
     }
 
-    /// (date, top-set weight in the display unit) per session, oldest first.
-    private var chartPoints: [(date: Date, weight: Double)] {
+    /// Working-set bounds in the display unit per session, oldest first.
+    private var chartRangePoints: [(date: Date, lower: Double, upper: Double)] {
         guard let name = selectedExercise else { return [] }
         return app.sessions.reversed().compactMap { session in
-            let top = session.exercises
+            let weights = session.exercises
                 .filter { $0.name == name }
                 .flatMap(\.sets)
+                .filter(\.isWorkingSet)
                 .compactMap(\.weight)
-                .max()
-            guard let top, top > 0 else { return nil }
-            return (session.createdAt, displayWeight(top))
+                .filter { $0 > 0 }
+            guard let lower = weights.min(), let upper = weights.max() else { return nil }
+            return (session.createdAt, displayWeight(lower), displayWeight(upper))
         }
+    }
+
+    /// Liveline windows are expressed in seconds. Cover the complete workout
+    /// history with a little horizontal breathing room at both ends.
+    private var chartWindow: TimeInterval {
+        guard let first = chartRangePoints.first?.date,
+              let last = chartRangePoints.last?.date else { return 86_400 }
+        return max(last.timeIntervalSince(first) * 1.08, 86_400)
     }
 
     private var weekCard: some View {
