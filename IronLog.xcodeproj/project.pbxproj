@@ -12,6 +12,7 @@
 		0CAEC92A90D144116D7DB4AD /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */; };
 		155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BD2BA9DE192DFF44B03330 /* LogView.swift */; };
 		281B71D30098F114656AA639 /* WorkoutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */; };
+		EF0D10000000000000000001 /* ExerciseFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0D10000000000000000002 /* ExerciseFinderView.swift */; };
 		291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4D54847F3760FF9E68C832 /* LocalStore.swift */; };
 		2A44DFB3109C1CEEF94579E7 /* RunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E109B1235B2AC42D7704C908 /* RunView.swift */; };
 		3055064C6BEFAFBDF7F2D6C6 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6C857F480AB04F72B2C84F /* WorkoutActivityAttributes.swift */; };
@@ -111,6 +112,7 @@
 		BE559FE293B780F2CEFB2966 /* IronLogWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = IronLogWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutsView.swift; sourceTree = "<group>"; };
+		EF0D10000000000000000002 /* ExerciseFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseFinderView.swift; sourceTree = "<group>"; };
 		C900D2DC3721D95BB94BDCC8 /* IronLogUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = IronLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8ADC01A0B1CEE349A4C8E3E /* WorkoutLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLiveActivity.swift; sourceTree = "<group>"; };
 		DC4D54847F3760FF9E68C832 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
@@ -219,6 +221,7 @@
 			isa = PBXGroup;
 			children = (
 				4BD1B0716FEAA0A7D27A95F6 /* ConfirmActionModal.swift */,
+				EF0D10000000000000000002 /* ExerciseFinderView.swift */,
 				E4C4FD635EC34C0285006A34 /* HistoryView.swift */,
 				47BD2BA9DE192DFF44B03330 /* LogView.swift */,
 				B15884452B261DC7C80276FD /* RootView.swift */,
@@ -421,6 +424,7 @@
 				9944DCF00295EBEF41988DB5 /* LiveWorkoutModels.swift in Sources */,
 				291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */,
 				155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */,
+				EF0D10000000000000000001 /* ExerciseFinderView.swift in Sources */,
 				4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */,
 				3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */,
 				2A44DFB3109C1CEEF94579E7 /* RunView.swift in Sources */,

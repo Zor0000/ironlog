@@ -14,6 +14,47 @@ final class SupabaseWireFormatTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
+    // MARK: - Auth
+
+    func testAutoConfirmedSignupCarriesAUsableSession() throws {
+        let payload = """
+        {
+          "access_token":"access-1",
+          "refresh_token":"refresh-1",
+          "user":{
+            "id":"user-1",
+            "email":"alex@example.com",
+            "user_metadata":{"full_name":"Alex Carter","email_verified":true}
+          }
+        }
+        """
+
+        let response = try decoder.decode(SignUpResponse.self, from: Data(payload.utf8))
+        let session = try XCTUnwrap(response.authSession)
+
+        XCTAssertEqual(session.accessToken, "access-1")
+        XCTAssertEqual(session.refreshToken, "refresh-1")
+        XCTAssertEqual(session.user.email, "alex@example.com")
+        XCTAssertEqual(session.user.userMetadata?.fullName, "Alex Carter")
+    }
+
+    func testConfirmationRequiredSignupHasNoSession() throws {
+        // GoTrue returns the created user directly when email confirmation is
+        // required, without access/refresh tokens.
+        let payload = #"{"id":"user-1","email":"alex@example.com"}"#
+        let response = try decoder.decode(SignUpResponse.self, from: Data(payload.utf8))
+
+        XCTAssertNil(response.authSession)
+    }
+
+    func testRefreshTokenErrorsAreRecognizedForReauthentication() throws {
+        for code in ["refresh_token_not_found", "refresh_token_already_used"] {
+            let payload = #"{"error_code":"\#(code)","msg":"Refresh failed"}"#
+            let error = try decoder.decode(SupabaseErrorPayload.self, from: Data(payload.utf8))
+            XCTAssertTrue(error.isExpiredRefreshToken)
+        }
+    }
+
     // MARK: - Column names
 
     /// Every key here is a real column. A mismatch is a 400 from PostgREST at
@@ -56,6 +97,15 @@ final class SupabaseWireFormatTests: XCTestCase {
             "session_id", "exercise_id", "weight_kg", "reps",
             "set_index", "bodyweight", "timed", "uses_minutes"
         ])
+    }
+
+    func testExerciseUpsertBatchUsesOneRowPerUniqueName() throws {
+        let names = Array(Set(["Squat", "Bench Press", "Squat"])).sorted()
+        let body = names.map { RemoteExerciseInsert(name: $0) }
+        let data = try encoder.encode(body)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: String]])
+
+        XCTAssertEqual(rows, [["name": "Bench Press"], ["name": "Squat"]])
     }
 
     func testSetMetadataKeepsLegacyTypesAndRoundTripsCustomRemarks() {

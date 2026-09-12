@@ -27,6 +27,21 @@ final class IronLogUITests: XCTestCase {
         return false
     }
 
+    /// The add-exercise sheet is scrollable and may grow as new discovery
+    /// tools are added above the custom field. Bring the field on-screen before
+    /// typing instead of depending on a particular device height.
+    private func scrollToHittable(_ element: XCUIElement, maxSwipes: Int = 5) {
+        var swipes = 0
+        let safeBottom = app.frame.maxY - 220
+        while element.exists,
+              (!element.isHittable || element.frame.maxY > safeBottom),
+              swipes < maxSwipes {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(element.isHittable && element.frame.maxY <= safeBottom)
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
@@ -43,6 +58,7 @@ final class IronLogUITests: XCTestCase {
 
         let exerciseField = app.textFields["new-exercise-name-field"]
         XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        scrollToHittable(exerciseField)
         exerciseField.tap()
         exerciseField.typeText("Push Ups")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -70,6 +86,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["start-free-workout-button"].tap()
         let exerciseField = app.textFields["new-exercise-name-field"]
         XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        scrollToHittable(exerciseField)
         exerciseField.tap()
         exerciseField.typeText("Push Ups")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -110,6 +127,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["start-free-workout-button"].tap()
         let exerciseField = app.textFields["new-exercise-name-field"]
         XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        scrollToHittable(exerciseField)
         exerciseField.tap()
         exerciseField.typeText("Push Ups")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -133,6 +151,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["start-free-workout-button"].tap()
         let exerciseField = app.textFields["new-exercise-name-field"]
         XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        scrollToHittable(exerciseField)
         exerciseField.tap()
         exerciseField.typeText("Push Ups")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -180,6 +199,7 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
         app.swipeUp()
         app.buttons["Weight + Reps"].tap()
+        scrollToHittable(exerciseField)
         exerciseField.tap()
         exerciseField.typeText("Bench Press")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -193,6 +213,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["start-free-workout-button"].tap()
         let exerciseField = app.textFields["new-exercise-name-field"]
         XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        scrollToHittable(exerciseField)
         exerciseField.tap()
         exerciseField.typeText("Push Ups")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -311,5 +332,21 @@ final class IronLogUITests: XCTestCase {
         app.buttons["start-suggested-workout-button"].tap()
         XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Barbell Bench Press"].waitForExistence(timeout: 3))
+    }
+
+    func testExerciseFinderStartsFromMuscleAndAddsItsMatch() {
+        XCTAssertTrue(app.buttons["exercise-finder-entry-button"].waitForExistence(timeout: 6))
+        app.buttons["exercise-finder-entry-button"].tap()
+
+        XCTAssertTrue(app.buttons["exercise-finder-muscle-shoulders"].waitForExistence(timeout: 3))
+        app.buttons["exercise-finder-muscle-shoulders"].tap()
+        app.buttons["find-best-exercise-button"].tap()
+
+        let addRecommendation = app.buttons["add-recommended-exercise-button"]
+        XCTAssertTrue(addRecommendation.waitForExistence(timeout: 6))
+        addRecommendation.tap()
+
+        XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Barbell Overhead Press"].waitForExistence(timeout: 4))
     }
 }

@@ -4,6 +4,7 @@ struct WorkoutsView: View {
     @EnvironmentObject private var app: AppState
     @State private var showDiscardConfirmation = false
     @State private var routineToDelete: SavedRoutine?
+    @State private var showExerciseFinder = false
 
     var body: some View {
         ScrollView {
@@ -58,6 +59,20 @@ struct WorkoutsView: View {
         } message: { routine in
             Text("\(routine.name) will be permanently removed. Your saved workout history will not be affected.")
         }
+        .fullScreenCover(isPresented: $showExerciseFinder) {
+            ExerciseFinderView(
+                library: app.library,
+                sessions: app.sessions,
+                currentExerciseNames: Set(app.todayExercises.map(\.name)),
+                initialMuscleID: app.singleTargetMuscle ?? app.selectedWorkoutMuscleIDs.first
+            ) { template in
+                if !app.hasActiveWorkout {
+                    app.startFreeWorkout()
+                }
+                app.addExercise(template: template)
+                app.selectedTab = .log
+            }
+        }
     }
 
     private var splitStep: some View {
@@ -65,6 +80,15 @@ struct WorkoutsView: View {
             TitleBlock(title: "Split Type", subtitle: "Choose your training program")
             freeWorkoutCard
                 .entrance(0)
+            ExerciseFinderEntryCard(
+                title: "Exercise Finder",
+                subtitle: app.hasActiveWorkout
+                    ? "Find a smart match for the workout in progress"
+                    : "Pick a muscle and let IronLog narrow down the options"
+            ) {
+                showExerciseFinder = true
+            }
+            .entrance(1)
             savedRoutines
             if app.library.splits.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {

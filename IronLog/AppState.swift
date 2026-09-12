@@ -52,6 +52,12 @@ final class AppState: ObservableObject {
     private var timerEndsAt: Date?
     private var timerTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
+    private var syncRetryTask: Task<Void, Never>?
+    private var syncRetryAttempt = 0
+    private var isSyncing = false
+    /// Nil selects the guest/local snapshot; a Supabase user id selects that
+    /// account's isolated on-device snapshot.
+    private var activeStoreOwnerID: String?
     /// Serializes disk writes. `persistAll` can fire many times in quick
     /// succession (e.g. on every keystroke in a set field); chaining each save
     /// onto the previous one guarantees the most recent snapshot is the last
@@ -147,42 +153,26 @@ final class AppState: ObservableObject {
         var suppressOnboarding = false
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") {
-            await localStore.clear()
+            await localStore.clear(ownerID: nil)
             supabase.signOut()
+            let defaults = UserDefaults.standard
+            defaults.removeObject(forKey: "seedDemo")
+            defaults.removeObject(forKey: "seedActive")
+            defaults.removeObject(forKey: "seedTab")
             suppressOnboarding = true // existing UI tests expect a clean slate, not intro cards
         }
         #endif
 
-        let snapshot = await localStore.load()
-        sessions = snapshot.sessions.sorted { $0.createdAt > $1.createdAt }
-        personalRecords = Dictionary(uniqueKeysWithValues: snapshot.personalRecords.map { ($0.exerciseName, $0) })
-        waterByDay = snapshot.waterByDay
-        routines = snapshot.routines ?? []
-        unitPreference = snapshot.unitPreference ?? .kg
-        currentWeightUnit = unitPreference
-        bodyWeight = snapshot.bodyWeight
-        currentBodyWeight = snapshot.bodyWeight ?? 0
-        timerMax = snapshot.timerPreset ?? 90
-        timerSecs = timerMax
-        hasOnboarded = snapshot.hasOnboarded ?? false
-        showingOnboarding = !hasOnboarded && !suppressOnboarding
-        if let draft = snapshot.draft {
-            todayExercises = draft.exercises
-            selectedSplit = draft.split
-            selectedDay = draft.day
-            workoutStep = draft.step ?? (draft.exercises.isEmpty ? .split : .workout)
-            showAddExerciseForm = draft.showAddExerciseForm ?? false
-            addExerciseWeighted = draft.addExerciseWeighted ?? false
-            workoutNote = draft.note ?? ""
-            if !draft.exercises.isEmpty || draft.showAddExerciseForm == true || !(draft.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                selectedTab = .log
-            }
+        let restoredUser = supabase.currentUser
+        activeStoreOwnerID = restoredUser?.id
+        if let ownerID = activeStoreOwnerID {
+            await localStore.migrateLegacyStoreIfNeeded(to: ownerID)
         }
+        applySnapshot(await localStore.load(ownerID: activeStoreOwnerID), suppressOnboarding: suppressOnboarding)
 
-        user = supabase.currentUser
-        if user != nil {
-            await refreshFromCloud()
-            await syncPending()
+        user = restoredUser
+        if restoredUser != nil {
+            await refreshAndSync()
         } else {
             user = localUser
             syncMessage = "Saved on this iPhone"
@@ -206,28 +196,46 @@ final class AppState: ObservableObject {
 
     func signIn(email: String, password: String) async {
         await runBusy {
-            user = try await supabase.signIn(email: email, password: password)
+            let profile = try await supabase.signIn(email: email, password: password)
+            await activateStore(for: profile)
+            user = profile
             showingAuth = false
             authMessage = nil
-            await refreshFromCloud()
-            await syncPending()
+            await refreshAndSync(reportMigrationProgress: true)
         }
     }
 
     func signUp(email: String, password: String, name: String) async -> Bool {
-        await runBusy {
-            try await supabase.signUp(email: email, password: password, name: name)
-            authMessage = "Account created. Check your email to confirm, then sign in."
+        var needsConfirmation = false
+        let succeeded = await runBusy {
+            if let profile = try await supabase.signUp(email: email, password: password, name: name) {
+                await activateStore(for: profile)
+                user = profile
+                showingAuth = false
+                authMessage = nil
+                await refreshAndSync(reportMigrationProgress: true)
+            } else {
+                needsConfirmation = true
+                authMessage = "Account created. Check your email to confirm, then sign in."
+            }
         }
+        return succeeded && needsConfirmation
     }
 
-    func signOut() {
+    func signOut() async {
+        cancelSyncRetry(resetAttempt: true)
+        await saveTask?.value
         supabase.signOut()
+        activeStoreOwnerID = nil
+        applySnapshot(await localStore.load(ownerID: nil), suppressOnboarding: true)
+        hasOnboarded = true
         user = localUser
         showingAuth = false
         authMessage = nil
         syncMessage = "Saved on this iPhone"
         selectedTab = .workouts
+        persistAll()
+        await saveTask?.value
     }
 
     func continueLocally() {
@@ -268,6 +276,9 @@ final class AppState: ObservableObject {
                 } else {
                     try await supabase.deleteWorkoutData()
                 }
+            } catch SupabaseError.sessionExpired {
+                await handleExpiredSession()
+                return false
             } catch {
                 showToast(removingAccount
                     ? "Couldn't delete your account. Check your connection and try again."
@@ -290,10 +301,14 @@ final class AppState: ObservableObject {
         selectedTab = .workouts
         if removingAccount {
             supabase.signOut()
-            user = nil
-            showingAuth = true
+            await localStore.clear(ownerID: activeStoreOwnerID)
+            activeStoreOwnerID = nil
+            applySnapshot(await localStore.load(ownerID: nil), suppressOnboarding: true)
+            hasOnboarded = true
+            user = localUser
+            showingAuth = false
             authMessage = nil
-            syncMessage = "Local first"
+            syncMessage = "Saved on this iPhone"
             showToast("Account deleted")
         } else {
             syncMessage = supabase.isAuthenticated ? "Backed up to Supabase" : "Saved on this iPhone"
@@ -472,7 +487,15 @@ final class AppState: ObservableObject {
         persistAll()
         showToast("\(name) deleted")
         guard supabase.isAuthenticated else { return }
-        Task { try? await supabase.deleteCloudRoutine(id) }
+        Task {
+            do {
+                try await supabase.deleteCloudRoutine(id)
+            } catch SupabaseError.sessionExpired {
+                await handleExpiredSession()
+            } catch {
+                syncMessage = "Saved locally. Cloud delete failed."
+            }
+        }
     }
 
     /// Push every routine the cloud may not have yet. Routines carry no
@@ -489,7 +512,16 @@ final class AppState: ObservableObject {
         let snapshot = routines
         Task {
             for routine in snapshot {
-                try? await supabase.backup(routine: routine)
+                do {
+                    try await supabase.backup(routine: routine)
+                } catch SupabaseError.sessionExpired {
+                    await handleExpiredSession()
+                    return
+                } catch {
+                    syncMessage = "Saved locally. Routine backup failed."
+                    scheduleSyncRetry()
+                    return
+                }
             }
         }
     }
@@ -728,6 +760,8 @@ final class AppState: ObservableObject {
                     persistAll()
                 }
                 syncMessage = "Backed up to Supabase"
+            } catch SupabaseError.sessionExpired {
+                await handleExpiredSession()
             } catch {
                 markFailed(session.id, error: error)
             }
@@ -782,7 +816,13 @@ final class AppState: ObservableObject {
         recalculateRecords()
         persistAll()
         if let cloudID = session.cloudID {
-            try? await supabase.deleteCloudSession(cloudID)
+            do {
+                try await supabase.deleteCloudSession(cloudID)
+            } catch SupabaseError.sessionExpired {
+                await handleExpiredSession()
+            } catch {
+                syncMessage = "Saved locally. Cloud delete failed."
+            }
         }
     }
 
@@ -815,7 +855,14 @@ final class AppState: ObservableObject {
         // ponytail: if the delete fails offline the stale copy can resurface on
         // the next pull (same ceiling as deleteSession); a tombstone queue fixes both.
         if let oldCloudID {
-            try? await supabase.deleteCloudSession(oldCloudID)
+            do {
+                try await supabase.deleteCloudSession(oldCloudID)
+            } catch SupabaseError.sessionExpired {
+                await handleExpiredSession()
+                return
+            } catch {
+                syncMessage = "Saved locally. Cloud update pending."
+            }
         }
         await syncPending()
     }
@@ -898,8 +945,16 @@ final class AppState: ObservableObject {
         notifier.cancel()
     }
 
-    func syncPending() async {
-        guard supabase.isAuthenticated else { return }
+    func syncPending(reportMigrationProgress: Bool = false, resetRetryOnSuccess: Bool = true) async {
+        guard supabase.isAuthenticated, !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+        let uploadCount = sessions.filter { $0.syncState != .synced }.count
+        if reportMigrationProgress, uploadCount > 0 {
+            let message = "Uploading \(uploadCount) workout\(uploadCount == 1 ? "" : "s")…"
+            syncMessage = message
+            showToast(message)
+        }
         let syncedUserID = supabase.currentUser?.id
         for session in sessions where session.syncState != .synced {
             do {
@@ -909,11 +964,26 @@ final class AppState: ObservableObject {
                     sessions[index].userID = syncedUserID ?? sessions[index].userID
                     sessions[index].syncState = .synced
                 }
+            } catch SupabaseError.sessionExpired {
+                await handleExpiredSession()
+                break
             } catch {
                 markFailed(session.id, error: error)
             }
         }
         persistAll()
+        guard supabase.isAuthenticated else { return }
+        let hasFailures = sessions.contains { $0.syncState != .synced }
+        if hasFailures {
+            scheduleSyncRetry()
+        } else {
+            if resetRetryOnSuccess { cancelSyncRetry(resetAttempt: true) }
+            if reportMigrationProgress, uploadCount > 0 {
+                let message = "Uploaded \(uploadCount) workout\(uploadCount == 1 ? "" : "s") to Supabase"
+                syncMessage = message
+                showToast(message)
+            }
+        }
     }
 
     func syncNow() async {
@@ -922,15 +992,15 @@ final class AppState: ObservableObject {
             return
         }
         syncMessage = "Syncing..."
-        await refreshFromCloud()
-        await syncPending()
+        await refreshAndSync()
         if syncMessage == "Syncing..." {
             syncMessage = "Synced with Supabase"
         }
         showToast(syncMessage)
     }
 
-    private func refreshFromCloud() async {
+    @discardableResult
+    private func refreshFromCloud() async -> Bool {
         do {
             let cloudSessions = try await supabase.pullSessions()
             let cloudRecords = try await supabase.pullPRs()
@@ -943,9 +1013,159 @@ final class AppState: ObservableObject {
             persistAll()
             syncRoutines()
             syncMessage = "Synced with Supabase"
+            return true
+        } catch SupabaseError.sessionExpired {
+            await handleExpiredSession()
+            return false
         } catch {
             syncMessage = "Local first. Cloud unavailable."
+            return false
         }
+    }
+
+    private func refreshAndSync(reportMigrationProgress: Bool = false) async {
+        let cloudAvailable = await refreshFromCloud()
+        guard supabase.isAuthenticated else { return }
+        await syncPending(reportMigrationProgress: reportMigrationProgress, resetRetryOnSuccess: false)
+        guard supabase.isAuthenticated else { return }
+        if cloudAvailable && !sessions.contains(where: { $0.syncState != .synced }) {
+            cancelSyncRetry(resetAttempt: true)
+        } else {
+            if !cloudAvailable {
+                syncMessage = "Saved locally. Cloud retry scheduled."
+            }
+            scheduleSyncRetry()
+        }
+    }
+
+    private func handleExpiredSession() async {
+        cancelSyncRetry(resetAttempt: true)
+        await saveTask?.value
+        supabase.signOut()
+        activeStoreOwnerID = nil
+        applySnapshot(await localStore.load(ownerID: nil), suppressOnboarding: true)
+        hasOnboarded = true
+        user = nil
+        showingAuth = true
+        authMessage = SupabaseError.sessionExpired.localizedDescription
+        syncMessage = "Sign in again to resume cloud sync"
+        persistAll()
+    }
+
+    /// Retry transient pull or upload failures without making the user press
+    /// Sync. Launch-time `refreshAndSync` remains the durable fallback when iOS
+    /// suspends the app before one of these timers fires.
+    private func scheduleSyncRetry() {
+        guard supabase.isAuthenticated, syncRetryTask == nil, syncRetryAttempt < 4 else { return }
+        let delays = [5, 15, 45, 120]
+        let delay = delays[syncRetryAttempt]
+        syncRetryAttempt += 1
+        syncRetryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+            guard let self else { return }
+            self.syncRetryTask = nil
+            await self.refreshAndSync()
+        }
+    }
+
+    private func cancelSyncRetry(resetAttempt: Bool = false) {
+        syncRetryTask?.cancel()
+        syncRetryTask = nil
+        if resetAttempt { syncRetryAttempt = 0 }
+    }
+
+    /// Switch from the guest snapshot to an account-scoped snapshot. Guest
+    /// workouts are intentionally imported on sign-in (the advertised local →
+    /// cloud migration), then the guest file is cleared so a later sign-out
+    /// cannot expose those workouts to another person using this device.
+    private func activateStore(for profile: UserProfile) async {
+        await saveTask?.value
+        let guestSnapshot = makeSnapshot()
+        let accountSnapshot = await localStore.load(ownerID: profile.id)
+        let snapshot: AppSnapshot
+        if activeStoreOwnerID == nil {
+            snapshot = Self.merging(guest: guestSnapshot, into: accountSnapshot)
+        } else {
+            snapshot = accountSnapshot
+        }
+        activeStoreOwnerID = profile.id
+        applySnapshot(snapshot)
+        await localStore.save(snapshot, ownerID: profile.id)
+        if activeStoreOwnerID == profile.id {
+            let guestShell = AppSnapshot(
+                unitPreference: snapshot.unitPreference,
+                hasOnboarded: true,
+                timerPreset: snapshot.timerPreset
+            )
+            await localStore.save(guestShell, ownerID: nil)
+        }
+    }
+
+    private static func merging(guest: AppSnapshot, into account: AppSnapshot) -> AppSnapshot {
+        var sessionsByID = Dictionary(uniqueKeysWithValues: account.sessions.map { ($0.id, $0) })
+        for session in guest.sessions where sessionsByID[session.id] == nil {
+            sessionsByID[session.id] = session
+        }
+
+        var routinesByID = Dictionary(uniqueKeysWithValues: (account.routines ?? []).map { ($0.id, $0) })
+        for routine in guest.routines ?? [] where routinesByID[routine.id] == nil {
+            routinesByID[routine.id] = routine
+        }
+
+        var water = account.waterByDay
+        for (day, glasses) in guest.waterByDay {
+            water[day] = max(water[day] ?? 0, glasses)
+        }
+
+        return AppSnapshot(
+            sessions: sessionsByID.values.sorted { $0.createdAt > $1.createdAt },
+            personalRecords: account.personalRecords + guest.personalRecords,
+            waterByDay: water,
+            draft: guest.draft ?? account.draft,
+            unitPreference: account.unitPreference ?? guest.unitPreference,
+            hasOnboarded: (account.hasOnboarded == true || guest.hasOnboarded == true),
+            timerPreset: account.timerPreset ?? guest.timerPreset,
+            routines: routinesByID.values.sorted { $0.createdAt < $1.createdAt },
+            bodyWeight: account.bodyWeight ?? guest.bodyWeight
+        )
+    }
+
+    private func applySnapshot(_ snapshot: AppSnapshot, suppressOnboarding: Bool = false) {
+        resetActiveWorkout()
+        selectedTab = .workouts
+        sessions = snapshot.sessions.sorted { $0.createdAt > $1.createdAt }
+        personalRecords = Dictionary(
+            snapshot.personalRecords.map { ($0.exerciseName, $0) },
+            uniquingKeysWith: { current, candidate in better(candidate, than: current) }
+        )
+        waterByDay = snapshot.waterByDay
+        routines = snapshot.routines ?? []
+        unitPreference = snapshot.unitPreference ?? .kg
+        currentWeightUnit = unitPreference
+        bodyWeight = snapshot.bodyWeight
+        currentBodyWeight = snapshot.bodyWeight ?? 0
+        timerMax = snapshot.timerPreset ?? 90
+        timerSecs = timerMax
+        hasOnboarded = snapshot.hasOnboarded ?? false
+        showingOnboarding = !hasOnboarded && !suppressOnboarding
+
+        if let draft = snapshot.draft {
+            todayExercises = draft.exercises
+            selectedSplit = draft.split
+            selectedDay = draft.day
+            workoutStep = draft.step ?? (draft.exercises.isEmpty ? .split : .workout)
+            showAddExerciseForm = draft.showAddExerciseForm ?? false
+            addExerciseWeighted = draft.addExerciseWeighted ?? false
+            workoutNote = draft.note ?? ""
+            if !draft.exercises.isEmpty || draft.showAddExerciseForm == true || !(draft.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                selectedTab = .log
+            }
+        }
+        updateLiveActivity(clearedDraft: snapshot.draft == nil)
     }
 
     @discardableResult
@@ -1063,6 +1283,7 @@ final class AppState: ObservableObject {
         }
         syncMessage = "Saved locally. Backup failed."
         persistAll()
+        scheduleSyncRetry()
     }
 
     /// Internal (not private) so the Live Activity bridge in another file can
@@ -1072,7 +1293,18 @@ final class AppState: ObservableObject {
     }
 
     private func persistAll(clearDraft: Bool = false, draft: WorkoutDraft? = nil) {
-        let snapshot = AppSnapshot(
+        let snapshot = makeSnapshot(clearDraft: clearDraft, draft: draft)
+        let ownerID = activeStoreOwnerID
+        let previous = saveTask
+        saveTask = Task { [localStore] in
+            await previous?.value
+            await localStore.save(snapshot, ownerID: ownerID)
+        }
+        updateLiveActivity(clearedDraft: clearDraft)
+    }
+
+    private func makeSnapshot(clearDraft: Bool = false, draft: WorkoutDraft? = nil) -> AppSnapshot {
+        AppSnapshot(
             sessions: sessions,
             personalRecords: Array(personalRecords.values),
             waterByDay: waterByDay,
@@ -1083,12 +1315,6 @@ final class AppState: ObservableObject {
             routines: routines,
             bodyWeight: bodyWeight
         )
-        let previous = saveTask
-        saveTask = Task { [localStore] in
-            await previous?.value
-            await localStore.save(snapshot)
-        }
-        updateLiveActivity(clearedDraft: clearDraft)
     }
 
     private var currentDraft: WorkoutDraft? {
@@ -1142,6 +1368,7 @@ final class AppState: ObservableObject {
 extension AppState {
     func applyDemoSeedIfRequested() {
         let defaults = UserDefaults.standard
+        guard !ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") else { return }
         guard defaults.bool(forKey: "seedDemo") else { return }
 
         // Clear any stale draft the local store may have restored, so every

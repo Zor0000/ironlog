@@ -350,6 +350,59 @@ final class AppStateTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(lunges.count, 3)
     }
 
+    func testExerciseFinderStaysWithinMuscleAndExcludesCurrentWorkout() {
+        let app = AppState()
+        let engine = ExerciseRecommendationEngine(
+            library: app.library,
+            sessions: [],
+            currentExerciseNames: ["Barbell Overhead Press"]
+        )
+
+        let matches = engine.recommendations(for: "shoulders")
+
+        XCTAssertEqual(matches.count, 5)
+        XCTAssertTrue(matches.allSatisfy { $0.muscle.id == "shoulders" })
+        XCTAssertFalse(matches.contains { $0.template.name == "Barbell Overhead Press" })
+        XCTAssertEqual(Set(matches.map(\.id)).count, matches.count)
+    }
+
+    func testExerciseFinderRotatesAwayFromVeryRecentExercise() {
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        let shoulder = Muscle(id: "shoulders", label: "Shoulders", systemImage: "figure.arms.open")
+        let first = ExerciseTemplate(name: "Primary Press", sets: 4, reps: "6–8", tip: "")
+        let second = ExerciseTemplate(name: "Alternate Press", sets: 3, reps: "8–10", tip: "")
+        let library = ExerciseLibrary(
+            splits: [],
+            muscles: [shoulder],
+            splitDays: [:],
+            workouts: [:],
+            library: ["shoulders": [first, second]]
+        )
+        let recent = WorkoutSession(
+            createdAt: now.addingTimeInterval(-86_400),
+            muscle: "shoulders",
+            split: nil,
+            note: nil,
+            exercises: [LoggedExercise(name: first.name, bodyweight: false, timed: false, sets: [])]
+        )
+
+        let freshRanking = ExerciseRecommendationEngine(
+            library: library,
+            sessions: [],
+            currentExerciseNames: [],
+            now: now
+        ).recommendations(for: "shoulders")
+        let rotatedRanking = ExerciseRecommendationEngine(
+            library: library,
+            sessions: [recent],
+            currentExerciseNames: [],
+            now: now
+        ).recommendations(for: "shoulders")
+
+        XCTAssertEqual(freshRanking.first?.template.name, first.name)
+        XCTAssertEqual(rotatedRanking.first?.template.name, second.name)
+    }
+
     func testCatalogBodyweightExerciseAddsAsBodyweight() {
         let app = AppState()
         app.startFreeWorkout()
@@ -1349,5 +1402,60 @@ final class AppStateTests: XCTestCase {
         let json = Data(#"{"kind":"run","duration":600,"distance":2000,"route":[],"terrain":"swamp"}"#.utf8)
         let activity = try JSONDecoder().decode(CardioActivity.self, from: json)
         XCTAssertEqual(activity.terrain, .road)
+    }
+
+    func testLocalStoreKeepsGuestAndAccountsIsolated() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("IronLogLocalStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = LocalStore(directory: directory)
+
+        func snapshot(_ label: String) -> AppSnapshot {
+            AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: label, exercises: [])])
+        }
+
+        await store.save(snapshot("Guest"), ownerID: nil)
+        await store.save(snapshot("Account A"), ownerID: "user-a")
+        await store.save(snapshot("Account B"), ownerID: "user-b")
+
+        let guest = await store.load(ownerID: nil)
+        let accountA = await store.load(ownerID: "user-a")
+        let accountB = await store.load(ownerID: "user-b")
+        XCTAssertEqual(guest.sessions.first?.split, "Guest")
+        XCTAssertEqual(accountA.sessions.first?.split, "Account A")
+        XCTAssertEqual(accountB.sessions.first?.split, "Account B")
+
+        await store.clear(ownerID: "user-a")
+        let clearedAccountA = await store.load(ownerID: "user-a")
+        let unchangedAccountB = await store.load(ownerID: "user-b")
+        XCTAssertTrue(clearedAccountA.sessions.isEmpty)
+        XCTAssertEqual(unchangedAccountB.sessions.first?.split, "Account B")
+    }
+
+    func testLegacyStoreMigrationClaimsDataOnlyForFirstAccountStore() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("IronLogLegacyStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = LocalStore(directory: directory)
+        let legacy = AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "Legacy", exercises: [])])
+
+        await store.save(legacy, ownerID: nil)
+        await store.migrateLegacyStoreIfNeeded(to: "user-a")
+
+        let migratedGuest = await store.load(ownerID: nil)
+        let migratedAccount = await store.load(ownerID: "user-a")
+        XCTAssertTrue(migratedGuest.sessions.isEmpty)
+        XCTAssertEqual(migratedAccount.sessions.first?.split, "Legacy")
+
+        let newGuest = AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "New Guest", exercises: [])])
+        await store.save(newGuest, ownerID: nil)
+        await store.migrateLegacyStoreIfNeeded(to: "user-a")
+
+        let retainedGuest = await store.load(ownerID: nil)
+        let retainedAccount = await store.load(ownerID: "user-a")
+        XCTAssertEqual(retainedGuest.sessions.first?.split, "New Guest")
+        XCTAssertEqual(retainedAccount.sessions.first?.split, "Legacy")
     }
 }

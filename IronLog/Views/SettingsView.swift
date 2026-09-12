@@ -90,8 +90,10 @@ struct SettingsView: View {
             }
             if isCloudUser {
                 settingsButton("Sign Out", systemImage: "rectangle.portrait.and.arrow.right") {
-                    app.signOut()
-                    dismiss()
+                    Task {
+                        await app.signOut()
+                        dismiss()
+                    }
                 }
             } else {
                 settingsButton("Sign In / Create Account", systemImage: "person.badge.plus") {
