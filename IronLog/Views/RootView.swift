@@ -195,8 +195,8 @@ struct AuthView: View {
                         if mode == .signIn {
                             await app.signIn(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
                         } else {
-                            let didCreateAccount = await app.signUp(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password, name: name.trimmingCharacters(in: .whitespacesAndNewlines))
-                            if didCreateAccount {
+                            let shouldShowSignIn = await app.signUp(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password, name: name.trimmingCharacters(in: .whitespacesAndNewlines))
+                            if shouldShowSignIn {
                                 mode = .signIn
                             }
                         }

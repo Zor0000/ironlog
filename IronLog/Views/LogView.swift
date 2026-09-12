@@ -16,6 +16,7 @@ struct LogView: View {
     @State private var showSaveRoutine = false
     @State private var routineName = ""
     @State private var draggingExerciseID: ActiveExercise.ID?
+    @State private var showExerciseFinder = false
     @FocusState private var noteFocused: Bool
 
     var body: some View {
@@ -79,6 +80,18 @@ struct LogView: View {
             }
         }
         .animation(AppMotion.quick, value: pendingDeleteSet)
+        .fullScreenCover(isPresented: $showExerciseFinder) {
+            ExerciseFinderView(
+                library: app.library,
+                sessions: app.sessions,
+                currentExerciseNames: Set(app.todayExercises.map(\.name)),
+                initialMuscleID: app.singleTargetMuscle ?? app.selectedWorkoutMuscleIDs.first
+            ) { template in
+                withAnimation(AppMotion.quick) {
+                    app.addExercise(template: template)
+                }
+            }
+        }
         }
     }
 
@@ -322,6 +335,13 @@ struct LogView: View {
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Close add exercise")
+            }
+
+            ExerciseFinderEntryCard(
+                title: "Find a match",
+                subtitle: "Start from a muscle group and let IronLog recommend one"
+            ) {
+                showExerciseFinder = true
             }
 
             ExerciseCatalogPicker(

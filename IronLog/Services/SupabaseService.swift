@@ -33,18 +33,26 @@ final class SupabaseService {
         return currentUser
     }
 
-    func signUp(email: String, password: String, name: String) async throws {
+    /// Returns the signed-in profile when Confirm Email is disabled for the
+    /// Supabase project. When confirmation is required, signup succeeds without
+    /// a session and the caller should ask the user to confirm and sign in.
+    func signUp(email: String, password: String, name: String) async throws -> UserProfile? {
         struct SignUpBody: Encodable {
             var email: String
             var password: String
             var data: [String: String]
         }
-        let _: EmptyResponse = try await authRequest(path: "/auth/v1/signup", body: SignUpBody(email: email, password: password, data: ["full_name": name]))
+        let response: SignUpResponse = try await authRequest(
+            path: "/auth/v1/signup",
+            body: SignUpBody(email: email, password: password, data: ["full_name": name])
+        )
+        guard let session = response.authSession else { return nil }
+        auth = session
+        return currentUser
     }
 
     func signOut() {
-        auth = nil
-        KeychainStore.delete(service: sessionService, account: sessionAccount)
+        invalidateSession()
     }
 
     func pullSessions() async throws -> [WorkoutSession] {
@@ -215,19 +223,15 @@ final class SupabaseService {
     }
 
     private func ensureExercises(_ names: [String]) async throws -> [String: String] {
-        var result: [String: String] = [:]
-        for name in Set(names) {
-            let rows: [RemoteExercise] = try await restPost(
-                path: "/rest/v1/exercises",
-                query: [URLQueryItem(name: "on_conflict", value: "name")],
-                body: RemoteExerciseInsert(name: name),
-                prefer: "resolution=merge-duplicates,return=representation"
-            )
-            if let row = rows.first {
-                result[name] = row.id
-            }
-        }
-        return result
+        let uniqueNames = Array(Set(names)).sorted()
+        guard !uniqueNames.isEmpty else { return [:] }
+        let rows: [RemoteExercise] = try await restPost(
+            path: "/rest/v1/exercises",
+            query: [URLQueryItem(name: "on_conflict", value: "name")],
+            body: uniqueNames.map { RemoteExerciseInsert(name: $0) },
+            prefer: "resolution=merge-duplicates,return=representation"
+        )
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.name, $0.id) })
     }
 
     private func backup(records: [PersonalRecord], exerciseIDs: [String: String], userID: String) async throws {
@@ -253,6 +257,11 @@ final class SupabaseService {
     private func persistAuth() {
         guard let auth, let data = try? JSONEncoder().encode(auth) else { return }
         KeychainStore.save(data, service: sessionService, account: sessionAccount)
+    }
+
+    private func invalidateSession() {
+        auth = nil
+        KeychainStore.delete(service: sessionService, account: sessionAccount)
     }
 
     private func authRequest<Response: Decodable, Body: Encodable>(path: String, body: Body) async throws -> Response {
@@ -328,7 +337,14 @@ final class SupabaseService {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            let payload = try? Self.makeDecoder().decode(SupabaseErrorPayload.self, from: data)
+            let message = payload?.msg
+                ?? payload?.message
+                ?? String(data: data, encoding: .utf8)
+                ?? "HTTP \(http.statusCode)"
+            if payload?.isExpiredRefreshToken == true {
+                throw SupabaseError.sessionExpired
+            }
             if http.statusCode == 401 { throw SupabaseError.unauthorized(message) }
             throw SupabaseError.requestFailed(message)
         }
@@ -340,10 +356,26 @@ final class SupabaseService {
         do {
             return try await decode(request, emptyValue: emptyValue)
         } catch SupabaseError.unauthorized {
-            guard try await refreshSession() else { throw SupabaseError.notAuthenticated }
+            do {
+                guard try await refreshSession() else {
+                    invalidateSession()
+                    throw SupabaseError.sessionExpired
+                }
+            } catch SupabaseError.sessionExpired {
+                invalidateSession()
+                throw SupabaseError.sessionExpired
+            } catch SupabaseError.unauthorized {
+                invalidateSession()
+                throw SupabaseError.sessionExpired
+            }
             var retry = request
             addRestHeaders(to: &retry)
-            return try await decode(retry, emptyValue: emptyValue)
+            do {
+                return try await decode(retry, emptyValue: emptyValue)
+            } catch SupabaseError.unauthorized {
+                invalidateSession()
+                throw SupabaseError.sessionExpired
+            }
         }
     }
 
@@ -359,11 +391,12 @@ final class SupabaseService {
 }
 
 enum SupabaseError: LocalizedError {
-    case notAuthenticated, invalidResponse, emptyResponse, unauthorized(String), requestFailed(String)
+    case notAuthenticated, sessionExpired, invalidResponse, emptyResponse, unauthorized(String), requestFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated: "Sign in to sync with Supabase."
+        case .sessionExpired: "Your session expired. Please sign in again."
         case .invalidResponse: "Supabase returned an invalid response."
         case .emptyResponse: "Supabase returned no data."
         case .unauthorized(let message): message
@@ -378,6 +411,27 @@ struct AuthSession: Codable {
     var accessToken: String
     var refreshToken: String?
     var user: AuthUser
+}
+
+struct SignUpResponse: Codable {
+    var accessToken: String?
+    var refreshToken: String?
+    var user: AuthUser?
+
+    var authSession: AuthSession? {
+        guard let accessToken, !accessToken.isEmpty, let user else { return nil }
+        return AuthSession(accessToken: accessToken, refreshToken: refreshToken, user: user)
+    }
+}
+
+struct SupabaseErrorPayload: Codable {
+    var errorCode: String?
+    var msg: String?
+    var message: String?
+
+    var isExpiredRefreshToken: Bool {
+        errorCode == "refresh_token_not_found" || errorCode == "refresh_token_already_used"
+    }
 }
 
 struct AuthUser: Codable {
