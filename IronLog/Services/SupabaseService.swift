@@ -1,8 +1,14 @@
 import Foundation
+import Supabase
 
 final class SupabaseService {
-    private let projectURL = URL(string: "https://dvqevdydldxjqjrpkkjc.supabase.co")!
-    private let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0"
+    private static let projectURL = URL(string: "https://dvqevdydldxjqjrpkkjc.supabase.co")!
+    private static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0"
+    private static let authCallbackURL = URL(string: "ironlog://auth/callback")!
+    private static let passwordRecoveryURL = URL(string: "ironlog://auth/reset-password")!
+    private let projectURL = SupabaseService.projectURL
+    private let anonKey = SupabaseService.anonKey
+    private let client: SupabaseClient
     private let sessionService = "IronLogSupabaseSession"
     private let sessionAccount = "current"
     private static let iso8601 = ISO8601DateFormatter()
@@ -12,8 +18,40 @@ final class SupabaseService {
     }
 
     init() {
+        client = SupabaseClient(
+            supabaseURL: Self.projectURL,
+            supabaseKey: Self.anonKey,
+            options: SupabaseClientOptions(
+                auth: .init(
+                    redirectToURL: Self.authCallbackURL,
+                    storageKey: "ironlog-auth",
+                    flowType: .pkce
+                )
+            )
+        )
         if let data = KeychainStore.load(service: sessionService, account: sessionAccount) {
             auth = try? JSONDecoder().decode(AuthSession.self, from: data)
+        }
+    }
+
+    /// Moves sessions created by IronLog's original REST auth client into the
+    /// official SDK once. Existing users stay signed in after this upgrade.
+    func restoreSessionIfNeeded() async {
+        if let session = client.auth.currentSession {
+            apply(session)
+            return
+        }
+        guard let legacy = auth,
+              let refreshToken = legacy.refreshToken,
+              !refreshToken.isEmpty else { return }
+        do {
+            let session = try await client.auth.setSession(
+                accessToken: legacy.accessToken,
+                refreshToken: refreshToken
+            )
+            apply(session)
+        } catch {
+            invalidateSession()
         }
     }
 
@@ -26,9 +64,8 @@ final class SupabaseService {
     }
 
     func signIn(email: String, password: String) async throws -> UserProfile {
-        let body = ["email": email, "password": password]
-        let session: AuthSession = try await authRequest(path: "/auth/v1/token?grant_type=password", body: body)
-        auth = session
+        let session = try await client.auth.signIn(email: email, password: password)
+        apply(session)
         guard let currentUser else { throw SupabaseError.emptyResponse }
         return currentUser
     }
@@ -37,21 +74,48 @@ final class SupabaseService {
     /// Supabase project. When confirmation is required, signup succeeds without
     /// a session and the caller should ask the user to confirm and sign in.
     func signUp(email: String, password: String, name: String) async throws -> UserProfile? {
-        struct SignUpBody: Encodable {
-            var email: String
-            var password: String
-            var data: [String: String]
-        }
-        let response: SignUpResponse = try await authRequest(
-            path: "/auth/v1/signup",
-            body: SignUpBody(email: email, password: password, data: ["full_name": name])
+        let response = try await client.auth.signUp(
+            email: email,
+            password: password,
+            data: ["full_name": .string(name)],
+            redirectTo: Self.authCallbackURL
         )
-        guard let session = response.authSession else { return nil }
-        auth = session
+        guard let session = response.session else { return nil }
+        apply(session)
         return currentUser
     }
 
-    func signOut() {
+    func signInWithGoogle() async throws -> UserProfile {
+        let session = try await client.auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: Self.authCallbackURL
+        )
+        apply(session)
+        guard let currentUser else { throw SupabaseError.emptyResponse }
+        return currentUser
+    }
+
+    func requestPasswordReset(email: String) async throws {
+        try await client.auth.resetPasswordForEmail(email, redirectTo: Self.passwordRecoveryURL)
+    }
+
+    func handleAuthCallback(_ url: URL) async throws -> UserProfile {
+        let session = try await client.auth.session(from: url)
+        apply(session)
+        guard let currentUser else { throw SupabaseError.emptyResponse }
+        return currentUser
+    }
+
+    func updatePassword(_ password: String) async throws -> UserProfile {
+        _ = try await client.auth.update(user: UserAttributes(password: password))
+        guard let session = client.auth.currentSession else { throw SupabaseError.notAuthenticated }
+        apply(session)
+        guard let currentUser else { throw SupabaseError.emptyResponse }
+        return currentUser
+    }
+
+    func signOut() async {
+        try? await client.auth.signOut(scope: .local)
         invalidateSession()
     }
 
@@ -380,13 +444,24 @@ final class SupabaseService {
     }
 
     private func refreshSession() async throws -> Bool {
-        guard let refreshToken = auth?.refreshToken, !refreshToken.isEmpty else { return false }
-        let session: AuthSession = try await authRequest(
-            path: "/auth/v1/token?grant_type=refresh_token",
-            body: ["refresh_token": refreshToken]
-        )
-        auth = session
+        let session = try await client.auth.session
+        apply(session)
         return true
+    }
+
+    private func apply(_ session: Session) {
+        let user = session.user
+        auth = AuthSession(
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+            user: AuthUser(
+                id: user.id.uuidString,
+                email: user.email ?? "",
+                userMetadata: UserMetadata(
+                    fullName: user.userMetadata["full_name"]?.stringValue
+                )
+            )
+        )
     }
 }
 

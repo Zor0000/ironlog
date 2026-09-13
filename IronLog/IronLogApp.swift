@@ -13,6 +13,9 @@ struct IronLogApp: App {
                 .task {
                     await appState.boot()
                 }
+                .onOpenURL { url in
+                    Task { await appState.handleAuthURL(url) }
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             // Fold in any sets logged from the Lock Screen while backgrounded.

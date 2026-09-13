@@ -132,95 +132,128 @@ struct AuthView: View {
     @State private var name = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var confirmation = ""
+    @State private var showForgotPassword = false
 
     var body: some View {
         VStack(spacing: 22) {
             Spacer()
             VStack(spacing: 4) {
-                Text("IronLog")
+                Text(app.isPasswordRecovery ? "New password" : "IronLog")
                     .font(.system(size: 52, weight: .black))
                     .fontWidth(.condensed)
-                    .tracking(4)
+                    .tracking(app.isPasswordRecovery ? 0 : 4)
                     .foregroundStyle(Theme.accent)
-                Text("Track your gains. Own your progress.")
+                Text(app.isPasswordRecovery
+                     ? "Choose a new password for your account."
+                     : "Track your gains. Own your progress.")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.muted2)
             }
 
             VStack(spacing: 14) {
-                Picker("", selection: $mode) {
-                    Text("Sign In").tag(AuthMode.signIn)
-                    Text("Sign Up").tag(AuthMode.signUp)
-                }
-                .pickerStyle(.segmented)
-                .tint(Theme.accent)
-                .animation(AppMotion.quick, value: mode)
-                .disabled(app.isBusy)
+                if app.isPasswordRecovery {
+                    passwordRecoveryForm
+                } else {
+                    Picker("", selection: $mode) {
+                        Text("Sign In").tag(AuthMode.signIn)
+                        Text("Sign Up").tag(AuthMode.signUp)
+                    }
+                    .pickerStyle(.segmented)
+                    .tint(Theme.accent)
+                    .animation(AppMotion.quick, value: mode)
+                    .disabled(app.isBusy)
 
-                if let message = app.authMessage {
-                    Text(message)
-                        .font(.system(size: 13))
-                        .foregroundStyle(message.contains("created") ? Theme.success : Theme.danger)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                    authMessage
 
-                if mode == .signUp {
-                    TextField("", text: $name)
-                        .textContentType(.name)
+                    if mode == .signUp {
+                        TextField("", text: $name)
+                            .textContentType(.name)
+                            .fieldStyle()
+                            .placeholderText("Your name", visible: name.isEmpty)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    TextField("", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         .fieldStyle()
-                        .placeholderText("Your name", visible: name.isEmpty)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-                TextField("", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .fieldStyle()
-                    .placeholderText("Email address", visible: email.isEmpty)
-                SecureField("", text: $password)
-                    .textContentType(mode == .signIn ? .password : .newPassword)
-                    .fieldStyle()
-                    .placeholderText(mode == .signIn ? "Password" : "Password (6+ characters)", visible: password.isEmpty)
-                if mode == .signUp {
-                    Text("Use at least 6 characters.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                        .placeholderText("Email address", visible: email.isEmpty)
+                    SecureField("", text: $password)
+                        .textContentType(mode == .signIn ? .password : .newPassword)
+                        .fieldStyle()
+                        .placeholderText(mode == .signIn ? "Password" : "Password (8+ characters)", visible: password.isEmpty)
 
-                Button {
-                    NativeFeedback.light()
-                    Task {
-                        if mode == .signIn {
-                            await app.signIn(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
-                        } else {
-                            let shouldShowSignIn = await app.signUp(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password, name: name.trimmingCharacters(in: .whitespacesAndNewlines))
-                            if shouldShowSignIn {
-                                mode = .signIn
+                    if mode == .signIn {
+                        Button("Forgot password?") {
+                            app.authMessage = nil
+                            showForgotPassword = true
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .disabled(app.isBusy)
+                        .accessibilityIdentifier("forgot-password-button")
+                    } else {
+                        Text("Use at least 8 characters.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.muted2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Button {
+                        NativeFeedback.light()
+                        Task {
+                            if mode == .signIn {
+                                await app.signIn(email: cleanEmail, password: password)
+                            } else {
+                                let shouldShowSignIn = await app.signUp(
+                                    email: cleanEmail,
+                                    password: password,
+                                    name: name.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
+                                if shouldShowSignIn { mode = .signIn }
                             }
                         }
+                    } label: {
+                        busyLabel(authButtonTitle, darkSpinner: true)
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        if app.isBusy {
-                            ProgressView()
-                                .tint(.black)
-                        }
-                        Text(authButtonTitle)
-                    }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(!canSubmit)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(!canSubmit)
 
-                Button {
-                    NativeFeedback.selection()
-                    app.continueLocally()
-                } label: {
-                    Text("Continue locally")
+                    HStack(spacing: 12) {
+                        Rectangle().fill(Theme.border).frame(height: 1)
+                        Text("OR")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.muted2)
+                        Rectangle().fill(Theme.border).frame(height: 1)
+                    }
+
+                    Button {
+                        NativeFeedback.light()
+                        Task { await app.signInWithGoogle() }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text("G")
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
+                            Text("Continue with Google")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(app.isBusy)
+                    .accessibilityIdentifier("google-sign-in-button")
+
+                    Button {
+                        NativeFeedback.selection()
+                        app.continueLocally()
+                    } label: {
+                        Text("Continue locally")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(app.isBusy)
                 }
-                .buttonStyle(SecondaryButtonStyle())
-                .disabled(app.isBusy)
             }
             .cardStyle(radius: 18)
             .padding(.horizontal, 28)
@@ -228,14 +261,73 @@ struct AuthView: View {
             .entrance()
             Spacer()
         }
+        .sheet(isPresented: $showForgotPassword) {
+            ForgotPasswordView(initialEmail: cleanEmail)
+                .environmentObject(app)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    @ViewBuilder
+    private var authMessage: some View {
+        if let message = app.authMessage {
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(isPositiveMessage(message) ? Theme.success : Theme.danger)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("auth-message")
+        }
+    }
+
+    private var passwordRecoveryForm: some View {
+        VStack(spacing: 14) {
+            authMessage
+            SecureField("", text: $password)
+                .textContentType(.newPassword)
+                .fieldStyle()
+                .placeholderText("New password", visible: password.isEmpty)
+            SecureField("", text: $confirmation)
+                .textContentType(.newPassword)
+                .fieldStyle()
+                .placeholderText("Confirm new password", visible: confirmation.isEmpty)
+            Text(password.count >= 8 && confirmation != password
+                 ? "Passwords do not match."
+                 : "Use at least 8 characters.")
+                .font(.system(size: 12))
+                .foregroundStyle(password.count >= 8 && confirmation != password ? Theme.danger : Theme.muted2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                NativeFeedback.light()
+                Task { await app.completePasswordReset(password) }
+            } label: {
+                busyLabel(app.isBusy ? "Updating…" : "Update Password", darkSpinner: true)
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(app.isBusy || password.count < 8 || password != confirmation)
+            .accessibilityIdentifier("update-password-button")
+        }
+    }
+
+    private func busyLabel(_ title: String, darkSpinner: Bool) -> some View {
+        HStack(spacing: 8) {
+            if app.isBusy {
+                ProgressView().tint(darkSpinner ? .black : Theme.text)
+            }
+            Text(title)
+        }
+    }
+
+    private var cleanEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var canSubmit: Bool {
         guard !app.isBusy,
-              !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !cleanEmail.isEmpty,
               !password.isEmpty else { return false }
         if mode == .signUp {
-            return password.count >= 6 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return password.count >= 8 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         return true
     }
@@ -245,6 +337,73 @@ struct AuthView: View {
             return mode == .signIn ? "Signing In…" : "Creating Account…"
         }
         return mode == .signIn ? "Sign In" : "Create Account"
+    }
+
+    private func isPositiveMessage(_ message: String) -> Bool {
+        message.contains("created") || message.contains("reset link")
+    }
+
+}
+
+private struct ForgotPasswordView: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var email: String
+    @State private var sent = false
+
+    init(initialEmail: String) {
+        _email = State(initialValue: initialEmail)
+    }
+
+    var body: some View {
+        ZStack {
+            NativeBackground()
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Reset password")
+                    .font(.system(size: 30, weight: .black))
+                    .fontWidth(.condensed)
+                Text(sent
+                     ? "If an account exists for that email, a reset link is on its way."
+                     : "Enter your account email and we’ll send you a secure reset link.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(sent ? Theme.success : Theme.muted2)
+
+                if !sent {
+                    TextField("", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .fieldStyle()
+                        .placeholderText("Email address", visible: email.isEmpty)
+                    if let message = app.authMessage {
+                        Text(message)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.danger)
+                    }
+                    Button {
+                        Task {
+                            sent = await app.requestPasswordReset(
+                                email: email.trimmingCharacters(in: .whitespacesAndNewlines)
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if app.isBusy { ProgressView().tint(.black) }
+                            Text(app.isBusy ? "Sending…" : "Send Reset Link")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(app.isBusy || !email.contains("@"))
+                    .accessibilityIdentifier("send-reset-link-button")
+                } else {
+                    Button("Done") { dismiss() }
+                        .buttonStyle(PrimaryButtonStyle())
+                }
+            }
+            .padding(28)
+        }
+        .onAppear { app.authMessage = nil }
     }
 }
 

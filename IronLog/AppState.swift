@@ -7,6 +7,7 @@ final class AppState: ObservableObject {
     @Published var user: UserProfile?
     @Published var selectedTab: WorkoutTab = .workouts
     @Published var authMessage: String?
+    @Published var isPasswordRecovery = false
     @Published var toast: String?
     @Published var isBusy = false
 
@@ -150,11 +151,12 @@ final class AppState: ObservableObject {
     }
 
     func boot() async {
+        await supabase.restoreSessionIfNeeded()
         var suppressOnboarding = false
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") {
             await localStore.clear(ownerID: nil)
-            supabase.signOut()
+            await supabase.signOut()
             let defaults = UserDefaults.standard
             defaults.removeObject(forKey: "seedDemo")
             defaults.removeObject(forKey: "seedActive")
@@ -191,17 +193,16 @@ final class AppState: ObservableObject {
 
         #if DEBUG
         applyDemoSeedIfRequested()
+        if ProcessInfo.processInfo.arguments.contains("UITest_ShowAuth") {
+            showAuth()
+        }
         #endif
     }
 
     func signIn(email: String, password: String) async {
         await runBusy {
             let profile = try await supabase.signIn(email: email, password: password)
-            await activateStore(for: profile)
-            user = profile
-            showingAuth = false
-            authMessage = nil
-            await refreshAndSync(reportMigrationProgress: true)
+            await finishAuthentication(profile)
         }
     }
 
@@ -209,11 +210,7 @@ final class AppState: ObservableObject {
         var needsConfirmation = false
         let succeeded = await runBusy {
             if let profile = try await supabase.signUp(email: email, password: password, name: name) {
-                await activateStore(for: profile)
-                user = profile
-                showingAuth = false
-                authMessage = nil
-                await refreshAndSync(reportMigrationProgress: true)
+                await finishAuthentication(profile)
             } else {
                 needsConfirmation = true
                 authMessage = "Account created. Check your email to confirm, then sign in."
@@ -222,10 +219,62 @@ final class AppState: ObservableObject {
         return succeeded && needsConfirmation
     }
 
+    func signInWithGoogle() async {
+        await runBusy {
+            let profile = try await supabase.signInWithGoogle()
+            await finishAuthentication(profile)
+        }
+    }
+
+    @discardableResult
+    func requestPasswordReset(email: String) async -> Bool {
+        let succeeded = await runBusy {
+            try await supabase.requestPasswordReset(email: email)
+        }
+        if succeeded {
+            authMessage = "If an account exists for that email, a reset link is on its way."
+        }
+        return succeeded
+    }
+
+    func handleAuthURL(_ url: URL) async {
+        guard url.scheme?.lowercased() == "ironlog" else { return }
+        await runBusy {
+            let profile = try await supabase.handleAuthCallback(url)
+            if url.path.lowercased().contains("reset-password") {
+                user = profile
+                showingAuth = true
+                isPasswordRecovery = true
+                authMessage = nil
+            } else {
+                await finishAuthentication(profile)
+            }
+        }
+    }
+
+    @discardableResult
+    func completePasswordReset(_ password: String) async -> Bool {
+        await runBusy {
+            let profile = try await supabase.updatePassword(password)
+            isPasswordRecovery = false
+            await finishAuthentication(profile)
+            showToast("Password updated")
+        }
+    }
+
+    private func finishAuthentication(_ profile: UserProfile) async {
+        await activateStore(for: profile)
+        user = profile
+        showingAuth = false
+        isPasswordRecovery = false
+        authMessage = nil
+        await refreshAndSync(reportMigrationProgress: true)
+    }
+
     func signOut() async {
         cancelSyncRetry(resetAttempt: true)
         await saveTask?.value
-        supabase.signOut()
+        await supabase.signOut()
         activeStoreOwnerID = nil
         applySnapshot(await localStore.load(ownerID: nil), suppressOnboarding: true)
         hasOnboarded = true
@@ -241,12 +290,14 @@ final class AppState: ObservableObject {
     func continueLocally() {
         user = localUser
         showingAuth = false
+        isPasswordRecovery = false
         authMessage = nil
         syncMessage = "Saved on this iPhone"
     }
 
     func showAuth() {
         showingAuth = true
+        isPasswordRecovery = false
         authMessage = nil
     }
 
@@ -300,7 +351,7 @@ final class AppState: ObservableObject {
         await saveTask?.value
         selectedTab = .workouts
         if removingAccount {
-            supabase.signOut()
+            await supabase.signOut()
             await localStore.clear(ownerID: activeStoreOwnerID)
             activeStoreOwnerID = nil
             applySnapshot(await localStore.load(ownerID: nil), suppressOnboarding: true)
@@ -1041,7 +1092,7 @@ final class AppState: ObservableObject {
     private func handleExpiredSession() async {
         cancelSyncRetry(resetAttempt: true)
         await saveTask?.value
-        supabase.signOut()
+        await supabase.signOut()
         activeStoreOwnerID = nil
         applySnapshot(await localStore.load(ownerID: nil), suppressOnboarding: true)
         hasOnboarded = true

@@ -7,6 +7,9 @@ packages:
   Liveline:
     url: https://github.com/ParthJadhav/liveline-swift.git
     from: 0.7.0
+  Supabase:
+    url: https://github.com/supabase/supabase-swift.git
+    from: 2.55.2
 settings:
   base:
     MARKETING_VERSION: 1.0
@@ -25,6 +28,7 @@ targets:
     dependencies:
       - target: IronLogWidgetExtension
       - package: Liveline
+      - package: Supabase
     settings:
       base:
         BASE_BUNDLE_ID: com.parthjadhav.ironlog

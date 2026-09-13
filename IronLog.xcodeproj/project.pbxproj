@@ -12,7 +12,6 @@
 		0CAEC92A90D144116D7DB4AD /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */; };
 		155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BD2BA9DE192DFF44B03330 /* LogView.swift */; };
 		281B71D30098F114656AA639 /* WorkoutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */; };
-		EF0D10000000000000000001 /* ExerciseFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0D10000000000000000002 /* ExerciseFinderView.swift */; };
 		291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4D54847F3760FF9E68C832 /* LocalStore.swift */; };
 		2A44DFB3109C1CEEF94579E7 /* RunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E109B1235B2AC42D7704C908 /* RunView.swift */; };
 		3055064C6BEFAFBDF7F2D6C6 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6C857F480AB04F72B2C84F /* WorkoutActivityAttributes.swift */; };
@@ -24,6 +23,8 @@
 		52B75DD8DDB2442BA56EA04C /* IronLogWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EA0588620B15D8527DEBAC /* IronLogWidgetBundle.swift */; };
 		5345FA5CC3D2C5139A0BBFB6 /* AppState+LiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1F2B7975A30F31806173C7 /* AppState+LiveActivity.swift */; };
 		56640A7727CE4B5BE2516B31 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFB9A623DBC89D3D0FCD0C8 /* SettingsView.swift */; };
+		586A4E4D212F3DEFBA23208B /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6A9C4AB88330A9FFC30C0FEC /* Supabase */; };
+		64CA6939BEE500E4FEF2C10F /* ExerciseFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABADC5F4EB91E23D49DEB387 /* ExerciseFinderView.swift */; };
 		6586E9525AD36B8EE56067DE /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */; };
 		68389DABBF5C51C093D30A71 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BC36223073AEFE8DA47054 /* Theme.swift */; };
 		685106BF5ADB0BB51D134B5D /* LiveWorkoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC71076D6360E4263A5BCDA0 /* LiveWorkoutEngine.swift */; };
@@ -106,13 +107,13 @@
 		9F11C8514ADE4D2439119EAE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrary.swift; sourceTree = "<group>"; };
 		A4AB0AF5E7CB33AF4B41D558 /* SupabaseWireFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseWireFormatTests.swift; sourceTree = "<group>"; };
+		ABADC5F4EB91E23D49DEB387 /* ExerciseFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseFinderView.swift; sourceTree = "<group>"; };
 		ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLiveActivityIntents.swift; sourceTree = "<group>"; };
 		B15884452B261DC7C80276FD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IronLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BE559FE293B780F2CEFB2966 /* IronLogWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = IronLogWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutsView.swift; sourceTree = "<group>"; };
-		EF0D10000000000000000002 /* ExerciseFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseFinderView.swift; sourceTree = "<group>"; };
 		C900D2DC3721D95BB94BDCC8 /* IronLogUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = IronLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8ADC01A0B1CEE349A4C8E3E /* WorkoutLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLiveActivity.swift; sourceTree = "<group>"; };
 		DC4D54847F3760FF9E68C832 /* LocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStore.swift; sourceTree = "<group>"; };
@@ -130,6 +131,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A4A3706F3EBABF148ABC4398 /* Liveline in Frameworks */,
+				586A4E4D212F3DEFBA23208B /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,7 +223,7 @@
 			isa = PBXGroup;
 			children = (
 				4BD1B0716FEAA0A7D27A95F6 /* ConfirmActionModal.swift */,
-				EF0D10000000000000000002 /* ExerciseFinderView.swift */,
+				ABADC5F4EB91E23D49DEB387 /* ExerciseFinderView.swift */,
 				E4C4FD635EC34C0285006A34 /* HistoryView.swift */,
 				47BD2BA9DE192DFF44B03330 /* LogView.swift */,
 				B15884452B261DC7C80276FD /* RootView.swift */,
@@ -297,6 +299,7 @@
 			name = IronLog;
 			packageProductDependencies = (
 				19684D3C856B8ABA30E6402C /* Liveline */,
+				6A9C4AB88330A9FFC30C0FEC /* Supabase */,
 			);
 			productName = IronLog;
 			productReference = BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */;
@@ -372,6 +375,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B9C1ABA69DCBA1BB8FE3148F /* XCRemoteSwiftPackageReference "liveline-swift" */,
+				F273ABB44132C96003502141 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 495CA01E4CE7E827A22E4F5C /* Products */;
@@ -417,6 +421,7 @@
 				5345FA5CC3D2C5139A0BBFB6 /* AppState+LiveActivity.swift in Sources */,
 				BFAC9AD4ADD2C0450067503A /* AppState.swift in Sources */,
 				D3B6A583F212C9566A5EC796 /* ConfirmActionModal.swift in Sources */,
+				64CA6939BEE500E4FEF2C10F /* ExerciseFinderView.swift in Sources */,
 				89AD41ECC9F5BCC5598FDC3B /* ExerciseLibrary.swift in Sources */,
 				40E46254FAA5036F5235C2EE /* HistoryView.swift in Sources */,
 				AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */,
@@ -424,7 +429,6 @@
 				9944DCF00295EBEF41988DB5 /* LiveWorkoutModels.swift in Sources */,
 				291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */,
 				155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */,
-				EF0D10000000000000000001 /* ExerciseFinderView.swift in Sources */,
 				4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */,
 				3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */,
 				2A44DFB3109C1CEEF94579E7 /* RunView.swift in Sources */,
@@ -814,6 +818,14 @@
 				minimumVersion = 0.7.0;
 			};
 		};
+		F273ABB44132C96003502141 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.55.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -821,6 +833,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B9C1ABA69DCBA1BB8FE3148F /* XCRemoteSwiftPackageReference "liveline-swift" */;
 			productName = Liveline;
+		};
+		6A9C4AB88330A9FFC30C0FEC /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F273ABB44132C96003502141 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

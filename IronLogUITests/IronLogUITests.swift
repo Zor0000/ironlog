@@ -50,6 +50,18 @@ final class IronLogUITests: XCTestCase {
         app.launch()
     }
 
+    func testAuthScreenOffersPasswordResetAndGoogle() {
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_ShowAuth"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["forgot-password-button"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.buttons["google-sign-in-button"].exists)
+        app.buttons["forgot-password-button"].tap()
+        XCTAssertTrue(app.staticTexts["Reset password"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["send-reset-link-button"].exists)
+    }
+
     func testFreeWorkoutCanAddExerciseCompleteSetAndSave() {
         XCTAssertTrue(app.buttons["Today"].waitForExistence(timeout: 6))
         app.buttons["Today"].tap()
