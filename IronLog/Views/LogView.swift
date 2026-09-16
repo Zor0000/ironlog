@@ -496,10 +496,6 @@ struct LogExerciseCard: View {
                                 .foregroundStyle(Theme.muted2)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.muted2)
-                            .rotationEffect(.degrees(exercise.expanded ? 90 : 0))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -512,6 +508,25 @@ struct LogExerciseCard: View {
                     dragPreview
                 }
 
+                // Expansion has its own generous target, leaving the title
+                // area clean and separating the two exercise-level actions.
+                Button {
+                    NativeFeedback.selection()
+                    withAnimation(AppMotion.quick) {
+                        app.toggleExercise(exercise.id)
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.muted2)
+                        .rotationEffect(.degrees(exercise.expanded ? 90 : 0))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(TactileButtonStyle())
+                .accessibilityLabel(exercise.expanded ? "Collapse \(exercise.name)" : "Expand \(exercise.name)")
+                .accessibilityIdentifier("exercise-expand-button")
+
                 Button {
                     NativeFeedback.selection()
                     onConfirmDelete()
@@ -519,6 +534,8 @@ struct LogExerciseCard: View {
                     Image(systemName: "trash")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Theme.muted2)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(TactileButtonStyle())
                 .accessibilityLabel("Remove \(exercise.name)")
@@ -680,6 +697,9 @@ struct LogExerciseCard: View {
                     Image(systemName: "minus.circle")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(exercise.sets.count > 1 ? Theme.muted2 : Theme.muted)
+                        // Match the existing check/remark row height without
+                        // changing this control's width or its siblings.
+                        .frame(height: 34)
                 }
                 .buttonStyle(TactileButtonStyle())
                 .disabled(exercise.sets.count <= 1)
