@@ -1,6 +1,26 @@
-# IronLog — Personal Gym Tracker
+# IronLog
 
-A simple, free gym tracker: a **native iOS app** (SwiftUI) backed by Supabase. No ads, no build step, no third-party SDKs.
+> **Launching soon** — a focused, free gym and running tracker for iPhone.
+
+IronLog makes it easy to plan a workout, log every set, record a run, and see the progress you have earned. It is a native SwiftUI app backed by Supabase—no ads, no third-party SDKs, and no unnecessary noise.
+
+## Built to keep momentum
+
+- **Plan and log workouts** — choose a split, browse a full exercise library, and check off weighted sets and reps as you train.
+- **Record every run** — capture time, distance, elevation gain, and terrain for runs, walks, treadmill sessions, and trails.
+- **Keep the full story** — revisit past sessions, personal records, and notes whenever you need them.
+- **See your progress** — follow sessions, streaks, total sets, training volume, and exercise-specific trends.
+
+## Inside IronLog
+
+<table>
+  <tr>
+    <td width="25%" align="center"><img src="images/workout-logger.png" alt="Workout logger with completed sets" width="100%" /><br /><strong>Workout logger</strong><br />Find exercises and log sets as you go.</td>
+    <td width="25%" align="center"><img src="images/run.png" alt="Run logging screen" width="100%" /><br /><strong>Run logging</strong><br />Capture distance, elevation, and terrain.</td>
+    <td width="25%" align="center"><img src="images/history.png" alt="Workout history screen" width="100%" /><br /><strong>History</strong><br />Your past sessions, exercises, and notes.</td>
+    <td width="25%" align="center"><img src="images/stats.png" alt="Stats dashboard" width="100%" /><br /><strong>Stats</strong><br />Sessions, streaks, volume, and progress.</td>
+  </tr>
+</table>
 
 ## Features
 
@@ -93,6 +113,7 @@ The [script header](scripts/install_iphone.sh) lists the one-time setup (sign in
 IronLog/            SwiftUI app (Views/, Services/, Live/ = Live Activity)
 IronLogWidget/      Lock-screen Live Activity widget extension
 IronLogTests/       Unit tests
+images/             README product screenshots
 supabase/           Database migrations, RLS tests, and account-deletion Edge Function
 scripts/            build_ios_release.sh, upload_testflight.sh, install_iphone.sh
 .github/workflows/  supabase-keepalive.yml (daily ping so the free tier never pauses)
