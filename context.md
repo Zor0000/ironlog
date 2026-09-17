@@ -66,4 +66,4 @@ scripts/upload_testflight.sh    # upload to App Store Connect (requires ASC cred
 ```
 
 ## Supabase Keep-alive
-`.github/workflows/supabase-keepalive.yml` — runs daily at 09:00 UTC, pings `/rest/v1/exercises?select=id&limit=1` with `--retry 5`. Prevents free-tier auto-pause (which requires a manual restore if it fires).
+`.github/workflows/supabase-keepalive.yml` — runs every six hours, issuing read-only REST queries with the `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions secret. Prevents free-tier auto-pause without granting the anonymous role database access.

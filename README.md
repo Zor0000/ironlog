@@ -52,6 +52,10 @@ A simple, free gym tracker: a **native iOS app** (SwiftUI) backed by Supabase. N
 - `supabase/config.toml` holds non-secret project configuration. Provider secrets and SMTP passwords remain in the Supabase dashboard or CI secrets; do not run `supabase config push` without supplying those secrets.
 - Validate policies locally with `supabase test db` before deploying database changes.
 
+### Keep-alive workflow
+
+The scheduled keep-alive workflow queries the database with the server-side `service_role` key because the anonymous role is intentionally denied table access. Store it as the repository Actions secret `SUPABASE_SERVICE_ROLE_KEY`; never commit it or add it to the iOS app.
+
 ## 2. Configure Your Keys
 
 Point the app at your own Supabase project in [`IronLog/Services/SupabaseService.swift`](IronLog/Services/SupabaseService.swift): set `projectURL` and `anonKey`.

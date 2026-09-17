@@ -19,20 +19,33 @@ jobs:
       - name: Ping Supabase REST endpoints
         env:
           SUPABASE_URL: https://dvqevdydldxjqjrpkkjc.supabase.co
-          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0
+          # The tables intentionally deny the anonymous role. This job runs
+          # server-side, so use the RLS-bypassing key from a GitHub secret.
+          # Never put this key in the app or in the repository.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -e
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY GitHub Actions secret"
+            exit 1
+          fi
           # Several tables per run, so a run is "a few requests" rather than one.
-          # RLS returns [] to anon, which is fine — the query still executes in
-          # Postgres, and executing is what the pause heuristic counts.
+          # The service role bypasses RLS, but all requests remain read-only.
           for table in exercises sessions routines; do
             # Retry to ride out transient DNS/5xx blips (a paused project fails DNS).
             code=$(curl -s -o /tmp/body -w "%{http_code}" \
               --retry 5 --retry-all-errors --retry-delay 10 --max-time 30 \
-              -H "apikey: $SUPABASE_ANON_KEY" \
-              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               "$SUPABASE_URL/rest/v1/$table?select=id&limit=1")
-            echo "$table -> HTTP $code $(cat /tmp/body)"
+            # Do not echo successful response data into the Actions log; this
+            # role can read every user's rows. The error body is useful when a
+            # table is renamed or the credential is rotated.
+            if [ "$code" != "200" ]; then
+              echo "$table -> HTTP $code $(cat /tmp/body)"
+            else
+              echo "$table -> HTTP $code"
+            fi
             # Fail loudly on 404/401: a renamed table or rotated key would
             # otherwise keep "succeeding" while pinging nothing.
             test "$code" = "200"
