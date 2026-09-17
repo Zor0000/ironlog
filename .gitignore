@@ -44,6 +44,10 @@ bun.lock
 .env.local
 .env.*.local
 
+# Supabase CLI state. The migration SQL and config.toml are source-controlled;
+# this directory only records the machine's currently linked project.
+supabase/.temp/
+
 # Signing material. build/ is ignored already and that is where
 # scripts/new_signing_certificate.sh writes, but this repository is public and a
 # committed private key would have to be treated as leaked wherever it landed.

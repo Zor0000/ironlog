@@ -27,21 +27,30 @@ A simple, free gym tracker: a **native iOS app** (SwiftUI) backed by Supabase. N
 ## 1. Backend Setup (Supabase)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. In the **SQL Editor**, create the tables the app expects (all with Row Level Security so users only see their own rows):
-   - `exercises` — master exercise list
-   - `sessions` — one row per workout
-   - `session_sets` — one row per set
-   - `personal_records` — best weight per exercise per user
-   - `routines` — user-created reusable workouts
-3. From **Settings → API**, copy your **Project URL** and **anon / public key** for the next step.
-4. Link the Supabase CLI to your project and deploy the authenticated account-deletion function:
+2. From **Settings → API**, copy your **Project URL** and **anon / public key** for the next step.
+3. Link the Supabase CLI, apply the source-controlled schema and RLS migrations, then deploy the authenticated account-deletion function:
 
    ```bash
    supabase link --project-ref YOUR_PROJECT_REF
+   supabase db push
    supabase functions deploy delete-account
    ```
 
    Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the function. Keep the service-role key server-side; never add it to the iOS app.
+
+4. To enable Google sign-in, add the Google OAuth client in **Authentication → Providers**. In Google Cloud, set the consent-screen app name to **IronLog** and register this Supabase callback exactly:
+
+   ```text
+   https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
+   ```
+
+   The iOS deep link (`ironlog://auth/callback`) belongs in Supabase Auth's Redirect URLs, not in Google Cloud.
+
+### Supabase source of truth
+
+- `supabase/migrations/` is the complete schema history. The first three files are a recovered, squashed baseline for migrations that existed remotely before the source was committed; all future database changes must be new migrations.
+- `supabase/config.toml` holds non-secret project configuration. Provider secrets and SMTP passwords remain in the Supabase dashboard or CI secrets; do not run `supabase config push` without supplying those secrets.
+- Validate policies locally with `supabase test db` before deploying database changes.
 
 ## 2. Configure Your Keys
 
@@ -80,7 +89,7 @@ The [script header](scripts/install_iphone.sh) lists the one-time setup (sign in
 IronLog/            SwiftUI app (Views/, Services/, Live/ = Live Activity)
 IronLogWidget/      Lock-screen Live Activity widget extension
 IronLogTests/       Unit tests
-supabase/           Authenticated account-deletion Edge Function
+supabase/           Database migrations, RLS tests, and account-deletion Edge Function
 scripts/            build_ios_release.sh, upload_testflight.sh, install_iphone.sh
 .github/workflows/  supabase-keepalive.yml (daily ping so the free tier never pauses)
 ```
