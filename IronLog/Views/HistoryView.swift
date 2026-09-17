@@ -564,6 +564,9 @@ struct EditSessionSheet: View {
                             Image(systemName: "minus.circle")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(Theme.muted2)
+                                // Keep the remove action aligned with the
+                                // input and set-detail controls in this row.
+                                .frame(height: 34)
                         }
                         .buttonStyle(TactileButtonStyle())
                         .accessibilityLabel("Remove set")
