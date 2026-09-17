@@ -194,9 +194,13 @@ final class SupabaseService {
         guard let user = currentUser else { throw SupabaseError.notAuthenticated }
         if let cloudID = local.cloudID { return cloudID }
 
+        // Resolve the shared exercise catalogue first. This can fail for an
+        // invalid name or a permission problem; doing it before inserting the
+        // session means such a failure cannot leave an empty session header in
+        // the user's cloud history.
+        let exerciseIDs = try await ensureExercises(local.exercises.map(\.name))
         let remoteSession = try await insertSession(local, userID: user.id)
         do {
-            let exerciseIDs = try await ensureExercises(local.exercises.map(\.name))
             // `setIndex` is the position in this flat list, so it records both
             // exercise order and set order in one column — a pull sorts by it and
             // groups by first appearance to rebuild the session as it was logged.
@@ -225,8 +229,16 @@ final class SupabaseService {
             try await backup(records: records, exerciseIDs: exerciseIDs, userID: user.id)
             return remoteSession.id
         } catch {
-            try? await deleteCloudSession(remoteSession.id)
-            throw error
+            let backupError = error
+            do {
+                try await deleteCloudSession(remoteSession.id)
+            } catch {
+                throw SupabaseError.partialBackup(
+                    backup: backupError.localizedDescription,
+                    cleanup: error.localizedDescription
+                )
+            }
+            throw backupError
         }
     }
 
@@ -289,11 +301,24 @@ final class SupabaseService {
     private func ensureExercises(_ names: [String]) async throws -> [String: String] {
         let uniqueNames = Array(Set(names)).sorted()
         guard !uniqueNames.isEmpty else { return [:] }
-        let rows: [RemoteExercise] = try await restPost(
+
+        // Exercises are a shared, immutable catalogue. `merge-duplicates`
+        // translates to `ON CONFLICT DO UPDATE`, which needs an UPDATE RLS
+        // policy for every existing exercise. We deliberately do not grant
+        // that power to clients: insert missing names, then read every ID.
+        let _: [EmptyResponse] = try await restPost(
             path: "/rest/v1/exercises",
             query: [URLQueryItem(name: "on_conflict", value: "name")],
             body: uniqueNames.map { RemoteExerciseInsert(name: $0) },
-            prefer: "resolution=merge-duplicates,return=representation"
+            prefer: "resolution=ignore-duplicates,return=minimal",
+            emptyValue: []
+        )
+        let rows: [RemoteExercise] = try await restGet(
+            path: "/rest/v1/exercises",
+            query: [
+                URLQueryItem(name: "select", value: "id,name"),
+                URLQueryItem(name: "name", value: "in.(\(postgrestInValues(uniqueNames)))")
+            ]
         )
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.name, $0.id) })
     }
@@ -466,7 +491,7 @@ final class SupabaseService {
 }
 
 enum SupabaseError: LocalizedError {
-    case notAuthenticated, sessionExpired, invalidResponse, emptyResponse, unauthorized(String), requestFailed(String)
+    case notAuthenticated, sessionExpired, invalidResponse, emptyResponse, unauthorized(String), requestFailed(String), partialBackup(backup: String, cleanup: String)
 
     var errorDescription: String? {
         switch self {
@@ -476,6 +501,8 @@ enum SupabaseError: LocalizedError {
         case .emptyResponse: "Supabase returned no data."
         case .unauthorized(let message): message
         case .requestFailed(let message): message
+        case .partialBackup(let backup, let cleanup):
+            "Supabase rejected the backup (\(backup)) and could not remove its partial session (\(cleanup))."
         }
     }
 }
@@ -556,6 +583,19 @@ struct RemoteRoutineInsert: Encodable {
 
 struct RemoteExerciseInsert: Encodable {
     var name: String
+}
+
+/// Values in a PostgREST `in.(...)` filter are quoted so exercise names can
+/// safely contain commas, quotes, or parentheses. URLQueryItem then applies
+/// the URL-level escaping.
+func postgrestInValues(_ values: [String]) -> String {
+    values.map { value in
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+    .joined(separator: ",")
 }
 
 struct RemoteSessionInsert: Encodable {

@@ -1332,7 +1332,7 @@ final class AppState: ObservableObject {
         if let index = sessions.firstIndex(where: { $0.id == id }) {
             sessions[index].syncState = .failed
         }
-        syncMessage = "Saved locally. Backup failed."
+        syncMessage = "Saved locally. Backup failed: \(error.localizedDescription)"
         persistAll()
         scheduleSyncRetry()
     }

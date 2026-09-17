@@ -108,6 +108,13 @@ final class SupabaseWireFormatTests: XCTestCase {
         XCTAssertEqual(rows, [["name": "Bench Press"], ["name": "Squat"]])
     }
 
+    func testExerciseLookupFilterQuotesPostgRESTValues() {
+        XCTAssertEqual(
+            postgrestInValues(["Bench Press", "Cable, Fly", "A \"quoted\" name"]),
+            #""Bench Press","Cable, Fly","A \"quoted\" name""#
+        )
+    }
+
     func testSetMetadataKeepsLegacyTypesAndRoundTripsCustomRemarks() {
         XCTAssertEqual(encodeSetMetadata(type: .warmup, remark: nil), "warmup")
         XCTAssertEqual(decodeSetMetadata("drop"), StoredSetMetadata(type: .drop, remark: nil))
@@ -276,6 +283,14 @@ final class SupabaseWireFormatTests: XCTestCase {
             setType: SetType.warmup.rawValue
         )
         XCTAssertEqual(try json(body)["set_type"] as? String, "warmup")
+        XCTAssertEqual(
+            try json(RemoteSetInsert(
+                sessionID: "s1", exerciseID: "e1", weightKg: 60, reps: 10,
+                setIndex: 0, bodyweight: false, timed: false, usesMinutes: false,
+                setType: SetType.repsInReserve.rawValue
+            ))["set_type"] as? String,
+            "repsInReserve"
+        )
 
         let payload = """
         [{"id":"s1","created_at":"2026-08-07T10:00:00Z","muscle_group":"legs","split_type":"PPL","session_sets":[
