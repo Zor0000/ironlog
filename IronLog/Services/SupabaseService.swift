@@ -25,7 +25,10 @@ final class SupabaseService {
                 auth: .init(
                     redirectToURL: Self.authCallbackURL,
                     storageKey: "ironlog-auth",
-                    flowType: .pkce
+                    flowType: .pkce,
+                    // Match Supabase's forthcoming default so a package upgrade
+                    // cannot change initial-session ordering under our feet.
+                    emitLocalSessionAsInitialSession: true
                 )
             )
         )

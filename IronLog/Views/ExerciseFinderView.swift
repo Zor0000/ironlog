@@ -11,6 +11,43 @@ struct ExerciseRecommendation: Identifiable, Equatable {
     var id: String { "\(muscle.id)/\(template.id)" }
 }
 
+/// The graph's route plan stays valid even when the current workout excludes
+/// most of a muscle group's catalog. Keeping it separate from the view makes
+/// the animated path deterministic and independently testable.
+struct ExerciseFinderGraphRoute: Equatable {
+    let from: String
+    let to: String
+}
+
+enum ExerciseFinderGraphPlan {
+    static let originNodeID = "origin"
+    static let historyNodeID = "history"
+    static let patternNodeID = "pattern"
+    static let goalNodeID = "goal"
+
+    static func decisionNodeID(for candidateIndex: Int) -> String {
+        candidateIndex < 2 ? historyNodeID : patternNodeID
+    }
+
+    static func scanRoutes(candidateNodeIDs: [String]) -> [ExerciseFinderGraphRoute] {
+        guard !candidateNodeIDs.isEmpty else { return [] }
+
+        var routes = [ExerciseFinderGraphRoute(from: originNodeID, to: historyNodeID)]
+        routes += candidateNodeIDs.prefix(2).map {
+            ExerciseFinderGraphRoute(from: historyNodeID, to: $0)
+        }
+
+        let patternCandidates = candidateNodeIDs.dropFirst(2)
+        guard !patternCandidates.isEmpty else { return routes }
+
+        routes.append(ExerciseFinderGraphRoute(from: originNodeID, to: patternNodeID))
+        routes += patternCandidates.map {
+            ExerciseFinderGraphRoute(from: patternNodeID, to: $0)
+        }
+        return routes
+    }
+}
+
 /// A small, deterministic recommendation layer. The animation visualizes this
 /// result; it never races the UI or changes the winner while the scan is running.
 struct ExerciseRecommendationEngine {
@@ -186,7 +223,11 @@ struct ExerciseFinderView: View {
     @State private var selectedMuscleID: String
     @State private var recommendations: [ExerciseRecommendation] = []
     @State private var phase: ExerciseFinderPhase = .idle
-    @State private var activeCandidateID: String?
+    @State private var activeNodeID: String?
+    @State private var activeEdgeID: String?
+    @State private var visitedNodeIDs: Set<String> = []
+    @State private var visitedEdgeIDs: Set<String> = []
+    @State private var routeProgress: CGFloat = 0
     @State private var finalistIDs: Set<String> = []
     @State private var winner: ExerciseRecommendation?
     @State private var alternativeOffset = 0
@@ -291,25 +332,27 @@ struct ExerciseFinderView: View {
     private var graph: some View {
         GeometryReader { geometry in
             let size = geometry.size
-            let hub = CGPoint(x: size.width * 0.5, y: size.height * 0.49)
-            let positions = candidatePositions(in: size)
+            let layout = graphLayout(in: size)
+            let edges = graphEdges
 
             ZStack {
                 FinderDotGrid()
 
-                ForEach(Array(recommendations.enumerated()), id: \.element.id) { index, recommendation in
-                    if positions.indices.contains(index) {
-                        let highlighted = isHighlighted(recommendation)
-                        FinderConnection(from: hub, to: positions[index])
+                ForEach(edges) { edge in
+                    if let from = layout[edge.from], let to = layout[edge.to] {
+                        let isActive = activeEdgeID == edge.id
+                        let isVisited = visitedEdgeIDs.contains(edge.id)
+                        let isWinningPath = winningPathEdgeIDs.contains(edge.id)
+                        FinderConnection(from: from, to: to)
                             .stroke(
-                                highlighted ? Theme.accent.opacity(0.34) : Theme.border.opacity(0.8),
-                                style: StrokeStyle(lineWidth: highlighted ? 5 : 1, lineCap: .round)
+                                (isActive || isWinningPath) ? Theme.accent.opacity(0.28) : Theme.border.opacity(0.8),
+                                style: StrokeStyle(lineWidth: (isActive || isWinningPath) ? 5 : 1, lineCap: .round)
                             )
-                            .blur(radius: highlighted ? 4 : 0)
-                        FinderConnection(from: hub, to: positions[index])
+                            .blur(radius: (isActive || isWinningPath) ? 4 : 0)
+                        FinderConnection(from: from, to: to)
                             .stroke(
-                                highlighted ? Theme.accent : Theme.muted.opacity(0.55),
-                                style: StrokeStyle(lineWidth: highlighted ? 1.5 : 1, lineCap: .round)
+                                (isActive || isWinningPath) ? Theme.accent : (isVisited ? Theme.accent.opacity(0.48) : Theme.muted.opacity(0.42)),
+                                style: StrokeStyle(lineWidth: (isActive || isWinningPath) ? 1.7 : 1, lineCap: .round)
                             )
                     }
                 }
@@ -318,37 +361,84 @@ struct ExerciseFinderView: View {
                     title: hubTitle,
                     subtitle: hubSubtitle,
                     isHub: true,
-                    isActive: phase.isSearching,
+                    isGoal: false,
+                    isActive: activeNodeID == Self.rootNodeID,
+                    isVisited: visitedNodeIDs.contains(Self.rootNodeID),
                     isFinalist: false,
                     isWinner: false,
-                    isMuted: false,
+                    isMuted: phase == .complete,
                     isPulsing: hubPulse
                 )
-                .frame(width: 106, height: 106)
-                .position(hub)
+                .frame(width: 78, height: 78)
+                .position(layout[Self.rootNodeID] ?? .zero)
                 .accessibilityLabel("\(selectedMuscle?.label ?? "Muscle") muscle group")
 
-                ForEach(Array(recommendations.enumerated()), id: \.element.id) { index, recommendation in
-                    if positions.indices.contains(index) {
+                ForEach(graphDecisionNodes) { node in
+                    FinderGraphNode(
+                        title: node.title,
+                        subtitle: node.subtitle,
+                        isHub: false,
+                        isGoal: false,
+                        isActive: activeNodeID == node.id,
+                        isVisited: visitedNodeIDs.contains(node.id),
+                        isFinalist: false,
+                        isWinner: false,
+                        isMuted: phase == .complete,
+                        isPulsing: false
+                    )
+                    .frame(width: 74, height: 74)
+                    .position(layout[node.id] ?? .zero)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(node.title) evaluation node")
+                }
+
+                ForEach(Array(recommendations.enumerated()), id: \.element.id) { _, recommendation in
+                    if layout[candidateNodeID(recommendation)] != nil {
                         FinderGraphNode(
                             title: shortName(recommendation.template.name),
                             subtitle: recommendation.movementStyle,
                             isHub: false,
-                            isActive: activeCandidateID == recommendation.id,
+                            isGoal: false,
+                            isActive: activeNodeID == candidateNodeID(recommendation),
+                            isVisited: visitedNodeIDs.contains(candidateNodeID(recommendation)),
                             isFinalist: finalistIDs.contains(recommendation.id),
                             isWinner: winner?.id == recommendation.id,
                             isMuted: phase == .complete && winner?.id != recommendation.id,
                             isPulsing: false
                         )
-                        .frame(width: 88, height: 88)
-                        .position(positions[index])
+                        .frame(width: 80, height: 80)
+                        .position(layout[candidateNodeID(recommendation)] ?? .zero)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(recommendation.template.name), \(recommendation.movementStyle)")
                     }
                 }
 
+                FinderGraphNode(
+                    title: winner.map { shortName($0.template.name) } ?? "Best fit",
+                    subtitle: winner == nil ? "Destination" : "Matched",
+                    isHub: false,
+                    isGoal: true,
+                    isActive: activeNodeID == Self.goalNodeID,
+                    isVisited: visitedNodeIDs.contains(Self.goalNodeID),
+                    isFinalist: false,
+                    isWinner: winner != nil,
+                    isMuted: false,
+                    isPulsing: false
+                )
+                .frame(width: 68, height: 68)
+                .position(layout[Self.goalNodeID] ?? .zero)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(winner.map { "Best match: \($0.template.name)" } ?? "Best-match destination")
+
+                if let activeEdgeID,
+                   let edge = edges.first(where: { $0.id == activeEdgeID }),
+                   let from = layout[edge.from],
+                   let to = layout[edge.to] {
+                    FinderTraversalPulse(from: from, to: to, progress: routeProgress)
+                }
+
                 HStack(spacing: 8) {
-                    Image(systemName: phase == .complete ? "checkmark.circle.fill" : "sparkle.magnifyingglass")
+                    Image(systemName: phase == .complete ? "checkmark.circle.fill" : "point.topleft.down.curvedto.point.bottomright.up")
                         .foregroundStyle(Theme.accent)
                     Text(statusText)
                     Spacer(minLength: 4)
@@ -414,55 +504,117 @@ struct ExerciseFinderView: View {
 
     private var hubTitle: String {
         switch phase {
-        case .charging: return selectedMuscle?.label ?? "Muscle"
-        case .scanning, .narrowing: return "Finding"
-        case .complete: return "Matched"
+        case .charging: return "Start"
+        case .scanning, .narrowing: return "Search"
+        case .complete: return "Origin"
         case .idle: return selectedMuscle?.label ?? "Muscle"
         }
     }
 
     private var hubSubtitle: String {
         switch phase {
-        case .charging: return "Activating"
-        case .scanning: return "Best match"
-        case .narrowing: return "Finalists"
-        case .complete: return selectedMuscle?.label.uppercased() ?? "COMPLETE"
+        case .charging: return "Muscle group"
+        case .scanning: return "Traversing"
+        case .narrowing: return "Shortest path"
+        case .complete: return selectedMuscle?.label.uppercased() ?? "MUSCLE"
         case .idle: return "Muscle group"
         }
     }
 
     private var statusText: String {
         switch phase {
-        case .idle: return "Ready to evaluate exercises"
-        case .charging: return "Activating muscle group"
-        case .scanning: return "Comparing movement patterns"
-        case .narrowing: return "Narrowing strongest matches"
-        case .complete: return "Best match selected"
+        case .idle: return "Ready to trace the best route"
+        case .charging: return "Setting the starting node"
+        case .scanning: return "Exploring the decision graph"
+        case .narrowing: return "Locking the shortest path"
+        case .complete: return "Best exercise reached"
         }
     }
 
     private var statusProgress: String {
         switch phase {
-        case .idle: return "\(recommendations.count) candidates"
-        case .charging: return "Starting"
-        case .scanning: return "\(scanStep)/10 checks"
-        case .narrowing: return "\(finalistIDs.count) finalists"
-        case .complete: return "Complete"
+        case .idle: return "\(recommendations.count) endpoints"
+        case .charging: return "Origin"
+        case .scanning: return "\(scanStep)/\(scanningRoutes(for: recommendations).count) paths"
+        case .narrowing: return "\(finalistIDs.count) routes"
+        case .complete: return "Reached"
         }
     }
 
-    private func candidatePositions(in size: CGSize) -> [CGPoint] {
-        [
-            CGPoint(x: size.width * 0.50, y: size.height * 0.15),
-            CGPoint(x: size.width * 0.82, y: size.height * 0.32),
-            CGPoint(x: size.width * 0.76, y: size.height * 0.73),
-            CGPoint(x: size.width * 0.24, y: size.height * 0.73),
-            CGPoint(x: size.width * 0.18, y: size.height * 0.32)
+    private static let rootNodeID = ExerciseFinderGraphPlan.originNodeID
+    private static let historyNodeID = ExerciseFinderGraphPlan.historyNodeID
+    private static let patternNodeID = ExerciseFinderGraphPlan.patternNodeID
+    private static let goalNodeID = ExerciseFinderGraphPlan.goalNodeID
+
+    private var graphDecisionNodes: [FinderGraphDecisionNode] {
+        var nodes = [FinderGraphDecisionNode(id: Self.historyNodeID, title: "Rotation", subtitle: "Recent use")]
+        if recommendations.count > 2 {
+            nodes.append(FinderGraphDecisionNode(id: Self.patternNodeID, title: "Fit", subtitle: "Movement"))
+        }
+        return nodes
+    }
+
+    private var graphEdges: [FinderGraphEdge] {
+        guard !recommendations.isEmpty else { return [] }
+
+        var edges = [FinderGraphEdge(from: Self.rootNodeID, to: Self.historyNodeID)]
+        if recommendations.count > 2 {
+            edges.append(FinderGraphEdge(from: Self.rootNodeID, to: Self.patternNodeID))
+        }
+        edges += recommendations.enumerated().map { index, recommendation in
+            FinderGraphEdge(from: decisionNodeID(for: index), to: candidateNodeID(recommendation))
+        }
+        edges += recommendations.map { recommendation in
+            FinderGraphEdge(from: candidateNodeID(recommendation), to: Self.goalNodeID)
+        }
+        return edges
+    }
+
+    private var winningPathEdgeIDs: Set<String> {
+        guard let winner,
+              let index = recommendations.firstIndex(where: { $0.id == winner.id }) else { return [] }
+        let decision = decisionNodeID(for: index)
+        let candidate = candidateNodeID(winner)
+        return [
+            FinderGraphEdge.id(from: Self.rootNodeID, to: decision),
+            FinderGraphEdge.id(from: decision, to: candidate),
+            FinderGraphEdge.id(from: candidate, to: Self.goalNodeID)
         ]
     }
 
-    private func isHighlighted(_ recommendation: ExerciseRecommendation) -> Bool {
-        activeCandidateID == recommendation.id || finalistIDs.contains(recommendation.id) || winner?.id == recommendation.id
+    private func graphLayout(in size: CGSize) -> [String: CGPoint] {
+        var positions: [String: CGPoint] = [
+            Self.rootNodeID: CGPoint(x: size.width * 0.13, y: size.height * 0.50),
+            Self.historyNodeID: CGPoint(x: size.width * 0.38, y: size.height * 0.30),
+            Self.patternNodeID: CGPoint(x: size.width * 0.38, y: size.height * 0.70),
+            Self.goalNodeID: CGPoint(x: size.width * 0.89, y: size.height * 0.50)
+        ]
+        for (index, recommendation) in recommendations.enumerated() {
+            positions[candidateNodeID(recommendation)] = CGPoint(
+                x: size.width * 0.65,
+                y: candidateYPosition(for: index, height: size.height)
+            )
+        }
+        return positions
+    }
+
+    private func candidateYPosition(for index: Int, height: CGFloat) -> CGFloat {
+        guard recommendations.count > 1 else { return height * 0.5 }
+        let clampedIndex = min(max(index, 0), recommendations.count - 1)
+        let progress = CGFloat(clampedIndex) / CGFloat(recommendations.count - 1)
+        return height * (0.13 + (0.74 * progress))
+    }
+
+    private func candidateNodeID(_ recommendation: ExerciseRecommendation) -> String {
+        "candidate/\(recommendation.id)"
+    }
+
+    private func decisionNodeID(for candidateIndex: Int) -> String {
+        ExerciseFinderGraphPlan.decisionNodeID(for: candidateIndex)
+    }
+
+    private func scanningRoutes(for candidates: [ExerciseRecommendation]) -> [ExerciseFinderGraphRoute] {
+        ExerciseFinderGraphPlan.scanRoutes(candidateNodeIDs: candidates.map(candidateNodeID))
     }
 
     private func shortName(_ name: String) -> String {
@@ -481,7 +633,11 @@ struct ExerciseFinderView: View {
         )
         recommendations = engine.recommendations(for: selectedMuscleID)
         phase = .idle
-        activeCandidateID = nil
+        activeNodeID = nil
+        activeEdgeID = nil
+        visitedNodeIDs = []
+        visitedEdgeIDs = []
+        routeProgress = 0
         finalistIDs = []
         winner = nil
         alternativeOffset = 0
@@ -498,7 +654,11 @@ struct ExerciseFinderView: View {
 
         winner = nil
         finalistIDs = []
-        activeCandidateID = nil
+        activeNodeID = Self.rootNodeID
+        activeEdgeID = nil
+        visitedNodeIDs = [Self.rootNodeID]
+        visitedEdgeIDs = []
+        routeProgress = 0
         scanStep = 0
         phase = .charging
         hubPulse = !reduceMotion
@@ -510,37 +670,68 @@ struct ExerciseFinderView: View {
             } else {
                 guard await pause(milliseconds: 430) else { return }
                 phase = .scanning
-                let timings: [UInt64] = [115, 115, 125, 125, 135, 145, 160, 185, 230, 300]
-                for step in timings.indices {
-                    guard !Task.isCancelled else { return }
-                    let candidateIndex = step == timings.count - 1
-                        ? winnerIndex
-                        : ((step * 2) + 1) % candidates.count
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        activeCandidateID = candidates[candidateIndex].id
-                        scanStep = step + 1
-                    }
-                    guard await pause(milliseconds: timings[step]) else { return }
+                let routes = scanningRoutes(for: candidates)
+                for (index, route) in routes.enumerated() {
+                    guard await traverse(from: route.from, to: route.to, duration: 170) else { return }
+                    scanStep = index + 1
+                    guard await pause(milliseconds: index == routes.indices.last ? 220 : 80) else { return }
                 }
 
                 phase = .narrowing
-                activeCandidateID = nil
                 let otherIndex = (winnerIndex + 1) % candidates.count
                 finalistIDs = [selectedWinner.id, candidates[otherIndex].id]
                 NativeFeedback.selection()
-                guard await pause(milliseconds: 390) else { return }
+                if otherIndex != winnerIndex {
+                    guard await traverse(
+                        from: decisionNodeID(for: otherIndex),
+                        to: candidateNodeID(candidates[otherIndex]),
+                        duration: 180
+                    ) else { return }
+                }
+                guard await traverse(
+                    from: decisionNodeID(for: winnerIndex),
+                    to: candidateNodeID(selectedWinner),
+                    duration: 210
+                ) else { return }
+                guard await pause(milliseconds: 180) else { return }
+                guard await traverse(
+                    from: candidateNodeID(selectedWinner),
+                    to: Self.goalNodeID,
+                    duration: 290
+                ) else { return }
             }
 
             withAnimation(AppMotion.smooth) {
                 phase = .complete
                 hubPulse = false
-                activeCandidateID = nil
+                activeNodeID = Self.goalNodeID
+                activeEdgeID = nil
                 finalistIDs = []
                 winner = selectedWinner
             }
             NativeFeedback.success()
             UIAccessibility.post(notification: .announcement, argument: "Best match found: \(selectedWinner.template.name)")
         }
+    }
+
+    @MainActor
+    private func traverse(from: String, to: String, duration: UInt64) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        let edgeID = FinderGraphEdge.id(from: from, to: to)
+        guard graphEdges.contains(where: { $0.id == edgeID }) else { return false }
+        activeNodeID = from
+        activeEdgeID = edgeID
+        routeProgress = 0
+        withAnimation(.linear(duration: Double(duration) / 1_000)) {
+            routeProgress = 1
+        }
+        guard await pause(milliseconds: duration) else { return false }
+        visitedEdgeIDs.insert(edgeID)
+        visitedNodeIDs.insert(to)
+        withAnimation(AppMotion.quick) {
+            activeNodeID = to
+        }
+        return true
     }
 
     @MainActor
@@ -618,7 +809,9 @@ private struct FinderGraphNode: View {
     let title: String
     let subtitle: String
     let isHub: Bool
+    let isGoal: Bool
     let isActive: Bool
+    let isVisited: Bool
     let isFinalist: Bool
     let isWinner: Bool
     let isMuted: Bool
@@ -665,7 +858,7 @@ private struct FinderGraphNode: View {
         if isWinner { return AnyShapeStyle(Theme.accent) }
         return AnyShapeStyle(
             RadialGradient(
-                colors: [Theme.accent.opacity(isActive || isFinalist || isHub ? 0.14 : 0.035), Theme.surface],
+                colors: [Theme.accent.opacity(isActive || isVisited || isFinalist || isHub ? 0.14 : (isGoal ? 0.06 : 0.035)), Theme.surface],
                 center: .center,
                 startRadius: 0,
                 endRadius: 54
@@ -676,21 +869,21 @@ private struct FinderGraphNode: View {
     private var border: Color {
         if isWinner { return Theme.accent }
         if isActive { return Theme.accent.opacity(0.95) }
-        if isFinalist || isHub { return Theme.accent.opacity(0.65) }
+        if isVisited || isFinalist || isHub { return Theme.accent.opacity(0.65) }
         return Theme.muted.opacity(0.52)
     }
 
     private var primaryGlow: Double {
         if isWinner { return 0.72 }
         if isActive { return 0.58 }
-        if isFinalist || isHub { return 0.28 }
+        if isVisited || isFinalist || isHub { return 0.28 }
         return 0
     }
 
     private var secondaryGlow: Double {
         if isWinner { return 0.32 }
         if isActive { return 0.22 }
-        if isHub { return 0.11 }
+        if isVisited || isHub { return 0.11 }
         return 0
     }
 
@@ -712,6 +905,46 @@ private struct FinderConnection: Shape {
         path.move(to: from)
         path.addLine(to: to)
         return path
+    }
+}
+
+private struct FinderGraphDecisionNode: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+}
+
+private struct FinderGraphEdge: Identifiable {
+    let from: String
+    let to: String
+
+    var id: String { Self.id(from: from, to: to) }
+
+    static func id(from: String, to: String) -> String {
+        "\(from)→\(to)"
+    }
+}
+
+/// A single traveling signal makes the recommendation process legible: it
+/// leaves the selected muscle, visits each decision branch, then lands on the
+/// chosen exercise. The result itself is deterministic; this only visualizes it.
+private struct FinderTraversalPulse: View {
+    let from: CGPoint
+    let to: CGPoint
+    let progress: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(Theme.accent)
+            .frame(width: 11, height: 11)
+            .shadow(color: Theme.accent.opacity(0.95), radius: 9)
+            .shadow(color: Theme.accent.opacity(0.54), radius: 20)
+            .position(
+                x: from.x + ((to.x - from.x) * progress),
+                y: from.y + ((to.y - from.y) * progress)
+            )
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
     }
 }
 

@@ -350,6 +350,56 @@ final class AppStateTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(lunges.count, 3)
     }
 
+    func testExpandedCatalogIncludesCommonMachineAndConditioningOptions() {
+        let library = ExerciseLibrary.bundled
+        let minimumCounts = [
+            "chest": 18,
+            "back": 20,
+            "legs": 28,
+            "shoulders": 18,
+            "biceps": 15,
+            "triceps": 16,
+            "core": 22,
+            "cardio": 20
+        ]
+
+        for (muscleID, minimum) in minimumCounts {
+            XCTAssertGreaterThanOrEqual(library.library[muscleID]?.count ?? 0, minimum, "\(muscleID) catalog")
+        }
+
+        XCTAssertTrue(library.catalogExercises(muscleID: "chest", query: "smith machine bench press").contains {
+            $0.template.name == "Smith Machine Bench Press"
+        })
+        XCTAssertTrue(library.catalogExercises(muscleID: "legs", query: "hack squat machine").contains {
+            $0.template.name == "Hack Squat (Machine)"
+        })
+        XCTAssertTrue(library.catalogExercises(muscleID: "cardio", query: "arc trainer").contains {
+            $0.template.name == "Arc Trainer"
+        })
+    }
+
+    func testFinderGraphPlanUsesOnlyValidBranchesForReducedCandidateCounts() {
+        let oneCandidate = ExerciseFinderGraphPlan.scanRoutes(candidateNodeIDs: ["candidate/one"])
+        XCTAssertEqual(oneCandidate, [
+            ExerciseFinderGraphRoute(from: "origin", to: "history"),
+            ExerciseFinderGraphRoute(from: "history", to: "candidate/one")
+        ])
+
+        let twoCandidates = ExerciseFinderGraphPlan.scanRoutes(candidateNodeIDs: ["candidate/one", "candidate/two"])
+        XCTAssertEqual(twoCandidates, [
+            ExerciseFinderGraphRoute(from: "origin", to: "history"),
+            ExerciseFinderGraphRoute(from: "history", to: "candidate/one"),
+            ExerciseFinderGraphRoute(from: "history", to: "candidate/two")
+        ])
+
+        let fullPlan = ExerciseFinderGraphPlan.scanRoutes(
+            candidateNodeIDs: ["candidate/one", "candidate/two", "candidate/three", "candidate/four", "candidate/five"]
+        )
+        XCTAssertEqual(fullPlan.count, 7)
+        XCTAssertEqual(fullPlan[3], ExerciseFinderGraphRoute(from: "origin", to: "pattern"))
+        XCTAssertEqual(fullPlan.last, ExerciseFinderGraphRoute(from: "pattern", to: "candidate/five"))
+    }
+
     func testExerciseFinderStaysWithinMuscleAndExcludesCurrentWorkout() {
         let app = AppState()
         let engine = ExerciseRecommendationEngine(
