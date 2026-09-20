@@ -1,0 +1,123 @@
+name: TestFlight
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-main
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    name: Build and upload to TestFlight
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      ASC_APP_ID: "6771258872"
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      TESTFLIGHT_GROUP_ID: "6497c060-a90c-4255-ace4-7ce105aff763"
+      DEVELOPMENT_TEAM: "75LRT8TRQY"
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      - name: Install asc CLI
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: brew install asc
+
+      - name: Prepare App Store Connect authentication
+        env:
+          ASC_API_PRIVATE_KEY: ${{ secrets.ASC_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$ASC_API_KEY_ID"
+          test -n "$ASC_API_ISSUER_ID"
+          test -n "$ASC_API_PRIVATE_KEY"
+          printf '%s\n' "$ASC_API_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+          echo "ASC_API_PRIVATE_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Select an installed iPhone simulator
+        run: |
+          set -euo pipefail
+          simulator_id="$(xcrun simctl list devices available \
+            | awk -F'[()]' '/iPhone/ { print $2; exit }')"
+          test -n "$simulator_id"
+          echo "SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -project IronLog.xcodeproj \
+            -scheme IronLog \
+            -destination "id=$SIMULATOR_ID" \
+            -only-testing:IronLogTests \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Without a distribution certificate already on the runner, xcodebuild's
+      # -allowProvisioningUpdates mints a fresh one per run until the account
+      # hits Apple's cap. Supplying our own keeps the count at one, forever.
+      - name: Import the signing certificate
+        env:
+          SIGNING_CERTIFICATE_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_CERTIFICATE_P12"
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          # Runners are ephemeral, but a locked keychain mid-archive fails the
+          # build, so disable the inactivity auto-lock rather than time it.
+          security set-keychain-settings "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+
+          printf '%s' "$SIGNING_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$keychain" \
+            -P "$SIGNING_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+          # Lets codesign use the key without a GUI prompt nothing can answer.
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
+
+          # Prepend, keeping the existing keychains: the Apple intermediate that
+          # completes the certificate chain lives in the runner's system one.
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '" ')
+
+          security find-identity -v -p codesigning "$keychain"
+
+      - name: Install the App Store provisioning profiles
+        run: scripts/install_provisioning_profiles.sh
+
+      - name: Build and archive
+        env:
+          BUILD_NUMBER: ${{ github.run_id }}
+        run: scripts/build_ios_release.sh
+
+      - name: Upload build with asc
+        run: scripts/upload_testflight.sh
+
+      - name: Delete the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

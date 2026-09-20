@@ -1,0 +1,52 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Every 6 hours. Supabase pauses a free project that lacks "sufficient user
+    # database activity", and their docs put the bar at "a few user requests to
+    # the database each day" — one ping a day cleared zero but not that bar, and
+    # the project got flagged anyway. Four runs also mean a delayed or dropped
+    # GitHub schedule costs one slot, not the whole day.
+    # Minute 17, not :00, because GitHub queues top-of-hour jobs behind everyone
+    # else's and drops them under load.
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoints
+        env:
+          SUPABASE_URL: https://dvqevdydldxjqjrpkkjc.supabase.co
+          # The tables intentionally deny the anonymous role. This job runs
+          # server-side, so use the RLS-bypassing key from a GitHub secret.
+          # Never put this key in the app or in the repository.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -e
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Missing SUPABASE_SERVICE_ROLE_KEY GitHub Actions secret"
+            exit 1
+          fi
+          # Several tables per run, so a run is "a few requests" rather than one.
+          # The service role bypasses RLS, but all requests remain read-only.
+          for table in exercises sessions routines; do
+            # Retry to ride out transient DNS/5xx blips (a paused project fails DNS).
+            code=$(curl -s -o /tmp/body -w "%{http_code}" \
+              --retry 5 --retry-all-errors --retry-delay 10 --max-time 30 \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              "$SUPABASE_URL/rest/v1/$table?select=id&limit=1")
+            # Do not echo successful response data into the Actions log; this
+            # role can read every user's rows. The error body is useful when a
+            # table is renamed or the credential is rotated.
+            if [ "$code" != "200" ]; then
+              echo "$table -> HTTP $code $(cat /tmp/body)"
+            else
+              echo "$table -> HTTP $code"
+            fi
+            # Fail loudly on 404/401: a renamed table or rotated key would
+            # otherwise keep "succeeding" while pinging nothing.
+            test "$code" = "200"
+          done

@@ -1,0 +1,3 @@
+-- Source for this already-applied remote migration was not in version control.
+-- The preceding recovered baseline represents the deployed schema at the end
+-- of the historical migration sequence.

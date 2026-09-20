@@ -1,0 +1,30 @@
+project_id = "dvqevdydldxjqjrpkkjc"
+
+[functions.delete-account]
+verify_jwt = true
+
+[auth]
+additional_redirect_urls = ["https://github.com/Zor0000/ironlog", "ironlog://auth/callback", "ironlog://auth/reset-password"]
+site_url = "http://localhost:3000"
+
+[auth.email]
+max_frequency = "1m0s"
+otp_length = 8
+
+[auth.rate_limit]
+email_sent = 30
+
+[auth.external.google]
+client_id = "467722322667-pfao1pgaet7mag8rk5s2btgt4du449rf.apps.googleusercontent.com"
+enabled = true
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[db.pooler]
+default_pool_size = 15
+max_client_conn = 200
+
+[storage.vector]
+enabled = false

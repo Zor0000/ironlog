@@ -1,0 +1,66 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Xcode (per-user state, not shared)
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.xcscmblueprint
+*.xccheckout
+
+# Node (if added later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Next.js build output (website/, screenshot-studio/)
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Installed agent skills / tooling — reinstall with `npx skills add`
+.agents/
+.claude/skills/
+skills-lock.json
+bun.lock
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Supabase CLI state. The migration SQL and config.toml are source-controlled;
+# this directory only records the machine's currently linked project.
+supabase/.temp/
+
+# Signing material. build/ is ignored already and that is where
+# scripts/new_signing_certificate.sh writes, but this repository is public and a
+# committed private key would have to be treated as leaked wherever it landed.
+*.p12
+*.key
+*.csr
+*.cer
+*.p8
+
+# Build output (if added later)
+dist/
+build/
+artifacts/
+
+# Logs
+*.log
