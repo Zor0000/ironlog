@@ -1,72 +1,167 @@
 {
-  "_doc": "Model-output evaluation cases for FuelBuddyResponseValidator + FuelBuddyGate. Every case is run against the same request (candidateFoodIDs below) and must resolve to `expect`: model (validated model answer) or local:<diagnostic code> (fallback with that FuelBuddyDiagnostic.code). `body` is the raw provider payload; REQ is replaced with the request id. `rulesReject` lists food IDs the *current* profile rules reject at validation time.",
-  "candidateFoodIDs": ["chana-masala", "vegetable-pulao", "palak-paneer"],
+  "_doc": "Model-output evaluation cases for FuelBuddyGate → FuelBuddyResponseValidator. Every case runs against the same presentation request (candidates below, in deterministic order, maxFoods 3, maxResponseBytes 8192) and must resolve to `expect`: model (validated model answer) or local:<FuelBuddyDiagnostic.code>. `body` is the raw provider payload; REQ is replaced with the request id. `provider` simulates a transport failure. `rulesReject` lists food IDs the *current* profile rules reject at validation time. `requestOverride` tweaks the request (maxFoods, maxResponseBytes).",
+  "candidates": [
+    { "foodID": "chana-masala",    "displayName": "Chana Masala",    "facts": ["cuisine:indian", "diet:vegetarian", "prep:15-min", "budget:low", "variety:not-served-recently"] },
+    { "foodID": "vegetable-pulao", "displayName": "Vegetable Pulao", "facts": ["cuisine:indian", "diet:vegetarian", "prep:20-min", "budget:low", "variety:new-cuisine-this-week"] },
+    { "foodID": "palak-paneer",    "displayName": "Palak Paneer",    "facts": ["cuisine:indian", "diet:vegetarian", "prep:25-min", "budget:moderate"] }
+  ],
   "cases": [
     {
       "id": "valid",
       "expect": "model",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"quick and different from the dal\"}],\"explanation\":\"A quick vegetarian dinner.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[\"prep:15-min\",\"variety:not-served-recently\"]},{\"foodID\":\"vegetable-pulao\",\"rationaleFacts\":[\"variety:new-cuisine-this-week\"]}],\"explanation\":\"Two quick Indian dinners that steer away from what you had this week.\",\"tradeOffs\":[{\"foodID\":\"vegetable-pulao\",\"fact\":\"prep:20-min\"}],\"declineReason\":null}"
     },
     {
-      "id": "valid-refusal",
+      "id": "valid-single-no-copy",
       "expect": "model",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"refused\",\"foods\":[],\"explanation\":\"\",\"tradeOffs\":[],\"refusalReason\":\"unsafeRequest\"}"
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
+
+    {
+      "id": "declined-is-fallback",
+      "expect": "local:model_declined",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"declined\",\"foods\":[],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":\"unsafeRequest\"}"
+    },
+    {
+      "id": "declined-without-reason",
+      "expect": "local:inconsistent_status",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"declined\",\"foods\":[],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "declined-but-with-foods",
+      "expect": "local:inconsistent_status",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"declined\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":\"unsafeRequest\"}"
+    },
+    {
+      "id": "ok-with-decline-reason",
+      "expect": "local:inconsistent_status",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":\"outOfScope\"}"
+    },
+
     {
       "id": "invented-food-name",
       "expect": "local:unknown_food_id",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"butter-chicken\",\"rationale\":\"classic\"}],\"explanation\":\"Try this.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"butter-chicken\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
       "id": "invented-food-id-lookalike",
       "expect": "local:unknown_food_id",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala-2\",\"rationale\":\"variant\"}],\"explanation\":\"Try this.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala-2\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
-      "id": "invented-calories",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"only 280 kcal\"}],\"explanation\":\"Light.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "id": "duplicate-food",
+      "expect": "local:duplicate_food_id",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]},{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
-      "id": "invented-protein",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"palak-paneer\",\"rationale\":\"packs 22 g protein\"}],\"explanation\":\"Filling.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "id": "reordered-candidates",
+      "expect": "local:order_mismatch",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"vegetable-pulao\",\"rationaleFacts\":[]},{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
-      "id": "invented-fibre-percent",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"fibre rich\"}],\"explanation\":\"Covers 40% of your daily fibre.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "id": "skipped-leading-candidate",
+      "expect": "local:order_mismatch",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"palak-paneer\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
-      "id": "invented-ingredient-health-claim",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"the turmeric will cure inflammation\"}],\"explanation\":\"Healing.\",\"tradeOffs\":[],\"refusalReason\":null}"
-    },
-    {
-      "id": "calorie-target",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"light\"}],\"explanation\":\"Keep to 1400 calories today.\",\"tradeOffs\":[],\"refusalReason\":null}"
-    },
-    {
-      "id": "supplement-advice",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"light\"}],\"explanation\":\"Pair with a creatine supplement.\",\"tradeOffs\":[],\"refusalReason\":null}"
-    },
-    {
-      "id": "medical-advice",
-      "expect": "local:forbidden_language",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"light\"}],\"explanation\":\"This will treat my symptoms; adjust your medication.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "id": "too-many-foods",
+      "expect": "local:too_many_foods",
+      "requestOverride": { "maxFoods": 1 },
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]},{\"foodID\":\"vegetable-pulao\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
       "id": "variety-reintroduces-filtered-food",
       "expect": "local:food_fails_current_rules",
       "rulesReject": ["vegetable-pulao"],
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"quick\"},{\"foodID\":\"vegetable-pulao\",\"rationale\":\"for variety\"}],\"explanation\":\"Two options.\",\"tradeOffs\":[],\"refusalReason\":null}"
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]},{\"foodID\":\"vegetable-pulao\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
+
+    {
+      "id": "invented-fact",
+      "expect": "local:unapproved_fact",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[\"nutrition:high-protein\"]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "fact-from-other-candidate",
+      "expect": "local:unapproved_fact",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[\"variety:new-cuisine-this-week\"]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-trade-off",
+      "expect": "local:unapproved_fact",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[{\"foodID\":\"chana-masala\",\"fact\":\"prep:5-min\"}],\"declineReason\":null}"
+    },
+
+    {
+      "id": "invented-calories",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Only 280 kcal.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-protein",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Packs 22 g protein.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-fibre-percent",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Covers 40% of your daily fibre.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-ingredient-contains",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Contains peanuts.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-allergen-free-claim",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"This option is peanut-free.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-ingredient-suggestion",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Serve with butter chicken.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "invented-health-claim",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Turmeric reduces inflammation.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "unverifiable-prep-time",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Ready in 5 minutes.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "calorie-target",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Keep to 1400 calories today.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "supplement-advice",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"Pair with a creatine supplement.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "medical-advice",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"It can treat diabetes.\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+    {
+      "id": "explanation-too-long",
+      "expect": "local:text_too_long",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"tradeOffs\":[],\"declineReason\":null}"
+    },
+
     {
       "id": "unknown-schema-version",
       "expect": "local:schema_version_mismatch",
       "body": "{\"schemaVersion\":3,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[],\"explanation\":\"\",\"tradeOffs\":[]}"
+    },
+    {
+      "id": "foreign-request-id",
+      "expect": "local:request_id_mismatch",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"00000000-0000-0000-0000-000000000000\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
     {
       "id": "malformed-json",
@@ -84,29 +179,15 @@
       "body": "Sure! Here are some great options: 1. Chana masala ..."
     },
     {
-      "id": "refused-but-with-foods",
-      "expect": "local:inconsistent_status",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"refused\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"anyway\"}],\"explanation\":\"\",\"tradeOffs\":[],\"refusalReason\":\"unsafeRequest\"}"
+      "id": "oversized-payload",
+      "expect": "local:response_too_large",
+      "requestOverride": { "maxResponseBytes": 64 },
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationaleFacts\":[]}],\"explanation\":\"\",\"tradeOffs\":[],\"declineReason\":null}"
     },
-    {
-      "id": "too-many-foods",
-      "expect": "local:too_many_foods",
-      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"a\"},{\"foodID\":\"vegetable-pulao\",\"rationale\":\"b\"},{\"foodID\":\"palak-paneer\",\"rationale\":\"c\"},{\"foodID\":\"chana-masala\",\"rationale\":\"d\"}],\"explanation\":\"Four.\",\"tradeOffs\":[],\"refusalReason\":null}"
-    },
-    {
-      "id": "provider-timeout",
-      "expect": "local:provider_timeout",
-      "provider": "timeout"
-    },
-    {
-      "id": "provider-rate-limited",
-      "expect": "local:provider_rate_limited",
-      "provider": "rateLimited"
-    },
-    {
-      "id": "provider-unavailable",
-      "expect": "local:provider_unavailable",
-      "provider": "unavailable"
-    }
+
+    { "id": "provider-timeout", "expect": "local:provider_timeout", "provider": "timeout" },
+    { "id": "provider-rate-limited", "expect": "local:provider_rate_limited", "provider": "rateLimited" },
+    { "id": "provider-unavailable", "expect": "local:provider_unavailable", "provider": "unavailable" },
+    { "id": "provider-hangs-ignoring-cancellation", "expect": "local:provider_timeout", "provider": "hang" }
   ]
 }

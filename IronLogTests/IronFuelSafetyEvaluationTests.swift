@@ -2,8 +2,8 @@ import XCTest
 @testable import IronLog
 
 /// Evaluation suite for the LLM-assisted Fuel Buddy path. It replays fixture
-/// requests through `FuelBuddySafetyPolicy` and fixture model outputs through
-/// `FuelBuddyGate` (validator + fallback) and asserts the safety contract
+/// requests and fixture model outputs through the real client boundary —
+/// `FuelBuddyGate` with a spy provider — and asserts the safety contract
 /// holds regardless of what a model might say. No provider, no credentials.
 ///
 /// Fixtures: `IronLogTests/Fixtures/IronFuel/*.json` — see
@@ -19,14 +19,16 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
     }
 
     private struct ModelOutputFixture: Decodable {
+        struct Override: Decodable { let maxFoods: Int?; let maxResponseBytes: Int? }
         struct Case: Decodable {
             let id: String
             let expect: String
             let body: String?
             let provider: String?
             let rulesReject: [String]?
+            let requestOverride: Override?
         }
-        let candidateFoodIDs: [String]
+        let candidates: [FuelBuddyCandidate]
         let cases: [Case]
     }
 
@@ -37,32 +39,57 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
 
     private let requestID = UUID(uuidString: "8C7E1A3E-6B0B-4C7C-9C3B-1B9B5B3E2F10")!
 
-    private func request(candidates: [String]) -> FuelBuddyLLMRequest {
-        FuelBuddyLLMRequest(
+    private func request(text: String = "indian vegetarian dinner", candidates: [FuelBuddyCandidate], override: ModelOutputFixture.Override? = nil) -> FuelBuddyPresentationRequest {
+        FuelBuddyPresentationRequest(
             policyVersion: FuelBuddySafetyPolicy.version,
             requestID: requestID,
-            stage: .presentation,
-            userText: "indian vegetarian dinner",
+            userText: FuelBuddyRequestRedactor.redact(text),
             mealContext: FuelBuddyMealContext(mealType: .dinner, cuisines: ["indian"]),
             profileContext: FuelBuddyProfileContext(ruleTags: ["vegetarian", "no-peanut"]),
-            candidateFoodIDs: candidates,
-            limits: FuelBuddyRequestLimits(timeoutMilliseconds: 50, maxResponseBytes: 8192, maxFoods: 3)
+            candidates: candidates,
+            limits: FuelBuddyRequestLimits(
+                timeoutMilliseconds: 50,
+                maxResponseBytes: override?.maxResponseBytes ?? 8192,
+                maxFoods: override?.maxFoods ?? 3
+            )
         )
     }
 
-    private struct FixtureProvider: FuelBuddyLLMProvider {
+    /// Replays a fixture body or simulates a transport failure, and counts
+    /// how often it was reached.
+    private final class FixtureProvider: FuelBuddyLLMProvider, @unchecked Sendable {
         let mode: String?
         let body: Data
-        func send(_ request: FuelBuddyLLMRequest) async throws -> Data {
+        private(set) var calls = 0
+
+        init(mode: String?, body: Data) {
+            self.mode = mode
+            self.body = body
+        }
+
+        func send(_ request: FuelBuddyPresentationRequest) async throws -> Data { try await respond() }
+        func send(_ request: FuelBuddyIntentRequest) async throws -> Data { try await respond() }
+
+        private func respond() async throws -> Data {
+            calls += 1
             switch mode {
             case "timeout":
                 try await Task.sleep(for: .seconds(5))
+                return body
+            case "hang":
+                await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
                 return body
             case "rateLimited": throw FuelBuddyProviderError.rateLimited
             case "unavailable": throw FuelBuddyProviderError.unavailable
             default: return body
             }
         }
+    }
+
+    private var validBody: Data {
+        Data("""
+        {"schemaVersion":1,"requestID":"\(requestID.uuidString)","status":"ok","foods":[{"foodID":"chana-masala","rationaleFacts":[]}],"explanation":"","tradeOffs":[],"declineReason":null}
+        """.utf8)
     }
 
     // MARK: Request-side policy
@@ -74,7 +101,7 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
 
     func testEveryRequestFixtureScreensAsDocumented() throws {
         let fixture: RequestFixture = try load("fuel-buddy-requests")
-        XCTAssertGreaterThanOrEqual(fixture.cases.count, 25)
+        XCTAssertGreaterThanOrEqual(fixture.cases.count, 40)
 
         for testCase in fixture.cases {
             let verdict = FuelBuddySafetyPolicy.screen(request: testCase.text)
@@ -85,37 +112,83 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
     func testRequestFixturesCoverEveryBlockAndRoutingReason() throws {
         let fixture: RequestFixture = try load("fuel-buddy-requests")
         let expectations = Set(fixture.cases.map(\.expect))
-        let blocks: [FuelBuddySafetyPolicy.BlockReason] = [.supplementsOrSteroids, .diagnosisOrTreatment, .crashDietOrCompensation, .allergyBypass, .dietaryRuleBypass]
-        let routes: [FuelBuddySafetyPolicy.RoutingReason] = [.under18, .pregnancyOrBreastfeeding, .disorderedEating, .clinicianManagedDiet]
-        for block in blocks { XCTAssertTrue(expectations.contains("blocked:\(block.rawValue)"), "no fixture for \(block)") }
-        for route in routes { XCTAssertTrue(expectations.contains("routed:\(route.rawValue)"), "no fixture for \(route)") }
-        XCTAssertTrue(expectations.contains("allowed"))
+        for block in FuelBuddySafetyPolicy.BlockReason.allCases {
+            XCTAssertTrue(expectations.contains("blocked:\(block.rawValue)"), "no fixture for \(block)")
+        }
+        for route in FuelBuddySafetyPolicy.RoutingReason.allCases {
+            XCTAssertTrue(expectations.contains("routed:\(route.rawValue)"), "no fixture for \(route)")
+        }
+        XCTAssertGreaterThanOrEqual(fixture.cases.filter { $0.expect == "allowed" }.count, 5, "benign cases keep the policy from being 'reject everything'")
     }
 
-    func testUnsafeRequestsNeverReachTheModel() throws {
-        // The gate is only ever called with a request that passed the
-        // policy; here we prove the policy alone stops every unsafe fixture,
-        // without any provider being involved.
+    /// The real boundary: every fixture goes through `FuelBuddyGate` with a
+    /// provider that would happily answer. Unsafe ones must never reach it;
+    /// allowed ones must.
+    func testUnsafeRequestsNeverReachTheProviderThroughTheGate() async throws {
         let fixture: RequestFixture = try load("fuel-buddy-requests")
-        for testCase in fixture.cases where testCase.expect != "allowed" {
-            if case .allowed = FuelBuddySafetyPolicy.screen(request: testCase.text) {
-                XCTFail("\(testCase.id) reached the model path")
+        let candidates: [FuelBuddyCandidate] = [FuelBuddyCandidate(foodID: "chana-masala", displayName: "Chana Masala", facts: ["cuisine:indian"])]
+
+        for testCase in fixture.cases {
+            let spy = FixtureProvider(mode: nil, body: validBody)
+            let gate = FuelBuddyGate(provider: spy)
+            let answer = await gate.presentation(request: request(text: testCase.text, candidates: candidates), local: "local", passesCurrentRules: { _ in true })
+
+            switch testCase.expect {
+            case "allowed":
+                XCTAssertEqual(spy.calls, 1, "\(testCase.id): allowed requests should reach the provider")
+                if case .local(let diagnostic) = answer.source { XCTFail("\(testCase.id): expected model answer, got \(String(describing: diagnostic))") }
+            case let expectation where expectation.hasPrefix("blocked:"):
+                XCTAssertEqual(spy.calls, 0, "\(testCase.id) reached the provider")
+                guard case .local(.blockedByPolicy(let reason)?) = answer.source else { return XCTFail("\(testCase.id): expected blocked, got \(answer.source)") }
+                XCTAssertEqual("blocked:\(reason.rawValue)", expectation, testCase.id)
+            case let expectation where expectation.hasPrefix("routed:"):
+                XCTAssertEqual(spy.calls, 0, "\(testCase.id) reached the provider")
+                guard case .local(.routedByPolicy(let reason)?) = answer.source else { return XCTFail("\(testCase.id): expected routed, got \(answer.source)") }
+                XCTAssertEqual("routed:\(reason.rawValue)", expectation, testCase.id)
+            default:
+                XCTFail("\(testCase.id): unknown expectation \(testCase.expect)")
             }
+            XCTAssertEqual(answer.local, "local", testCase.id)
         }
+    }
+
+    func testSensitiveDetailsAreRedactedBeforeTheProviderSeesThem() async {
+        final class Capture: FuelBuddyLLMProvider, @unchecked Sendable {
+            var seen: String?
+            let body: Data
+            init(body: Data) { self.body = body }
+            func send(_ request: FuelBuddyPresentationRequest) async throws -> Data { seen = request.userText.value; return body }
+            func send(_ request: FuelBuddyIntentRequest) async throws -> Data { seen = request.userText.value; return body }
+        }
+        let capture = Capture(body: validBody)
+        let candidates: [FuelBuddyCandidate] = [FuelBuddyCandidate(foodID: "chana-masala", displayName: "Chana Masala", facts: [])]
+        let text = "I'm jane@example.com, 90 kg, on +44 7911 123456 — quick lunch?"
+
+        _ = await FuelBuddyGate(provider: capture).presentation(request: request(text: text, candidates: candidates), local: "local", passesCurrentRules: { _ in true })
+
+        let seen = capture.seen ?? ""
+        XCTAssertFalse(seen.contains("jane@example.com"))
+        XCTAssertFalse(seen.contains("90 kg"))
+        XCTAssertFalse(seen.contains("7911"))
+        XCTAssertTrue(seen.contains("quick lunch"))
     }
 
     // MARK: Model-output guardrails
 
     func testEveryModelOutputFixtureResolvesAsDocumented() async throws {
         let fixture: ModelOutputFixture = try load("fuel-buddy-model-outputs")
-        XCTAssertGreaterThanOrEqual(fixture.cases.count, 20)
-        let request = request(candidates: fixture.candidateFoodIDs)
+        XCTAssertGreaterThanOrEqual(fixture.cases.count, 35)
 
         for testCase in fixture.cases {
             let body = Data((testCase.body ?? "").replacingOccurrences(of: "REQ", with: requestID.uuidString).utf8)
-            let gate = FuelBuddyGate<String>(provider: FixtureProvider(mode: testCase.provider, body: body))
+            let provider = FixtureProvider(mode: testCase.provider, body: body)
+            let gate = FuelBuddyGate(provider: provider)
             let rejected = Set(testCase.rulesReject ?? [])
-            let answer = await gate.answer(request: request, local: "local-answer", passesCurrentRules: { !rejected.contains($0) })
+            let answer = await gate.presentation(
+                request: request(candidates: fixture.candidates, override: testCase.requestOverride),
+                local: "local-answer",
+                passesCurrentRules: { !rejected.contains($0) }
+            )
 
             XCTAssertEqual(describe(answer), testCase.expect, "case \(testCase.id)")
             XCTAssertEqual(answer.local, "local-answer", "case \(testCase.id): the local answer is always available")
@@ -124,37 +197,44 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
 
     func testHallucinatedFoodsAndFactsNeverReachTheUser() async throws {
         let fixture: ModelOutputFixture = try load("fuel-buddy-model-outputs")
-        let approved = Set(fixture.candidateFoodIDs)
-        let request = request(candidates: fixture.candidateFoodIDs)
+        let approvedFacts = Dictionary(uniqueKeysWithValues: fixture.candidates.map { ($0.foodID, Set($0.facts)) })
+        let order = fixture.candidates.map(\.foodID)
 
         for testCase in fixture.cases where testCase.body != nil {
             let body = Data(testCase.body!.replacingOccurrences(of: "REQ", with: requestID.uuidString).utf8)
-            let gate = FuelBuddyGate<String>(provider: FixtureProvider(mode: nil, body: body))
+            let gate = FuelBuddyGate(provider: FixtureProvider(mode: nil, body: body))
             let rejected = Set(testCase.rulesReject ?? [])
-            let answer = await gate.answer(request: request, local: "local", passesCurrentRules: { !rejected.contains($0) })
+            let answer = await gate.presentation(
+                request: request(candidates: fixture.candidates, override: testCase.requestOverride),
+                local: "local",
+                passesCurrentRules: { !rejected.contains($0) }
+            )
 
-            guard case .model(let validated) = answer.source, case .foods(let foods, let explanation, let tradeOffs) = validated.outcome else { continue }
-            for food in foods {
-                XCTAssertTrue(approved.contains(food.foodID), "\(testCase.id): \(food.foodID) is not approved")
+            guard case .model(let validated) = answer.source else { continue }
+            // Order is the deterministic order; nothing skipped or added.
+            XCTAssertEqual(validated.foods.map(\.foodID), Array(order.prefix(validated.foods.count)), testCase.id)
+            for food in validated.foods {
                 XCTAssertFalse(rejected.contains(food.foodID), "\(testCase.id): \(food.foodID) fails current rules")
-                XCTAssertFalse(FuelBuddySafetyPolicy.containsForbiddenLanguage(food.rationale), testCase.id)
+                XCTAssertTrue(Set(food.rationaleFacts).isSubset(of: approvedFacts[food.foodID] ?? []), "\(testCase.id): rationale cites an unapproved fact")
+                XCTAssertTrue(Set(food.tradeOffFacts).isSubset(of: approvedFacts[food.foodID] ?? []), "\(testCase.id): trade-off cites an unapproved fact")
+                XCTAssertEqual(food.displayName, fixture.candidates.first { $0.foodID == food.foodID }?.displayName, "\(testCase.id): names come from the catalog")
             }
-            XCTAssertFalse(FuelBuddySafetyPolicy.containsForbiddenLanguage(explanation), testCase.id)
-            XCTAssertTrue(tradeOffs.allSatisfy { !FuelBuddySafetyPolicy.containsForbiddenLanguage($0) }, testCase.id)
+            XCTAssertFalse(FuelBuddySafetyPolicy.containsForbiddenLanguage(validated.explanation), testCase.id)
         }
     }
 
     func testModelOutputFixturesCoverEveryFailureCategory() throws {
         let fixture: ModelOutputFixture = try load("fuel-buddy-model-outputs")
         let codes = Set(fixture.cases.map(\.expect))
-        for required in [
-            "model",
-            "local:unknown_food_id", "local:forbidden_language", "local:food_fails_current_rules",
-            "local:schema_version_mismatch", "local:malformed_json", "local:inconsistent_status", "local:too_many_foods",
-            "local:provider_timeout", "local:provider_rate_limited", "local:provider_unavailable"
-        ] {
-            XCTAssertTrue(codes.contains(required), "no fixture resolves to \(required)")
+        let required: [FuelBuddyDiagnostic] = [
+            .modelDeclined, .inconsistentStatus, .unknownFoodID, .duplicateFoodID, .orderMismatch, .tooManyFoods(count: 0),
+            .foodFailsCurrentRules, .unapprovedFact, .forbiddenLanguage, .textTooLong, .schemaVersionMismatch(received: 0),
+            .requestIDMismatch, .malformedJSON, .responseTooLarge(bytes: 0), .providerTimeout, .providerRateLimited, .providerUnavailable
+        ]
+        for diagnostic in required {
+            XCTAssertTrue(codes.contains("local:\(diagnostic.code)"), "no fixture resolves to \(diagnostic.code)")
         }
+        XCTAssertTrue(codes.contains("model"), "at least one fixture must be accepted, or the guardrails are just 'reject everything'")
     }
 
     // MARK: Deterministic layers stay provider-independent
@@ -172,12 +252,13 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
         XCTAssertEqual(Set(rotated.map(\.food.id)), ["chana-masala", "vegetable-pulao"])
     }
 
-    func testPolicyAndValidatorNeedNoNetworkOrCredentials() {
-        // Sanity: both are pure functions of their inputs.
-        XCTAssertEqual(FuelBuddySafetyPolicy.screen(request: "quick lunch"), .allowed)
-        XCTAssertFalse(FuelBuddySafetyPolicy.containsForbiddenLanguage("a light, quick option"))
-        XCTAssertTrue(FuelBuddySafetyPolicy.containsForbiddenLanguage("about 300 kcal"))
-        XCTAssertNil(ProcessInfo.processInfo.environment["FUEL_BUDDY_PROVIDER_KEY"], "evaluation must not depend on a provider secret")
+    func testNoProviderMeansNoNetworkAndAStillUsableAnswer() async {
+        // With no provider configured nothing can leave the device and the
+        // local answer is returned; with a provider, only the gate calls it.
+        let candidates: [FuelBuddyCandidate] = [FuelBuddyCandidate(foodID: "chana-masala", displayName: "Chana Masala", facts: [])]
+        let answer = await FuelBuddyGate(provider: nil).presentation(request: request(candidates: candidates), local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(answer.source, .local(.providerUnavailable))
+        XCTAssertEqual(answer.local, "local")
     }
 
     // MARK: Helpers
@@ -190,7 +271,7 @@ final class IronFuelSafetyEvaluationTests: XCTestCase {
         }
     }
 
-    private func describe(_ answer: FuelBuddyAnswer<String>) -> String {
+    private func describe(_ answer: FuelBuddyAnswer<FuelBuddyValidatedPresentation, String>) -> String {
         switch answer.source {
         case .model: return "model"
         case .local(let diagnostic): return "local:\(diagnostic?.code ?? "none")"
