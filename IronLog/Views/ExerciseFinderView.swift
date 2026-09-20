@@ -106,7 +106,9 @@ struct ExerciseFinderView: View {
                         // Runners-up sit below the primary actions so "Add" is
                         // never pushed off a compact screen.
                         if phase == .complete, let result, !result.alternates.isEmpty {
-                            alternates(result.alternates)
+                            // The pool can be wide when many candidates tie;
+                            // show the strongest few, the rest surface via Try another.
+                            alternates(Array(result.alternates.prefix(4)))
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
                     }

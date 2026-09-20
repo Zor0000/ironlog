@@ -471,6 +471,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(byName["Fresh Raise"]?.factors, [.neverLogged])
         XCTAssertEqual(byName["Fresh Raise"]?.reason, "A fresh pick you haven't logged yet.")
         XCTAssertEqual(byName["Busy Raise"]?.factors, [.trainedRecently(days: 4), .frequentlyUsed(count: 3)])
+        XCTAssertEqual(ExerciseRecommendationFactor.frequentlyUsed(count: 3).label, "Used 3× in 30 days")
         // Only negative factors: the copy falls back to a neutral line rather
         // than inventing a reason.
         XCTAssertEqual(byName["Busy Raise"]?.reason, "A solid shoulders option from your library.")
@@ -525,6 +526,34 @@ final class AppStateTests: XCTestCase {
         let restarted = selector.select(from: candidates)!
         XCTAssertTrue(restarted.cycleRestarted)
         XCTAssertNotEqual(restarted.selected.template.name, firstCycle.last, "no immediate repeat on restart")
+    }
+
+    func testExerciseFinderSelectorKeepsTiedCandidatesAtTheCutoff() {
+        // Eight never-logged isolation moves all score the same: the pool must
+        // hold all eight, and Try another must reach every one of them.
+        let names = (1...8).map { "Raise \($0)" }
+        let candidates = ExerciseRecommendationEngine(library: finderLibrary(names), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+        XCTAssertEqual(Set(candidates.map(\.score)).count, 1)
+
+        let pool = ExerciseFinderSelector<SeededRandomNumberGenerator>.qualifiedPool(from: candidates, limit: 5, margin: 0.35)
+        XCTAssertEqual(pool.count, 8)
+
+        var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: 9))
+        let firstCycle = Set((0..<8).map { _ in selector.select(from: candidates)!.selected.template.name })
+        XCTAssertEqual(firstCycle, Set(names))
+
+        // A genuinely lower-scoring tail is still cut.
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        let mixed = ExerciseRecommendationEngine(
+            library: finderLibrary(names + ["Stale Raise"]),
+            sessions: [finderSession(["Stale Raise"], daysAgo: 1, now: now)],
+            currentExerciseNames: [],
+            now: now
+        ).candidates(for: "shoulders")
+        let mixedPool = ExerciseFinderSelector<SeededRandomNumberGenerator>.qualifiedPool(from: mixed, limit: 5, margin: 0.35)
+        XCTAssertEqual(mixedPool.count, 8)
+        XCTAssertFalse(mixedPool.contains { $0.template.name == "Stale Raise" })
     }
 
     func testExerciseFinderSelectorIsReproducibleForSameSeed() {

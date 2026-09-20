@@ -11,6 +11,7 @@ enum ExerciseRecommendationFactor: Equatable, Hashable {
     /// Logged within the last few days; pushed down the ranking.
     case trainedRecently(days: Int)
     /// Logged this many times in the last 30 days (2+); pushed down slightly.
+    /// Rolling window, not the calendar month — the label says so.
     case frequentlyUsed(count: Int)
     /// A compound movement while the current workout has none yet.
     case addsCompound
@@ -24,7 +25,7 @@ enum ExerciseRecommendationFactor: Equatable, Hashable {
         case .neverLogged: return "New to your log"
         case .restedFor(let days): return "Rested \(days) days"
         case .trainedRecently(let days): return days == 0 ? "Trained today" : "Trained \(days)d ago"
-        case .frequentlyUsed(let count): return "Used \(count)× this month"
+        case .frequentlyUsed(let count): return "Used \(count)× in 30 days"
         case .addsCompound: return "Adds a compound lift"
         case .complementsCompound: return "Complements your compound"
         case .familiar: return "Familiar movement"
@@ -294,7 +295,14 @@ struct ExerciseFinderSelector<Generator: RandomNumberGenerator> {
         // collapse the finder into a single repeated answer.
         let top = candidates.prefix(limit)
         let withinMargin = top.filter { $0.score >= floor }
-        return withinMargin.count >= 3 ? withinMargin : Array(top.prefix(3))
+        var pool = withinMargin.count >= 3 ? withinMargin : Array(top.prefix(3))
+        // Keep everything tied with the last entry. Never-logged exercises of
+        // one movement style all score the same, so a hard cutoff would let
+        // the alphabetical tie-break permanently bar equally relevant options.
+        if let cutoff = pool.last?.score {
+            pool += candidates.dropFirst(pool.count).prefix { $0.score == cutoff }
+        }
+        return pool
     }
 
     /// Weighted by score so relevance still tilts the odds. A one-item pool is
