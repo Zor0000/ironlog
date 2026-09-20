@@ -61,6 +61,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# `--publish` names one directory on the pr-evidence branch.  Keep it a
+# single, ordinary path component: the publish cleanup runs from a clone, but
+# an absolute path or traversal component would make it operate outside it.
+if [[ -n "$PUBLISH" ]]; then
+  if [[ ! "$PUBLISH" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "invalid --publish label '$PUBLISH': use a single label containing only letters, digits, dots, underscores, or hyphens" >&2
+    exit 2
+  fi
+fi
+
 if [[ $ALL -eq 1 ]]; then
   SCENARIOS=()
   while IFS= read -r line; do
