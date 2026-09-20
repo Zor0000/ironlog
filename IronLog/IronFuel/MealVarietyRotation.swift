@@ -14,10 +14,26 @@ struct ApprovedFood: Equatable, Hashable {
     var budgetTier: Int?
 }
 
-/// What the user has been served recently, oldest first.
+/// What the user has been served recently, oldest first. Carries the food's
+/// tags as they were when served, so a recent meal that isn't in today's
+/// pool (yesterday's breakfast while picking dinner) still counts toward
+/// "seen this cuisine lately".
 struct MealHistoryEntry: Equatable {
     let foodID: String
     let servedAt: Date
+    var cuisines: Set<String> = []
+    var mealTags: Set<String> = []
+
+    init(foodID: String, servedAt: Date, cuisines: Set<String> = [], mealTags: Set<String> = []) {
+        self.foodID = foodID
+        self.servedAt = servedAt
+        self.cuisines = cuisines
+        self.mealTags = mealTags
+    }
+
+    init(_ food: ApprovedFood, servedAt: Date) {
+        self.init(foodID: food.id, servedAt: servedAt, cuisines: food.cuisines, mealTags: food.mealTags)
+    }
 }
 
 /// Preferences that must be preserved while rotating. Everything here is a
@@ -170,7 +186,9 @@ enum MealVarietyRotation {
         return usage
     }
 
-    /// Tags of anything served inside the recency window.
+    /// Tags of anything served inside the recency window: the entry's own
+    /// snapshot, plus the pool's tags for the same id in case the entry was
+    /// recorded without them.
     private static func recentTags(
         history: [MealHistoryEntry],
         pool: [ApprovedFood],
@@ -181,6 +199,7 @@ enum MealVarietyRotation {
         let cutoff = context.now.addingTimeInterval(-Double(context.recencyWindowDays) * 86_400)
         var tags: Set<String> = []
         for entry in history where entry.servedAt >= cutoff && entry.servedAt <= context.now {
+            tags.formUnion(keyPath == \.cuisines ? entry.cuisines : entry.mealTags)
             if let food = byID[entry.foodID] { tags.formUnion(food[keyPath: keyPath]) }
         }
         return tags

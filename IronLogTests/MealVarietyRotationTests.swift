@@ -98,6 +98,28 @@ final class MealVarietyRotationTests: XCTestCase {
         XCTAssertEqual(result.first?.food.id, "pho")
     }
 
+    func testRecentFoodOutsideThePoolStillCountsAsSeenCuisine() {
+        // Yesterday's breakfast was Indian; today's dinner pool doesn't contain
+        // it, but Indian must not be treated as fresh.
+        let pool = [food("curry", cuisines: ["indian"]), food("tacos", cuisines: ["mexican"])]
+        let breakfast = ApprovedFood(id: "masala-oats", cuisines: ["indian"], mealTags: ["breakfast"])
+        let history = [MealHistoryEntry(breakfast, servedAt: now.addingTimeInterval(-86_400))]
+
+        let result = MealVarietyRotation.rotate(pool: pool, history: history, context: context())
+        let byID = Dictionary(uniqueKeysWithValues: result.map { ($0.food.id, $0) })
+
+        XCTAssertFalse(byID["curry"]!.factors.contains(.freshCuisine))
+        XCTAssertTrue(byID["tacos"]!.factors.contains(.freshCuisine))
+        XCTAssertEqual(result.first?.food.id, "tacos")
+    }
+
+    func testHistoryWithoutTagsFallsBackToThePoolsTags() {
+        let pool = [food("curry", cuisines: ["indian"]), food("tacos", cuisines: ["mexican"])]
+        let history = [served("curry", daysAgo: 1)] // legacy entry, no snapshot
+        let result = MealVarietyRotation.rotate(pool: pool, history: history, context: context())
+        XCTAssertFalse(result.first(where: { $0.food.id == "curry" })!.factors.contains(.freshCuisine))
+    }
+
     func testPreferencesPrepTimeAndBudgetArePreserved() {
         let pool = [
             food("slow-roast", cuisines: ["british"], prep: 90, budget: 2),
