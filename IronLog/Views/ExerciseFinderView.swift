@@ -1,54 +1,6 @@
 import SwiftUI
 import UIKit
 
-struct ExerciseFinderEntryCard: View {
-    let title: String
-    let subtitle: String
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            NativeFeedback.light()
-            action()
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(Theme.accent)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.black)
-                }
-                .frame(width: 40, height: 40)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Theme.text)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.accent)
-            }
-            .padding(14)
-            .background(Theme.accentDim)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Theme.accent.opacity(0.42))
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(TactileButtonStyle())
-        .accessibilityIdentifier("exercise-finder-entry-button")
-    }
-}
-
 private enum ExerciseFinderPhase: Equatable {
     case idle
     case scanning

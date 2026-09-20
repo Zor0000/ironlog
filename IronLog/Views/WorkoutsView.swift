@@ -80,15 +80,6 @@ struct WorkoutsView: View {
             TitleBlock(title: "Split Type", subtitle: "Choose your training program")
             freeWorkoutCard
                 .entrance(0)
-            ExerciseFinderEntryCard(
-                title: "Exercise Finder",
-                subtitle: app.hasActiveWorkout
-                    ? "Find a smart match for the workout in progress"
-                    : "Pick a muscle and let IronLog narrow down the options"
-            ) {
-                showExerciseFinder = true
-            }
-            .entrance(1)
             savedRoutines
             if app.library.splits.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -106,34 +97,21 @@ struct WorkoutsView: View {
                 }
                 .cardStyle()
             } else {
-                VStack(spacing: 8) {
-                    ForEach(Array(app.library.splits.enumerated()), id: \.element) { index, split in
-                        Button {
-                            NativeFeedback.selection()
-                            withAnimation(AppMotion.quick) {
-                                app.selectSplit(split)
-                            }
-                        } label: {
-                            HStack {
-                                Text(split)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Theme.muted2)
-                            }
-                            .font(.system(size: 14, weight: .medium))
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 14)
-                            .background(Theme.surface2)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
-                        }
-                        .foregroundStyle(Theme.text)
-                        .buttonStyle(TactileButtonStyle())
-                        .entrance(index + 1)
+                Text("Programs")
+                    .cardLabel()
+                    .padding(.top, 4)
+                SplitProgramGrid(splits: app.library.splits, days: app.library.splitDays) { split in
+                    withAnimation(AppMotion.quick) {
+                        app.selectSplit(split)
                     }
                 }
             }
+            // After the last split, one calm pointer for anyone who came in
+            // without a plan — it opens the same finder the Log's composer does.
+            ExerciseFinderCallout {
+                showExerciseFinder = true
+            }
+            .entrance(app.library.splits.count + 1)
         }
     }
 

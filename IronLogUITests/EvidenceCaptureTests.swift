@@ -153,6 +153,18 @@ final class EvidenceCaptureTests: XCTestCase {
     }
 
     /// The live log with a logged exercise and one completed set.
+    /// Workouts tab as it opens: the split picker grid with the finder callout,
+    /// then Single Muscle's training-day step to show the flow is unchanged.
+    func testScenarioSplitPicker() {
+        waitFor(app.staticTexts["Split Type"])
+        waitFor(app.buttons["exercise-finder-entry-button"])
+        snap("programs")
+
+        app.buttons["split-single-muscle"].tap()
+        waitFor(app.staticTexts["Training Day"])
+        snap("training-day")
+    }
+
     func testScenarioWorkoutLog() {
         waitFor(app.buttons["Today"])
         app.buttons["Today"].tap()
