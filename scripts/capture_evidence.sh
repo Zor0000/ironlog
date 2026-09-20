@@ -96,7 +96,7 @@ for runtime, items in devices.items():
 for name in candidates:
     if name in found:
         runtime, udid = sorted(found[name])[-1]
-        print(udid, name, runtime.rsplit(".", 1)[-1])
+        print("\t".join([udid, name, runtime.rsplit(".", 1)[-1]]))
         break
 ' "$candidates"
 }
@@ -116,7 +116,7 @@ IFS=',' read -r -a SIZE_KEYS <<< "$SIZES"
 
 declare -a UDIDS NAMES
 for class in "${DEVICE_CLASSES[@]}"; do
-  read -r udid name runtime < <(resolve_udid "$(device_candidates "$class")")
+  IFS=$'\t' read -r udid name runtime < <(resolve_udid "$(device_candidates "$class")")
   if [[ -z "${udid:-}" ]]; then
     echo "no simulator available for class '$class'" >&2
     exit 1
