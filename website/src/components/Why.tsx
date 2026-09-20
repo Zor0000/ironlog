@@ -10,9 +10,9 @@ const POINTS: { icon: LucideIcon; title: string; body: string }[] = [
 
 export function Why() {
   return (
-    <section className="py-16">
-      <div className="mx-auto max-w-6xl px-5 sm:px-8">
-        <div className="grid grid-cols-2 gap-6 rounded-3xl border border-line bg-surface/40 p-8 sm:p-10 lg:grid-cols-4">
+    <section className="border-t border-line/60 py-20 lg:py-24">
+      <div className="page">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4 lg:gap-x-10">
           {POINTS.map(({ icon: Icon, title, body }, i) => (
             <Reveal key={title} delay={i * 70}>
               <div>

@@ -58,23 +58,29 @@ const FEATURES: Feature[] = [
 
 export function Features() {
   return (
-    <section id="features" className="relative py-24">
-      <div className="mx-auto max-w-6xl px-5 sm:px-8">
-        <Reveal className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-lime">
-            Built for lifters
-          </p>
-          <h2 className="mt-3 font-display text-5xl text-fg sm:text-6xl">
-            Everything you need.
-            <br />
-            Nothing you don&apos;t.
-          </h2>
+    <section id="features" className="border-t border-line/60 py-24 lg:py-32">
+      <div className="page">
+        <Reveal>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-16">
+            <div>
+              <p className="eyebrow">Built for lifters</p>
+              <h2 className="mt-4 font-display text-5xl text-fg sm:text-6xl">
+                Everything you need.
+                <br />
+                Nothing you don&apos;t.
+              </h2>
+            </div>
+            <p className="max-w-lg text-lg leading-relaxed text-muted lg:justify-self-end lg:pb-1">
+              Eight things, done properly. All of them work offline, from the
+              first session, without an account.
+            </p>
+          </div>
         </Reveal>
 
-        <div className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, body }, i) => (
             <Reveal key={title} delay={(i % 4) * 70}>
-              <div className="group h-full bg-ink p-6 transition-colors hover:bg-surface">
+              <div className="group h-full bg-ink p-6 transition-colors hover:bg-surface lg:p-7">
                 <span className="grid size-11 place-items-center rounded-xl bg-lime/10 ring-1 ring-lime/20 transition-colors group-hover:bg-lime/15">
                   <Icon className="size-5 text-lime" strokeWidth={2} />
                 </span>

@@ -12,18 +12,12 @@ import { Reveal } from "./Reveal";
 
 export function LiveActivity() {
   return (
-    <section id="live-activity" className="relative overflow-hidden py-24">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(212,255,74,0.10),transparent_65%)]"
-      />
-      <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 sm:px-8 lg:grid-cols-2">
+    <section id="live-activity" className="border-t border-line/60 py-24 lg:py-32">
+      <div className="page grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
         {/* Copy */}
         <Reveal>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-lime">
-            The killer feature
-          </p>
-          <h2 className="mt-3 font-display text-5xl text-fg sm:text-6xl">
+          <p className="eyebrow">The killer feature</p>
+          <h2 className="mt-4 font-display text-5xl text-fg sm:text-6xl">
             Log a set without
             <br />
             <span className="text-lime">unlocking your phone.</span>
@@ -51,8 +45,10 @@ export function LiveActivity() {
         </Reveal>
 
         {/* Lock screen mock */}
-        <Reveal delay={120} className="flex justify-center">
-          <LockScreen />
+        <Reveal delay={120}>
+          <div className="flex justify-center rounded-[2rem] border border-line bg-surface/60 px-6 py-10 sm:px-10 sm:py-14">
+            <LockScreen />
+          </div>
         </Reveal>
       </div>
     </section>
@@ -61,7 +57,7 @@ export function LiveActivity() {
 
 function LockScreen() {
   return (
-    <div className="relative w-full max-w-[360px] rounded-[2.6rem] border border-white/10 bg-gradient-to-b from-[#0e0e10] via-[#0b0b0c] to-black p-3 shadow-[0_50px_100px_-30px_rgba(0,0,0,0.9)]">
+    <div className="relative w-full max-w-[360px] rounded-[2.6rem] border border-white/10 bg-black p-3 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.9)]">
       <div className="flex min-h-[600px] flex-col rounded-[2.1rem] bg-[radial-gradient(120%_60%_at_50%_0%,rgba(212,255,74,0.08),transparent_60%)] px-5 pb-5 pt-8">
         {/* Status glyphs */}
         <div className="flex items-center justify-center text-muted-2">

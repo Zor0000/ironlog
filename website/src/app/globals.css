@@ -16,13 +16,6 @@
 
   --font-display: var(--font-bebas), "Impact", sans-serif;
   --font-sans: var(--font-dm), ui-sans-serif, system-ui, sans-serif;
-
-  --animate-float: float 7s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-14px); }
 }
 
 :root {
@@ -32,6 +25,12 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
@@ -55,15 +54,50 @@ body {
   color: #0a0a0a;
 }
 
+/*
+ * One page width for every section. Wide enough that a 1440–1920px desktop
+ * doesn't read as a narrow column with dead margins, capped so line lengths
+ * and the four-up grids stay comfortable.
+ */
+@utility page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1400px;
+  padding-inline: 1.25rem;
+  @variant sm {
+    padding-inline: 2rem;
+  }
+  @variant lg {
+    padding-inline: 3.5rem;
+  }
+}
+
+/* Section eyebrow: the one place lime is used for text. */
+@utility eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-lime);
+}
+
 /* Scroll-reveal primitive (paired with the <Reveal> client component) */
 .reveal {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 .reveal.is-visible {
   opacity: 1;
   transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }

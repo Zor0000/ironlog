@@ -5,7 +5,7 @@ import { NAV_LINKS, SITE } from "@/lib/site";
 export function Footer() {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-5 py-10 sm:flex-row sm:px-8">
+      <div className="page flex flex-col items-center justify-between gap-6 py-10 sm:flex-row">
         <div className="flex flex-col items-center gap-3 sm:items-start">
           <Logo />
           <p className="text-sm text-muted-2">
