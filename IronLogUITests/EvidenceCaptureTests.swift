@@ -79,6 +79,15 @@ final class EvidenceCaptureTests: XCTestCase {
         waitFor(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'exercise-template-'")).firstMatch)
         snap("muscle-filter")
 
+        // Bounded preview → dedicated browser for the rest of the catalog.
+        if app.buttons["browse-all-exercises-button"].exists {
+            app.buttons["browse-all-exercises-button"].tap()
+            waitFor(app.buttons["close-exercise-browser-button"])
+            snap("browse-all")
+            app.buttons["close-exercise-browser-button"].tap()
+            waitFor(app.buttons["add-exercise-mode-custom"])
+        }
+
         let customField = app.textFields["new-exercise-name-field"]
         if app.buttons["add-exercise-mode-custom"].exists {
             app.buttons["add-exercise-mode-custom"].tap()
