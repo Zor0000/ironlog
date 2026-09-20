@@ -40,39 +40,57 @@ user text
    │                                          measurements → placeholders;
    │                                          truncate to the contract limit
    ▼
-1. FuelBuddySafetyPolicy (deterministic)      blocked? → refusal / routing copy, stop
+1. FuelBuddyConstraintResolver (deterministic) profile rules + recognised
+   │                                          explicit text restrictions →
+   │                                          canonical required-rule tags;
+   │                                          ambiguous safety text → clarify, stop
+   ▼
+2. FuelBuddySafetyPolicy (deterministic)      blocked? → refusal / routing copy, stop
    │
    ▼
-2. Intent extraction (LLM, optional)          FuelBuddyIntentRequest → intent JSON
-   │  enums + allowlisted tags only            fails? → local keyword intent
+3. Intent extraction (LLM, optional)          FuelBuddyIntentRequest → preferences only
+   │  enums + allowlisted tags only            cannot add, remove or weaken rules;
+   │                                          fails? → local keyword intent
    ▼
-3. FoodRuleEngine (deterministic)             hard filters: allergy, intolerance,
+4. FoodRuleEngine (deterministic)             hard filters: allergy, intolerance,
    │                                          religious/ethical rules, exclusions
    ▼
-4. EnergyFirewall (deterministic)             energy/portion bounds
+5. EnergyFirewall (deterministic)             energy/portion bounds
    │
    ▼
-5. MealVarietyRotation (deterministic)        recency/frequency penalty, cuisine
+6. MealVarietyRotation (deterministic)        recency/frequency penalty, cuisine
    │  ordered candidates + catalog facts       and meal-tag rotation, stable tie-break
    ▼
-6. Presentation (LLM, optional)               FuelBuddyPresentationRequest →
-   │  explanation copy + which approved         explanation, per-food rationale
-   │  facts to highlight                        facts, trade-off facts
+7. Presentation (LLM, optional)               FuelBuddyPresentationRequest →
+   │  an allowlisted presentation key +         per-food rationale facts,
+   │  which approved facts to highlight         trade-off facts
    ▼
-7. FuelBuddyResponseValidator (deterministic) order must match step 5 / facts
-   │                                          must be from the request / free
-   │                                          text screened / size / schema
+8. FuelBuddyResponseValidator (deterministic) order must match step 6 / facts
+   │                                          must be from the request / key,
+   │                                          size and schema validated
    ▼
-8. Local fallback if 2, 6 or 7 fail,          existing deterministic Fuel Buddy
+9. Local fallback if 3, 7 or 8 fail,          existing deterministic Fuel Buddy
    │  or if the model declines                  response (never empty-handed when
    ▼                                            a safe local answer exists)
 rendered answer
 ```
 
-Steps 0, 1, 3, 4, 5, 7 and 8 are pure Swift, run on device, and have no
-network dependency. Steps 2 and 6 are the only places a model is consulted,
+Steps 0, 1, 2, 4, 5, 6, 8 and 9 are pure Swift, run on device, and have no
+network dependency. Steps 3 and 7 are the only places a model is consulted,
 and both are optional: the pipeline produces a correct answer with them
 switched off.
+
+### Safety constraints are fixed before the model sees the request
+
+`FuelBuddyConstraintResolver` starts from the user's profile rules and merges
+recognised explicit restrictions in the request, such as "no peanuts" or
+"vegetarian". It produces the canonical tags that `FoodRuleEngine` must use;
+the intent model receives them as read-only context and cannot add, remove, or
+weaken them. If text appears to state an allergy, intolerance, exclusion, or
+religious rule but cannot be mapped deterministically, the app asks for
+clarification and does not call a model or make a recommendation from that
+request. A local keyword intent is only a preference fallback; it never
+replaces constraint resolution.
 
 ### Grounding: the model only chooses from facts it was given
 
@@ -82,42 +100,45 @@ name** and a list of catalog-derived **fact tokens** (`prep:15-min`,
 `variety:not-served-recently`). The response can only *point at* those
 tokens — a rationale is a subset of the candidate's facts, a trade-off is one
 of the candidate's facts. The UI renders facts from the catalog, never from
-model text. The one free-text field, `explanation`, is caption copy: it is
-screened for numbers-with-units, medical/supplement terms, ingredient and
-allergen vocabulary, and property-claim verbs ("contains", "free", "rich in",
-"reduces", …), so it cannot smuggle a food property in. Catalogs with opaque
-IDs therefore still work: the model never needs to know what an ID is beyond
-the name and facts it was handed.
+model text. There is no free-text `explanation` field: the response selects an
+allowlisted presentation key and fact references, and the app fills a fixed,
+localised template from those catalog facts. Catalogs with opaque IDs therefore
+still work: the model never needs to know what an ID is beyond the name and
+facts it was handed.
 
 ### Ordering is not the model's
 
-`candidates` arrive in the order `MealVarietyRotation` produced. The response's
-`foods` must be exactly the first *N* of that sequence (`N ≤ maxFoods`); any
-omission, reordering or addition is rejected and the local answer is shown.
+`candidates` arrive in the order `MealVarietyRotation` produced. Deterministic
+code fixes `N = min(candidates.count, maxFoods)` before presentation. The
+response's `foods` must be exactly the first `N` candidates in that sequence;
+any omission, reordering or addition is rejected and the local answer is
+shown.
 
 ### Two request shapes, one version
 
 Intent extraction happens before candidates exist, so it has its own contract
-(`FuelBuddyIntentRequest` / `FuelBuddyIntentResponse`: enums and tags from an
-allowlist the client supplies). Presentation has `FuelBuddyPresentationRequest`
-/ `FuelBuddyPresentationResponse`. Both share `schemaVersion` and
+(`FuelBuddyIntentRequest` / `FuelBuddyIntentResponse`: preference enums and
+tags from an allowlist the client supplies, never safety constraints).
+Presentation has `FuelBuddyPresentationRequest` / `FuelBuddyPresentationResponse`.
+Both share `schemaVersion` and
 `policyVersion`. Full schema: `docs/ironfuel/fuel-buddy-llm-contract.md` (#35),
 mirrored in `IronLog/IronFuel/FuelBuddyLLMContract.swift`.
 
 ## Data flow rules
 
 - **Request** — the *redacted* user text, meal context, the resolved rule
-  *tags* (`vegetarian`, `no-peanut`) the deterministic filter used, recent
+  *tags* (`vegetarian`, `no-peanut`) that the deterministic constraint resolver
+  and filter fixed, recent
   food IDs, the ordered candidates with names and facts, schema + policy
   version, request id, limits. No email, account id, body metrics, or free-text
   health history leaves the device: `FuelBuddyRequestRedactor` replaces
   emails, phone numbers and measurements before the request can be built, and
   the gate refuses to send text that isn't in redacted form or exceeds
   `maxUserTextLength`.
-- **Response** — status, foods (ID + rationale facts) in the required order, an
-  explanation caption, trade-off facts. `declined` is representable so the
-  gateway can report a provider-side refusal, but the client always treats it
-  as a fallback: safety was decided in step 1.
+- **Response** — status, foods (ID + rationale facts) in the required order,
+  an allowlisted presentation key, and trade-off facts. `declined` is
+  representable so the gateway can report a provider-side refusal, but the
+  client always treats it as a fallback: safety was decided in step 2.
 
 ## Where it runs
 
@@ -140,7 +161,7 @@ iOS app ──HTTPS + user JWT──▶ Supabase Edge Function `fuel-buddy` ─�
 
 ## Privacy
 
-- Send only what steps 2/6 need: redacted request text, meal context, rule
+- Send only what steps 3/7 need: redacted request text, meal context, rule
   *tags*, recent food IDs, candidate names + facts.
 - Never send: email, user id, weight/height, medical notes, full history.
 - Do not log raw request text or profile data by default; log the
@@ -151,7 +172,7 @@ iOS app ──HTTPS + user JWT──▶ Supabase Edge Function `fuel-buddy` ─�
 
 ## Latency and cost
 
-- One round-trip per request for step 2 and one for step 6; both run under a
+- One round-trip per request for step 3 and one for step 7; both run under a
   hard timeout (default 4 s each) after which the local path answers, and the
   timeout does not depend on the transport cooperating with cancellation.
 - Input is bounded on device (`maxUserTextLength`, `maxCandidates`,
@@ -166,8 +187,8 @@ iOS app ──HTTPS + user JWT──▶ Supabase Edge Function `fuel-buddy` ─�
 The deterministic Fuel Buddy response is always computed first (it is cheap)
 and returned whenever the model is switched off, unavailable, rate limited,
 times out, returns malformed JSON, fails schema validation, reorders or
-omits candidates, references an unknown food or fact, trips the language
-filter, or declines a request the policy already allowed. The client surfaces
+omits candidates, references an unknown food or fact, or declines a request
+the policy already allowed. The client surfaces
 which happened via `FuelBuddyDiagnostic` for metrics; the user just sees a
 good answer.
 
