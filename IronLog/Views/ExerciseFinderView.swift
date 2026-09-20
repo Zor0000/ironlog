@@ -70,7 +70,7 @@ struct ExerciseFinderView: View {
 
     @State private var selectedMuscleID: String
     @State private var candidates: [ExerciseRecommendation] = []
-    @State private var selector = ExerciseFinderSelector(generator: SystemRandomNumberGenerator())
+    @State private var selector = ExerciseFinderSelector.live()
     @State private var phase: ExerciseFinderPhase = .idle
     @State private var result: ExerciseFinderResult?
     @State private var tickerIndex = 0

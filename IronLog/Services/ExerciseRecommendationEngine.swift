@@ -313,6 +313,32 @@ struct ExerciseFinderSelector<Generator: RandomNumberGenerator> {
     }
 }
 
+extension ExerciseFinderSelector where Generator == AnyRandomNumberGenerator {
+    /// The app's selector: system randomness, or a seeded generator when the
+    /// `UITest_Seed` launch argument is present so UI tests and evidence
+    /// captures reproduce the same picks.
+    static func live() -> ExerciseFinderSelector<AnyRandomNumberGenerator> {
+        if let seed = UITestHooks.seed {
+            return ExerciseFinderSelector(generator: AnyRandomNumberGenerator(SeededRandomNumberGenerator(seed: seed)))
+        }
+        return ExerciseFinderSelector(generator: AnyRandomNumberGenerator(SystemRandomNumberGenerator()))
+    }
+}
+
+/// Type-erased generator so the view can hold either source in one property.
+struct AnyRandomNumberGenerator: RandomNumberGenerator {
+    private var nextValue: () -> UInt64
+
+    init<G: RandomNumberGenerator>(_ generator: G) {
+        var generator = generator
+        nextValue = { generator.next() }
+    }
+
+    mutating func next() -> UInt64 {
+        nextValue()
+    }
+}
+
 /// Small, fast, reproducible generator for tests and previews (SplitMix64).
 struct SeededRandomNumberGenerator: RandomNumberGenerator {
     private var state: UInt64
