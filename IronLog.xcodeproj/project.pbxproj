@@ -25,6 +25,8 @@
 		5345FA5CC3D2C5139A0BBFB6 /* AppState+LiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1F2B7975A30F31806173C7 /* AppState+LiveActivity.swift */; };
 		56640A7727CE4B5BE2516B31 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CFB9A623DBC89D3D0FCD0C8 /* SettingsView.swift */; };
 		586A4E4D212F3DEFBA23208B /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6A9C4AB88330A9FFC30C0FEC /* Supabase */; };
+		58A60CB92D3DAAB3CC526CF0 /* MealVarietyRotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BF3BB555EEAAD75F5DF605E /* MealVarietyRotation.swift */; };
+		61ADA5DC4C1853B691BF60CF /* MealVarietyRotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56872AB402DE97431C5A796A /* MealVarietyRotationTests.swift */; };
 		64CA6939BEE500E4FEF2C10F /* ExerciseFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABADC5F4EB91E23D49DEB387 /* ExerciseFinderView.swift */; };
 		6586E9525AD36B8EE56067DE /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */; };
 		68389DABBF5C51C093D30A71 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BC36223073AEFE8DA47054 /* Theme.swift */; };
@@ -102,8 +104,10 @@
 		47BD2BA9DE192DFF44B03330 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		4BD1B0716FEAA0A7D27A95F6 /* ConfirmActionModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmActionModal.swift; sourceTree = "<group>"; };
 		50EA0588620B15D8527DEBAC /* IronLogWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogWidgetBundle.swift; sourceTree = "<group>"; };
+		56872AB402DE97431C5A796A /* MealVarietyRotationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealVarietyRotationTests.swift; sourceTree = "<group>"; };
 		70BC36223073AEFE8DA47054 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		77FD0FF6F621454F8735020E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7BF3BB555EEAAD75F5DF605E /* MealVarietyRotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealVarietyRotation.swift; sourceTree = "<group>"; };
 		8080B3EB9CF08F43637FB44C /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		83F2CA90E9BCF385638C6AF0 /* FuelBuddyLLMContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelBuddyLLMContract.swift; sourceTree = "<group>"; };
 		899F06F1968D97F14BD885E8 /* IronLogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogUITests.swift; sourceTree = "<group>"; };
@@ -244,6 +248,7 @@
 				8080B3EB9CF08F43637FB44C /* AppStateTests.swift */,
 				1EBF085CBFB21677D66A94AF /* FuelBuddyLLMContractTests.swift */,
 				17FA8048B05382C85289E072 /* LiveWorkoutReducerTests.swift */,
+				56872AB402DE97431C5A796A /* MealVarietyRotationTests.swift */,
 				A4AB0AF5E7CB33AF4B41D558 /* SupabaseWireFormatTests.swift */,
 			);
 			path = IronLogTests;
@@ -253,6 +258,7 @@
 			isa = PBXGroup;
 			children = (
 				83F2CA90E9BCF385638C6AF0 /* FuelBuddyLLMContract.swift */,
+				7BF3BB555EEAAD75F5DF605E /* MealVarietyRotation.swift */,
 			);
 			path = IronFuel;
 			sourceTree = "<group>";
@@ -425,6 +431,7 @@
 				D6609B6FCD5A616C7B4752E3 /* AppStateTests.swift in Sources */,
 				402BF1C9D350089D12242F31 /* FuelBuddyLLMContractTests.swift in Sources */,
 				FE1A1655FD01A13F3A60D279 /* LiveWorkoutReducerTests.swift in Sources */,
+				61ADA5DC4C1853B691BF60CF /* MealVarietyRotationTests.swift in Sources */,
 				E8FB58DF8CD106A498B94E9E /* SupabaseWireFormatTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -445,6 +452,7 @@
 				9944DCF00295EBEF41988DB5 /* LiveWorkoutModels.swift in Sources */,
 				291686743EC3A2EFCF55C198 /* LocalStore.swift in Sources */,
 				155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */,
+				58A60CB92D3DAAB3CC526CF0 /* MealVarietyRotation.swift in Sources */,
 				4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */,
 				3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */,
 				2A44DFB3109C1CEEF94579E7 /* RunView.swift in Sources */,
