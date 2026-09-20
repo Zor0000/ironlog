@@ -456,27 +456,10 @@ struct EditSessionSheet: View {
     /// session — `updateSession` still drops any left without valid reps.
     @ViewBuilder private var addExerciseBlock: some View {
         if showAddExercise {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Add Exercise").cardLabel()
-                    Spacer()
-                    Button {
-                        NativeFeedback.selection()
-                        withAnimation(AppMotion.quick) { showAddExercise = false }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .frame(width: 30, height: 30)
-                            .foregroundStyle(Theme.muted2)
-                            .background(Theme.surface2)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Theme.border))
-                    }
-                    .buttonStyle(TactileButtonStyle())
-                    .accessibilityLabel("Close add exercise")
-                }
-
-                ExerciseCatalogPicker(library: app.library) { template in
+            AddExerciseComposer(
+                library: app.library,
+                weighted: $customWeighted,
+                onSelect: { template in
                     NativeFeedback.light()
                     withAnimation(AppMotion.quick) {
                         append(
@@ -486,12 +469,14 @@ struct EditSessionSheet: View {
                             minutes: template.minutes
                         )
                     }
-                }
-
-                CustomExerciseField(weighted: $customWeighted) { name in
+                },
+                onAddCustom: { name in
                     append(name: name, bodyweight: !customWeighted, timed: false, custom: true)
+                },
+                onClose: {
+                    withAnimation(AppMotion.quick) { showAddExercise = false }
                 }
-            }
+            )
             .cardStyle()
             .transition(.opacity)
         } else {
