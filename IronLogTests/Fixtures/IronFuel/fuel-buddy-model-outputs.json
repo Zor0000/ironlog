@@ -1,0 +1,112 @@
+{
+  "_doc": "Model-output evaluation cases for FuelBuddyResponseValidator + FuelBuddyGate. Every case is run against the same request (candidateFoodIDs below) and must resolve to `expect`: model (validated model answer) or local:<diagnostic code> (fallback with that FuelBuddyDiagnostic.code). `body` is the raw provider payload; REQ is replaced with the request id. `rulesReject` lists food IDs the *current* profile rules reject at validation time.",
+  "candidateFoodIDs": ["chana-masala", "vegetable-pulao", "palak-paneer"],
+  "cases": [
+    {
+      "id": "valid",
+      "expect": "model",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"quick and different from the dal\"}],\"explanation\":\"A quick vegetarian dinner.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "valid-refusal",
+      "expect": "model",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"refused\",\"foods\":[],\"explanation\":\"\",\"tradeOffs\":[],\"refusalReason\":\"unsafeRequest\"}"
+    },
+    {
+      "id": "invented-food-name",
+      "expect": "local:unknown_food_id",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"butter-chicken\",\"rationale\":\"classic\"}],\"explanation\":\"Try this.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "invented-food-id-lookalike",
+      "expect": "local:unknown_food_id",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala-2\",\"rationale\":\"variant\"}],\"explanation\":\"Try this.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "invented-calories",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"only 280 kcal\"}],\"explanation\":\"Light.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "invented-protein",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"palak-paneer\",\"rationale\":\"packs 22 g protein\"}],\"explanation\":\"Filling.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "invented-fibre-percent",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"fibre rich\"}],\"explanation\":\"Covers 40% of your daily fibre.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "invented-ingredient-health-claim",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"the turmeric will cure inflammation\"}],\"explanation\":\"Healing.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "calorie-target",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"light\"}],\"explanation\":\"Keep to 1400 calories today.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "supplement-advice",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"light\"}],\"explanation\":\"Pair with a creatine supplement.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "medical-advice",
+      "expect": "local:forbidden_language",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"light\"}],\"explanation\":\"This will treat my symptoms; adjust your medication.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "variety-reintroduces-filtered-food",
+      "expect": "local:food_fails_current_rules",
+      "rulesReject": ["vegetable-pulao"],
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"quick\"},{\"foodID\":\"vegetable-pulao\",\"rationale\":\"for variety\"}],\"explanation\":\"Two options.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "unknown-schema-version",
+      "expect": "local:schema_version_mismatch",
+      "body": "{\"schemaVersion\":3,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[],\"explanation\":\"\",\"tradeOffs\":[]}"
+    },
+    {
+      "id": "malformed-json",
+      "expect": "local:malformed_json",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{"
+    },
+    {
+      "id": "wrong-types",
+      "expect": "local:malformed_json",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":\"chana-masala\",\"explanation\":\"\",\"tradeOffs\":[]}"
+    },
+    {
+      "id": "prose-not-json",
+      "expect": "local:malformed_json",
+      "body": "Sure! Here are some great options: 1. Chana masala ..."
+    },
+    {
+      "id": "refused-but-with-foods",
+      "expect": "local:inconsistent_status",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"refused\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"anyway\"}],\"explanation\":\"\",\"tradeOffs\":[],\"refusalReason\":\"unsafeRequest\"}"
+    },
+    {
+      "id": "too-many-foods",
+      "expect": "local:too_many_foods",
+      "body": "{\"schemaVersion\":1,\"requestID\":\"REQ\",\"status\":\"ok\",\"foods\":[{\"foodID\":\"chana-masala\",\"rationale\":\"a\"},{\"foodID\":\"vegetable-pulao\",\"rationale\":\"b\"},{\"foodID\":\"palak-paneer\",\"rationale\":\"c\"},{\"foodID\":\"chana-masala\",\"rationale\":\"d\"}],\"explanation\":\"Four.\",\"tradeOffs\":[],\"refusalReason\":null}"
+    },
+    {
+      "id": "provider-timeout",
+      "expect": "local:provider_timeout",
+      "provider": "timeout"
+    },
+    {
+      "id": "provider-rate-limited",
+      "expect": "local:provider_rate_limited",
+      "provider": "rateLimited"
+    },
+    {
+      "id": "provider-unavailable",
+      "expect": "local:provider_unavailable",
+      "provider": "unavailable"
+    }
+  ]
+}
