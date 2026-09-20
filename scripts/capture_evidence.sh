@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
     --publish) PUBLISH="$2"; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --all) ALL=1; shift ;;
-    -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     *) SCENARIOS+=("$1"); shift ;;
   esac
 done
@@ -68,6 +68,7 @@ fi
 
 OUT="${OUT:-evidence/$(date -u +%Y%m%dT%H%M%SZ)}"
 mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
 
 # ── Simulator matrix ─────────────────────────────────────────────────────────
 # Each class lists device names in order of preference; the first one that
@@ -145,13 +146,41 @@ set_reduce_motion() {
   xcrun simctl spawn "$1" defaults write com.apple.Accessibility ReduceMotionEnabled -bool "$2" >/dev/null
 }
 
+# Copy every attachment out of a result bundle as
+# <label>-<scenario>-<n>-<step>.png and echo how many there were.
+export_screenshots() {
+  local bundle="$1" label="$2"
+  local export_dir="$OUT/.export/$label"
+  rm -r -f "$export_dir"; mkdir -p "$export_dir"
+  xcrun xcresulttool export attachments --path "$bundle" --output-path "$export_dir" >/dev/null 2>&1 || true
+  python3 - "$export_dir" "$OUT" "$label" <<'PY'
+import json, os, re, shutil, sys
+export_dir, out, label = sys.argv[1:4]
+path = os.path.join(export_dir, "manifest.json")
+count = 0
+if os.path.exists(path):
+    for test in json.load(open(path)):
+        for att in test.get("attachments", []):
+            name = re.sub(r"_\d+_[0-9A-F-]+", "", att["suggestedHumanReadableName"])
+            if not name.endswith(".png"):
+                name += ".png"
+            shutil.copy(os.path.join(export_dir, att["exportedFileName"]), os.path.join(out, f"{label}-{name}"))
+            count += 1
+print(count)
+PY
+}
+
+FAILED_LABELS=()
+
 run_one() {
   local udid="$1" class="$2" size="$3" motion="$4"
   local label="$class-$size"
   [[ "$motion" == "1" ]] && label="$label-reduce-motion"
   local bundle="$OUT/.xcresult/$label.xcresult"
+  local log="$OUT/.logs/$label.log"
   local category
   category="$(content_size_for "$size")"
+  mkdir -p "$OUT/.logs"
 
   echo "▸ capture $label"
   xcrun simctl bootstatus "$udid" -b >/dev/null
@@ -160,37 +189,32 @@ run_one() {
     --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100 >/dev/null
   set_reduce_motion "$udid" "$([[ "$motion" == "1" ]] && echo true || echo false)"
 
-  rm -rf "$bundle"
-  TEST_RUNNER_EVIDENCE_CAPTURE=1 \
-  TEST_RUNNER_EVIDENCE_CONTENT_SIZE="$category" \
-  TEST_RUNNER_EVIDENCE_SEED="$SEED" \
-  xcodebuild test-without-building \
-    -project IronLog.xcodeproj -scheme IronLog \
-    -destination "id=$udid" \
-    "${ONLY_TESTING[@]}" \
-    -resultBundlePath "$bundle" \
-    CODE_SIGNING_ALLOWED=NO -quiet 2>&1 | grep -E "error:|failed" || true
+  local attempt count=0
+  # A simulator still tearing down the previous session can make xcodebuild
+  # bail before any test runs; one retry covers that.
+  for attempt in 1 2; do
+    rm -r -f "$bundle"
+    TEST_RUNNER_EVIDENCE_CAPTURE=1 \
+    TEST_RUNNER_EVIDENCE_CONTENT_SIZE="$category" \
+    TEST_RUNNER_EVIDENCE_SEED="$SEED" \
+    xcodebuild test-without-building \
+      -project IronLog.xcodeproj -scheme IronLog \
+      -destination "id=$udid" \
+      "${ONLY_TESTING[@]}" \
+      -resultBundlePath "$bundle" \
+      CODE_SIGNING_ALLOWED=NO > "$log" 2>&1 || true
+    count="$(export_screenshots "$bundle" "$label")"
+    [[ "$count" -gt 0 ]] && break
+    echo "  attempt $attempt produced no screenshots; see $log"
+    sleep 5
+  done
 
   set_reduce_motion "$udid" false
   xcrun simctl status_bar "$udid" clear >/dev/null
 
-  local export_dir="$OUT/.export/$label"
-  rm -rf "$export_dir"; mkdir -p "$export_dir"
-  xcrun xcresulttool export attachments --path "$bundle" --output-path "$export_dir" >/dev/null
-  python3 - "$export_dir" "$OUT" "$label" <<'PY'
-import json, os, re, shutil, sys
-export_dir, out, label = sys.argv[1:4]
-manifest = json.load(open(os.path.join(export_dir, "manifest.json")))
-count = 0
-for test in manifest:
-    for att in test.get("attachments", []):
-        name = re.sub(r"_\d+_[0-9A-F-]+", "", att["suggestedHumanReadableName"])
-        if not name.endswith(".png"):
-            name += ".png"
-        shutil.copy(os.path.join(export_dir, att["exportedFileName"]), os.path.join(out, f"{label}-{name}"))
-        count += 1
-print(f"  {count} screenshots → {out}")
-PY
+  grep -E "Test Case .* failed|error:" "$log" | sed 's/^/  /' || true
+  echo "  $count screenshots"
+  [[ "$count" -gt 0 ]] || FAILED_LABELS+=("$label")
 }
 
 for i in "${!UDIDS[@]}"; do
@@ -214,6 +238,10 @@ done
 } > "$OUT/MANIFEST.txt"
 
 echo "▸ done: $(/bin/ls "$OUT"/*.png | wc -l | tr -d ' ') screenshots in $OUT"
+if [[ ${#FAILED_LABELS[@]} -gt 0 ]]; then
+  echo "▸ FAILED: ${FAILED_LABELS[*]} (logs in $OUT/.logs)" >&2
+  exit 1
+fi
 
 # ── Publish ──────────────────────────────────────────────────────────────────
 # Images go to an orphan branch so nothing binary ever lands in main. The
@@ -221,6 +249,7 @@ echo "▸ done: $(/bin/ls "$OUT"/*.png | wc -l | tr -d ' ') screenshots in $OUT"
 if [[ -n "$PUBLISH" ]]; then
   remote_url="$(git config --get remote.origin.url)"
   slug="$(echo "$remote_url" | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+  commit="$(git rev-parse --short HEAD)"
   work="$(mktemp -d)"
   git clone -q --no-checkout "$remote_url" "$work"
   (
@@ -233,33 +262,32 @@ if [[ -n "$PUBLISH" ]]; then
       printf '# PR evidence\n\nScreenshots referenced from pull requests. Not merged into main.\n' > README.md
     fi
     mkdir -p "$PUBLISH"
-    for f in "$OLDPWD/$OUT"/*.png "$OLDPWD/$OUT/MANIFEST.txt"; do
+    for f in "$OUT"/*.png; do
       # Downscale for the PR page; the full-resolution originals stay in $OUT.
-      if [[ "$f" == *.png ]]; then
-        sips -Z 1200 "$f" --out "$PUBLISH/$(basename "$f")" >/dev/null
-      else
-        cp "$f" "$PUBLISH/"
-      fi
+      sips -Z 1200 "$f" --out "$PUBLISH/$(basename "$f")" >/dev/null
     done
+    cp "$OUT/MANIFEST.txt" "$PUBLISH/"
     git add -A
-    git commit -qm "Evidence: $PUBLISH ($(git -C "$OLDPWD" rev-parse --short HEAD))" || true
+    git commit -qm "Evidence: $PUBLISH ($commit)" || true
     git push -q origin pr-evidence
   )
   echo
   echo "## Evidence"
   echo
-  echo "Captured with \`scripts/capture_evidence.sh ${SCENARIOS[*]} --seed $SEED --publish $PUBLISH\` (see MANIFEST.txt on the branch)."
+  echo "Captured with \`scripts/capture_evidence.sh ${SCENARIOS[*]} --seed $SEED --publish $PUBLISH\` at $commit (see \`$PUBLISH/MANIFEST.txt\` on the \`pr-evidence\` branch)."
   echo
   for s in "${SCENARIOS[@]}"; do
     scen="$(echo "$s" | tr '[:upper:]' '[:lower:]')"
     echo "### $s"
     echo
     for i in "${!UDIDS[@]}"; do
-      for size in "${SIZE_KEYS[@]}"; do
-        label="${DEVICE_CLASSES[$i]}-$size"
+      labels=()
+      for size in "${SIZE_KEYS[@]}"; do labels+=("${DEVICE_CLASSES[$i]}-$size"); done
+      [[ $REDUCE_MOTION -eq 1 ]] && labels+=("${DEVICE_CLASSES[$i]}-default-reduce-motion")
+      for label in "${labels[@]}"; do
         files=("$OUT"/"$label"-"$scen"-*.png)
         [[ -e "${files[0]}" ]] || continue
-        echo "**${NAMES[$i]} · $size**"
+        echo "**${NAMES[$i]} · ${label#${DEVICE_CLASSES[$i]}-}**"
         echo
         header=""; sep=""; row=""
         for f in "${files[@]}"; do
