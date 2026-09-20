@@ -81,3 +81,22 @@ Rules of thumb:
 - Don't `sleep`; wait on the element that proves the state, then `snap`.
 - The class is skipped unless `EVIDENCE_CAPTURE=1`, so it never runs in CI's
   `xcodebuild test`.
+
+## Website (landing page)
+
+`website/scripts/capture.mjs` does the same job for the Next.js landing page:
+
+```sh
+cd website && npm ci && npm run build && npx next start -p 3051 &
+npm run evidence -- --url http://localhost:3051 --out ../evidence/website --label after
+```
+
+It screenshots three viewports — mobile 390×844 @2x, laptop 1440×900,
+wide 1920×1080 — as `<label>-<viewport>-01-first-viewport.png` and
+`…-02-full-page.png`, with scroll-reveal forced visible, animations and
+transitions disabled, `prefers-reduced-motion` on, fonts awaited and the
+page pre-scrolled so lazy images have loaded. Capture the production build
+(`next start`), not `next dev`, so the dev overlay never appears. Playwright's
+Chromium is used when installed; otherwise it falls back to Google Chrome
+(`--channel chrome` forces it). Publish the PNGs to `pr-evidence/<label>/`
+the same way as the iOS captures.

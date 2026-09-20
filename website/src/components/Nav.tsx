@@ -5,7 +5,7 @@ import { NAV_LINKS, SITE } from "@/lib/site";
 export function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-line/60 bg-ink/70 backdrop-blur-xl">
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+      <nav className="page flex h-16 items-center justify-between">
         <a href="#top" aria-label="IronLog home">
           <Logo />
         </a>

@@ -5,13 +5,13 @@ import { SITE } from "@/lib/site";
 
 export function CTA() {
   return (
-    <section id="get" className="relative py-24">
-      <div className="mx-auto max-w-6xl px-5 sm:px-8">
+    <section id="get" className="border-t border-line/60 py-24 lg:py-32">
+      <div className="page">
         <Reveal>
-          <div className="relative overflow-hidden rounded-[2rem] border border-lime/20 bg-gradient-to-b from-surface to-ink px-6 py-16 text-center sm:px-12">
+          <div className="relative overflow-hidden rounded-[2rem] border border-line bg-surface/60 px-6 py-16 text-center sm:px-12 lg:py-20">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 -top-24 h-64 bg-[radial-gradient(50%_100%_at_50%_0%,rgba(212,255,74,0.22),transparent_70%)]"
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-lime/60 to-transparent"
             />
             <h2 className="relative mx-auto max-w-2xl font-display text-5xl text-fg sm:text-6xl">
               Ready to own your progress?
