@@ -207,10 +207,16 @@ count = 0
 if os.path.exists(path):
     for test in json.load(open(path)):
         for att in test.get("attachments", []):
+            src = os.path.join(export_dir, att["exportedFileName"])
+            # XCTest also attaches diagnostics (spindumps, logs) when a launch
+            # is slow; only PNG payloads are screenshots.
+            with open(src, "rb") as fh:
+                if fh.read(8) != b"\x89PNG\r\n\x1a\n":
+                    continue
             name = re.sub(r"_\d+_[0-9A-F-]+", "", att["suggestedHumanReadableName"])
             if not name.endswith(".png"):
                 name += ".png"
-            shutil.copy(os.path.join(export_dir, att["exportedFileName"]), os.path.join(out, f"{label}-{name}"))
+            shutil.copy(src, os.path.join(out, f"{label}-{name}"))
             count += 1
 print(count)
 PY

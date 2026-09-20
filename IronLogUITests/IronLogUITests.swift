@@ -255,6 +255,16 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.buttons["run-kind-run"].waitForExistence(timeout: 4))
     }
 
+    /// Swipe up until `element` can be tapped, for content that lands below
+    /// the fold on compact devices or at large text sizes.
+    private func scrollUntilHittable(_ element: XCUIElement, maxSwipes: Int = 6) {
+        var swipes = 0
+        while element.exists, !element.isHittable, swipes < maxSwipes {
+            app.swipeUp()
+            swipes += 1
+        }
+    }
+
     private func typeInto(_ identifier: String, _ text: String) {
         let field = app.textFields[identifier]
         XCTAssertTrue(field.waitForExistence(timeout: 3))
@@ -319,7 +329,7 @@ final class IronLogUITests: XCTestCase {
 
     func testSuggestedWorkoutWizardStartsWorkoutAndPreventsOverwrite() {
         XCTAssertTrue(app.staticTexts["Split Type"].waitForExistence(timeout: 6))
-        app.buttons["PPL"].tap()
+        app.buttons["split-ppl"].tap()
         app.buttons["Push"].tap()
 
         XCTAssertTrue(app.buttons["start-suggested-workout-button"].waitForExistence(timeout: 3))
@@ -418,6 +428,39 @@ final class IronLogUITests: XCTestCase {
         XCTAssertFalse(app.buttons["add-exercise-mode-browse"].waitForExistence(timeout: 1))
         XCTAssertTrue(app.buttons["show-add-exercise-button"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Push Ups"].exists)
+    }
+
+    func testSplitPickerShowsProgramCardsAndFinderCallout() {
+        XCTAssertTrue(app.staticTexts["Split Type"].waitForExistence(timeout: 6))
+        for id in ["split-full-body", "split-ppl", "split-upper-lower", "split-single-muscle"] {
+            XCTAssertTrue(app.buttons[id].exists, "missing program card \(id)")
+        }
+        XCTAssertTrue(app.buttons["split-free-workout-button"].exists)
+        XCTAssertEqual(app.buttons["split-ppl"].label, "PPL")
+        XCTAssertTrue(app.buttons["split-ppl"].value as? String == "Push, pull and legs on rotating days. 3–6 days / week")
+
+        // The finder callout sits after the last split, not above them.
+        let callout = app.buttons["exercise-finder-entry-button"]
+        XCTAssertTrue(callout.exists)
+        XCTAssertGreaterThan(callout.frame.minY, app.buttons["split-single-muscle"].frame.maxY)
+
+        // Every card still leads into the existing wizard.
+        app.buttons["split-single-muscle"].tap()
+        XCTAssertTrue(app.staticTexts["Training Day"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Chest"].exists)
+        app.buttons["Single Muscle"].tap()
+        XCTAssertTrue(app.staticTexts["Split Type"].waitForExistence(timeout: 3))
+
+        app.buttons["split-full-body"].tap()
+        XCTAssertTrue(app.buttons["start-suggested-workout-button"].waitForExistence(timeout: 3))
+        app.buttons["Full Body"].tap()
+        XCTAssertTrue(app.staticTexts["Split Type"].waitForExistence(timeout: 3))
+
+        scrollUntilHittable(callout)
+        callout.tap()
+        XCTAssertTrue(app.buttons["exercise-finder-muscle-chest"].waitForExistence(timeout: 3))
+        app.buttons["close-exercise-finder-button"].tap()
+        XCTAssertTrue(app.staticTexts["Split Type"].waitForExistence(timeout: 3))
     }
 
     func testExerciseFinderStartsFromMuscleAndAddsItsMatch() {
