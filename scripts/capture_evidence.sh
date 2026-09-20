@@ -17,15 +17,17 @@
 #     --reduce-motion                    also capture with Reduce Motion on
 #     --seed N                           seed for randomised features (default 7)
 #     --out DIR                          output directory (default evidence/<UTC stamp>)
+#     --clean                            empty an existing --out DIR first
 #     --publish LABEL                    push to pr-evidence/<LABEL>/ and print Markdown
+#     --allow-dirty                      publish even with uncommitted changes
 #     --skip-build                       reuse the last build-for-testing products
 #
-# Output files: DIR/<device>-<size>[-reduce-motion]-<scenario>-<n>-<step>.png
+# Output files: DIR/<device>-<size>[-reduce-motion]-<scenario>-<nn>-<step>.png
 #
 # Determinism: clean store (UITest_ResetStore), fixed status bar (9:41, full
-# battery), fixed content-size categories, UITest_Seed, and each screenshot
-# waits on the element that marks its state. Re-running with the same inputs
-# on the same simulator runtime should give pixel-identical output.
+# battery), en_US + UTC, an explicit content-size category, UITest_Seed, and
+# each screenshot waits on the element that marks its state. Re-running with
+# the same inputs on the same simulator runtime should give identical output.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -35,7 +37,9 @@ SIZES="default,ax"
 REDUCE_MOTION=0
 SEED=7
 OUT=""
+CLEAN=0
 PUBLISH=""
+ALLOW_DIRTY=0
 SKIP_BUILD=0
 ALL=0
 SCENARIOS=()
@@ -47,10 +51,12 @@ while [[ $# -gt 0 ]]; do
     --reduce-motion) REDUCE_MOTION=1; shift ;;
     --seed) SEED="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
+    --clean) CLEAN=1; shift ;;
     --publish) PUBLISH="$2"; shift 2 ;;
+    --allow-dirty) ALLOW_DIRTY=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --all) ALL=1; shift ;;
-    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) SCENARIOS+=("$1"); shift ;;
   esac
 done
@@ -59,16 +65,40 @@ if [[ $ALL -eq 1 ]]; then
   SCENARIOS=()
   while IFS= read -r line; do
     SCENARIOS+=("$line")
-  done < <(grep -o 'func testScenario[A-Za-z0-9]*' IronLogUITests/EvidenceCaptureTests.swift | sed 's/func testScenario//')
+  done < <(grep -oE 'func testScenario[A-Za-z0-9]+\(' IronLogUITests/EvidenceCaptureTests.swift | sed -E 's/func testScenario([A-Za-z0-9]+)\(/\1/')
 fi
 if [[ ${#SCENARIOS[@]} -eq 0 ]]; then
   echo "usage: $0 [options] <Scenario>... | --all   (see --help)" >&2
   exit 2
 fi
 
+# ── Output directory ─────────────────────────────────────────────────────────
+# A reused directory must not mix runs: the manifest describes exactly what is
+# in it, so refuse leftovers unless asked to clear them.
 OUT="${OUT:-evidence/$(date -u +%Y%m%dT%H%M%SZ)}"
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
+if [[ -n "$(/bin/ls -A "$OUT")" ]]; then
+  if [[ $CLEAN -eq 1 ]]; then
+    find "$OUT" -mindepth 1 -maxdepth 1 -exec rm -r -f {} +
+  else
+    echo "output directory is not empty: $OUT (pass --clean to empty it)" >&2
+    exit 2
+  fi
+fi
+
+# ── Source state ─────────────────────────────────────────────────────────────
+COMMIT="$(git rev-parse --short HEAD)"
+DIRTY=0
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  DIRTY=1
+  echo "▸ warning: worktree has uncommitted changes; evidence will be stamped $COMMIT+dirty"
+fi
+if [[ -n "$PUBLISH" && $DIRTY -eq 1 && $ALLOW_DIRTY -eq 0 ]]; then
+  echo "refusing to publish from a dirty worktree (commit first, or pass --allow-dirty)" >&2
+  exit 2
+fi
+STAMP="$COMMIT"; [[ $DIRTY -eq 1 ]] && STAMP="$COMMIT+dirty"
 
 # ── Simulator matrix ─────────────────────────────────────────────────────────
 # Each class lists device names in order of preference; the first one that
@@ -102,12 +132,14 @@ for name in candidates:
 ' "$candidates"
 }
 
+# The "default" entry is passed explicitly (Large), never inherited from the
+# simulator, so a hand-changed Dynamic Type setting can't leak into a capture.
 content_size_for() {
   case "$1" in
-    default) echo "" ;;
+    default) echo "UICTContentSizeCategoryL" ;;
+    xl) echo "UICTContentSizeCategoryExtraLarge" ;;
     ax) echo "UICTContentSizeCategoryAccessibilityL" ;;
     ax-xxxl) echo "UICTContentSizeCategoryAccessibilityXXXL" ;;
-    xl) echo "UICTContentSizeCategoryExtraLarge" ;;
     *) echo "unknown size: $1" >&2; exit 2 ;;
   esac
 }
@@ -115,7 +147,7 @@ content_size_for() {
 IFS=',' read -r -a DEVICE_CLASSES <<< "$DEVICES"
 IFS=',' read -r -a SIZE_KEYS <<< "$SIZES"
 
-declare -a UDIDS NAMES
+declare -a UDIDS NAMES RUNTIMES
 for class in "${DEVICE_CLASSES[@]}"; do
   IFS=$'\t' read -r udid name runtime < <(resolve_udid "$(device_candidates "$class")")
   if [[ -z "${udid:-}" ]]; then
@@ -123,7 +155,7 @@ for class in "${DEVICE_CLASSES[@]}"; do
     exit 1
   fi
   echo "▸ $class → $name ($runtime) $udid"
-  UDIDS+=("$udid"); NAMES+=("$name")
+  UDIDS+=("$udid"); NAMES+=("$name"); RUNTIMES+=("$runtime")
 done
 
 # ── Build once ───────────────────────────────────────────────────────────────
@@ -142,12 +174,16 @@ for s in "${SCENARIOS[@]}"; do
   ONLY_TESTING+=("-only-testing:IronLogUITests/EvidenceCaptureTests/testScenario${s}")
 done
 
+read_reduce_motion() {
+  xcrun simctl spawn "$1" defaults read com.apple.Accessibility ReduceMotionEnabled 2>/dev/null || echo 0
+}
+
 set_reduce_motion() {
   xcrun simctl spawn "$1" defaults write com.apple.Accessibility ReduceMotionEnabled -bool "$2" >/dev/null
 }
 
 # Copy every attachment out of a result bundle as
-# <label>-<scenario>-<n>-<step>.png and echo how many there were.
+# <label>-<scenario>-<nn>-<step>.png and echo how many there were.
 export_screenshots() {
   local bundle="$1" label="$2"
   local export_dir="$OUT/.export/$label"
@@ -187,13 +223,19 @@ run_one() {
   xcrun simctl status_bar "$udid" override \
     --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 \
     --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100 >/dev/null
+  # Remember the developer's own Reduce Motion preference and put it back.
+  local previous_motion
+  previous_motion="$(read_reduce_motion "$udid")"
   set_reduce_motion "$udid" "$([[ "$motion" == "1" ]] && echo true || echo false)"
 
-  local attempt count=0
+  local attempt status=0 count=0
   # A simulator still tearing down the previous session can make xcodebuild
-  # bail before any test runs; one retry covers that.
+  # bail before any test runs (non-zero exit, no attachments); one retry covers
+  # that. A genuine test failure (non-zero exit *with* attachments) is not
+  # retried and fails the run.
   for attempt in 1 2; do
     rm -r -f "$bundle"
+    status=0
     TEST_RUNNER_EVIDENCE_CAPTURE=1 \
     TEST_RUNNER_EVIDENCE_CONTENT_SIZE="$category" \
     TEST_RUNNER_EVIDENCE_SEED="$SEED" \
@@ -202,19 +244,23 @@ run_one() {
       -destination "id=$udid" \
       "${ONLY_TESTING[@]}" \
       -resultBundlePath "$bundle" \
-      CODE_SIGNING_ALLOWED=NO > "$log" 2>&1 || true
+      CODE_SIGNING_ALLOWED=NO > "$log" 2>&1 || status=$?
     count="$(export_screenshots "$bundle" "$label")"
-    [[ "$count" -gt 0 ]] && break
-    echo "  attempt $attempt produced no screenshots; see $log"
+    [[ $status -eq 0 || $count -gt 0 ]] && break
+    echo "  attempt $attempt: xcodebuild exited $status before any test ran; retrying (see $log)"
     sleep 5
   done
 
-  set_reduce_motion "$udid" false
+  set_reduce_motion "$udid" "$([[ "$previous_motion" == "1" ]] && echo true || echo false)"
   xcrun simctl status_bar "$udid" clear >/dev/null
 
   grep -E "Test Case .* failed|error:" "$log" | sed 's/^/  /' || true
-  echo "  $count screenshots"
-  [[ "$count" -gt 0 ]] || FAILED_LABELS+=("$label")
+  if [[ $status -ne 0 ]]; then
+    echo "  FAILED (xcodebuild exit $status, $count screenshots) — see $log"
+    FAILED_LABELS+=("$label")
+  else
+    echo "  $count screenshots"
+  fi
 }
 
 for i in "${!UDIDS[@]}"; do
@@ -229,17 +275,17 @@ done
 # Manifest of what was captured with what, so the evidence is reproducible.
 {
   echo "generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "commit: $(git rev-parse --short HEAD)"
+  echo "commit: $STAMP"
   echo "seed: $SEED"
   echo "scenarios: ${SCENARIOS[*]}"
-  for i in "${!UDIDS[@]}"; do echo "device ${DEVICE_CLASSES[$i]}: ${NAMES[$i]} (${UDIDS[$i]})"; done
-  echo "sizes: $SIZES  reduce-motion: $REDUCE_MOTION"
+  for i in "${!UDIDS[@]}"; do echo "device ${DEVICE_CLASSES[$i]}: ${NAMES[$i]} · ${RUNTIMES[$i]} (${UDIDS[$i]})"; done
+  echo "sizes: $SIZES  reduce-motion: $REDUCE_MOTION  locale: en_US  tz: UTC"
   echo "xcode: $(xcodebuild -version | tr '\n' ' ')"
 } > "$OUT/MANIFEST.txt"
 
-echo "▸ done: $(/bin/ls "$OUT"/*.png | wc -l | tr -d ' ') screenshots in $OUT"
+echo "▸ done: $(/bin/ls "$OUT"/*.png 2>/dev/null | wc -l | tr -d ' ') screenshots in $OUT"
 if [[ ${#FAILED_LABELS[@]} -gt 0 ]]; then
-  echo "▸ FAILED: ${FAILED_LABELS[*]} (logs in $OUT/.logs)" >&2
+  echo "▸ FAILED: ${FAILED_LABELS[*]} — not publishing incomplete evidence (logs in $OUT/.logs)" >&2
   exit 1
 fi
 
@@ -249,8 +295,8 @@ fi
 if [[ -n "$PUBLISH" ]]; then
   remote_url="$(git config --get remote.origin.url)"
   slug="$(echo "$remote_url" | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
-  commit="$(git rev-parse --short HEAD)"
   work="$(mktemp -d)"
+  trap 'rm -r -f "$work"' EXIT
   git clone -q --no-checkout "$remote_url" "$work"
   (
     cd "$work"
@@ -261,20 +307,24 @@ if [[ -n "$PUBLISH" ]]; then
       git read-tree --empty
       printf '# PR evidence\n\nScreenshots referenced from pull requests. Not merged into main.\n' > README.md
     fi
-    mkdir -p "$PUBLISH"
+    rm -r -f "$PUBLISH"; mkdir -p "$PUBLISH"
     for f in "$OUT"/*.png; do
       # Downscale for the PR page; the full-resolution originals stay in $OUT.
       sips -Z 1200 "$f" --out "$PUBLISH/$(basename "$f")" >/dev/null
     done
     cp "$OUT/MANIFEST.txt" "$PUBLISH/"
     git add -A
-    git commit -qm "Evidence: $PUBLISH ($commit)" || true
-    git push -q origin pr-evidence
+    if git diff --cached --quiet; then
+      echo "▸ pr-evidence/$PUBLISH already up to date"
+    else
+      git commit -qm "Evidence: $PUBLISH ($STAMP)"
+      git push -q origin pr-evidence
+    fi
   )
   echo
   echo "## Evidence"
   echo
-  echo "Captured with \`scripts/capture_evidence.sh ${SCENARIOS[*]} --seed $SEED --publish $PUBLISH\` at $commit (see \`$PUBLISH/MANIFEST.txt\` on the \`pr-evidence\` branch)."
+  echo "Captured with \`scripts/capture_evidence.sh ${SCENARIOS[*]} --seed $SEED --publish $PUBLISH\` at $STAMP (see \`$PUBLISH/MANIFEST.txt\` on the \`pr-evidence\` branch)."
   echo
   for s in "${SCENARIOS[@]}"; do
     scen="$(echo "$s" | tr '[:upper:]' '[:lower:]')"
@@ -290,12 +340,14 @@ if [[ -n "$PUBLISH" ]]; then
         echo "**${NAMES[$i]} · ${label#${DEVICE_CLASSES[$i]}-}**"
         echo
         header=""; sep=""; row=""
-        for f in "${files[@]}"; do
+        # Step numbers are zero-padded, but sort numerically anyway so an
+        # older, unpadded capture still comes out in order.
+        while IFS= read -r f; do
           b="$(basename "$f" .png)"
-          rest="${b##*-$scen-}"   # "<n>-<step>"
+          rest="${b##*-$scen-}"   # "<nn>-<step>"
           step="${rest#*-}"
           header+="| $step "; sep+="|---"; row+="| ![]($(printf 'https://raw.githubusercontent.com/%s/pr-evidence/%s/%s.png' "$slug" "$PUBLISH" "$b")) "
-        done
+        done < <(printf '%s\n' "${files[@]}" | awk -v scen="$scen" '{ n=$0; sub(".*-" scen "-", "", n); sub("-.*", "", n); print n+0 "\t" $0 }' | sort -n | cut -f2-)
         echo "$header|"; echo "$sep|"; echo "$row|"; echo
       done
     done

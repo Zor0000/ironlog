@@ -32,10 +32,14 @@ final class EvidenceCaptureTests: XCTestCase {
         stepIndex = 0
         app = XCUIApplication()
         var arguments = ["UITest_ResetStore", "UITest_Seed", environment["EVIDENCE_SEED"] ?? "7"]
-        if let category = environment["EVIDENCE_CONTENT_SIZE"], !category.isEmpty {
-            arguments += ["-UIPreferredContentSizeCategoryName", category]
-        }
+        // Pin language, region and time zone so date headers and the keyboard
+        // don't vary with the simulator's settings.
+        arguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        // Always pass a content size, so a simulator whose Dynamic Type was
+        // changed by hand can't leak into a "default" capture.
+        arguments += ["-UIPreferredContentSizeCategoryName", environment["EVIDENCE_CONTENT_SIZE"].flatMap { $0.isEmpty ? nil : $0 } ?? "UICTContentSizeCategoryL"]
         app.launchArguments = arguments
+        app.launchEnvironment["TZ"] = "UTC"
         app.launch()
     }
 
@@ -44,8 +48,8 @@ final class EvidenceCaptureTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Attach a screenshot named `<scenario>-<index>-<step>`; the index keeps
-    /// the exported files in capture order.
+    /// Attach a screenshot named `<scenario>-<index>-<step>`; the zero-padded
+    /// index keeps the exported files in capture order even past ten steps.
     private func snap(_ step: String, settle: TimeInterval = 0.6) {
         RunLoop.current.run(until: Date().addingTimeInterval(settle))
         stepIndex += 1
@@ -54,7 +58,7 @@ final class EvidenceCaptureTests: XCTestCase {
             .replacingOccurrences(of: "]", with: "")
             .lowercased()
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "\(scenario)-\(stepIndex)-\(step)"
+        attachment.name = String(format: "%@-%02d-%@", scenario, stepIndex, step)
         attachment.lifetime = .keepAlways
         add(attachment)
     }

@@ -13,11 +13,15 @@ scripts/capture_evidence.sh ExerciseFinder --publish issue-39 # push + print a M
 Output lands in `evidence/<UTC stamp>/` (git-ignored):
 
 ```
-compact-default-addexercise-1-initial.png
-compact-ax-addexercise-1-initial.png
-standard-default-reduce-motion-exercisefinder-2-searching.png
-MANIFEST.txt   # commit, seed, simulators, Xcode version
+compact-default-addexercise-01-initial.png
+compact-ax-addexercise-01-initial.png
+standard-default-reduce-motion-exercisefinder-02-searching.png
+MANIFEST.txt   # commit (+dirty if uncommitted changes), seed, simulators + runtimes, Xcode
 ```
+
+A reused `--out` must be empty or passed with `--clean`. A failing scenario
+fails the run (exit 1) and nothing is published. Publishing from a dirty
+worktree is refused unless `--allow-dirty`, and the stamp says `+dirty`.
 
 `--publish <label>` copies the set to the `pr-evidence` orphan branch under
 `<label>/` and prints Markdown you can paste straight into the PR body. Nothing
@@ -33,7 +37,7 @@ binary lands in `main`.
 
 | size | `UIPreferredContentSizeCategoryName` |
 |---|---|
-| `default` | system default (Large) |
+| `default` | `UICTContentSizeCategoryL` (passed explicitly, never inherited) |
 | `ax` | `UICTContentSizeCategoryAccessibilityL` |
 | `ax-xxxl` | `UICTContentSizeCategoryAccessibilityXXXL` |
 | `xl` | `UICTContentSizeCategoryExtraLarge` |
@@ -46,8 +50,10 @@ Use `--devices` / `--sizes` to trim the matrix while iterating.
 - `UITest_Seed <n>` — features that use randomness read `UITestHooks.seed` and
   swap in a seeded generator. Default seed is 7; change with `--seed`.
 - Status bar override — 9:41, Wi-Fi, full battery (`simctl status_bar`).
+- `en_US` language/region and `TZ=UTC` passed at launch, so the date header
+  and keyboard don't follow the simulator's settings.
 - Fixed content-size category per run; Reduce Motion toggled via simulator
-  defaults and reset afterwards.
+  defaults and restored to whatever it was afterwards.
 - Each screenshot is taken only after `waitForExistence` on the element that
   marks the state, then a short settle so springs finish.
 
