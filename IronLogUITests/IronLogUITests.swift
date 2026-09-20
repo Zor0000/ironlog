@@ -356,9 +356,45 @@ final class IronLogUITests: XCTestCase {
 
         let addRecommendation = app.buttons["add-recommended-exercise-button"]
         XCTAssertTrue(addRecommendation.waitForExistence(timeout: 6))
+
+        // The pick is relevance-weighted and varied, so read whatever was
+        // matched rather than expecting a fixed catalog entry.
+        let resultName = app.staticTexts["exercise-finder-result-name"]
+        XCTAssertTrue(resultName.waitForExistence(timeout: 2))
+        let matchedName = resultName.label
+        XCTAssertFalse(matchedName.isEmpty)
+        XCTAssertTrue(app.buttons["find-another-exercise-button"].exists)
+
         addRecommendation.tap()
 
         XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts["Barbell Overhead Press"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts[matchedName].waitForExistence(timeout: 4))
+    }
+
+    func testExerciseFinderTryAnotherAvoidsImmediateRepeat() {
+        XCTAssertTrue(app.buttons["exercise-finder-entry-button"].waitForExistence(timeout: 6))
+        app.buttons["exercise-finder-entry-button"].tap()
+
+        XCTAssertTrue(app.buttons["exercise-finder-muscle-chest"].waitForExistence(timeout: 3))
+        app.buttons["exercise-finder-muscle-chest"].tap()
+        app.buttons["find-best-exercise-button"].tap()
+
+        let resultName = app.staticTexts["exercise-finder-result-name"]
+        XCTAssertTrue(resultName.waitForExistence(timeout: 6))
+        let first = resultName.label
+
+        app.buttons["find-another-exercise-button"].tap()
+        let changed = NSPredicate(format: "label != %@", first)
+        expectation(for: changed, evaluatedWith: resultName)
+        waitForExpectations(timeout: 6)
+        XCTAssertNotEqual(resultName.label, first)
+
+        // Switching muscle groups resets to the idle state for the new pool.
+        app.buttons["exercise-finder-muscle-back"].tap()
+        XCTAssertTrue(app.buttons["find-best-exercise-button"].waitForExistence(timeout: 3))
+        XCTAssertFalse(resultName.exists)
+
+        app.buttons["close-exercise-finder-button"].tap()
+        XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 4))
     }
 }
