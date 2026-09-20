@@ -52,6 +52,7 @@ final class EvidenceCaptureTests: XCTestCase {
     /// index keeps the exported files in capture order even past ten steps.
     private func snap(_ step: String, settle: TimeInterval = 0.6) {
         RunLoop.current.run(until: Date().addingTimeInterval(settle))
+        dismissSystemAlerts()
         stepIndex += 1
         let scenario = name
             .replacingOccurrences(of: "-[EvidenceCaptureTests testScenario", with: "")
@@ -61,6 +62,23 @@ final class EvidenceCaptureTests: XCTestCase {
         attachment.name = String(format: "%@-%02d-%@", scenario, stepIndex, step)
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// System permission prompts (notifications for the rest timer, etc.)
+    /// would otherwise land in a screenshot depending on simulator state.
+    /// Decline them so captures don't depend on prior grants either.
+    private func dismissSystemAlerts() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        var attempts = 0
+        while springboard.alerts.firstMatch.exists, attempts < 3 {
+            let alert = springboard.alerts.firstMatch
+            for title in ["Don't Allow", "Not Now", "Cancel", "OK", "Allow"] where alert.buttons[title].exists {
+                alert.buttons[title].tap()
+                break
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            attempts += 1
+        }
     }
 
     private func waitFor(_ element: XCUIElement, _ timeout: TimeInterval = 6) {
