@@ -64,3 +64,6 @@ artifacts/
 
 # Logs
 *.log
+
+# Evidence captures (scripts/capture_evidence.sh); published to the pr-evidence branch instead
+evidence/

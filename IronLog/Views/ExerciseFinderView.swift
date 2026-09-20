@@ -1,156 +1,6 @@
 import SwiftUI
 import UIKit
 
-struct ExerciseRecommendation: Identifiable, Equatable {
-    let template: ExerciseTemplate
-    let muscle: Muscle
-    let score: Int
-    let movementStyle: String
-    let reason: String
-
-    var id: String { "\(muscle.id)/\(template.id)" }
-}
-
-/// The graph's route plan stays valid even when the current workout excludes
-/// most of a muscle group's catalog. Keeping it separate from the view makes
-/// the animated path deterministic and independently testable.
-struct ExerciseFinderGraphRoute: Equatable {
-    let from: String
-    let to: String
-}
-
-enum ExerciseFinderGraphPlan {
-    static let originNodeID = "origin"
-    static let historyNodeID = "history"
-    static let patternNodeID = "pattern"
-    static let goalNodeID = "goal"
-
-    static func decisionNodeID(for candidateIndex: Int) -> String {
-        candidateIndex < 2 ? historyNodeID : patternNodeID
-    }
-
-    static func scanRoutes(candidateNodeIDs: [String]) -> [ExerciseFinderGraphRoute] {
-        guard !candidateNodeIDs.isEmpty else { return [] }
-
-        var routes = [ExerciseFinderGraphRoute(from: originNodeID, to: historyNodeID)]
-        routes += candidateNodeIDs.prefix(2).map {
-            ExerciseFinderGraphRoute(from: historyNodeID, to: $0)
-        }
-
-        let patternCandidates = candidateNodeIDs.dropFirst(2)
-        guard !patternCandidates.isEmpty else { return routes }
-
-        routes.append(ExerciseFinderGraphRoute(from: originNodeID, to: patternNodeID))
-        routes += patternCandidates.map {
-            ExerciseFinderGraphRoute(from: patternNodeID, to: $0)
-        }
-        return routes
-    }
-}
-
-/// A small, deterministic recommendation layer. The animation visualizes this
-/// result; it never races the UI or changes the winner while the scan is running.
-struct ExerciseRecommendationEngine {
-    let library: ExerciseLibrary
-    let sessions: [WorkoutSession]
-    let currentExerciseNames: Set<String>
-    var now = Date()
-
-    func recommendations(for muscleID: String, limit: Int = 5) -> [ExerciseRecommendation] {
-        guard let muscle = library.muscle(muscleID),
-              let templates = library.library[muscleID],
-              limit > 0 else { return [] }
-
-        let currentNames = Set(currentExerciseNames.map { $0.lowercased() })
-        let latestUse = latestUseByExercise()
-        let currentHasCompound = library.library.values
-            .joined()
-            .contains { template in
-                currentNames.contains(template.name.lowercased()) && Self.movementStyle(for: template) == "Compound"
-            }
-
-        let ranked = templates.enumerated().compactMap { index, template -> ExerciseRecommendation? in
-            guard !currentNames.contains(template.name.lowercased()) else { return nil }
-
-            let lastUsed = latestUse[template.name.lowercased()]
-            let daysSinceUse = lastUsed.map(daysSince)
-            var score = 120 - (index * 3) // The catalog's order is the editorial baseline.
-
-            if let daysSinceUse {
-                switch daysSinceUse {
-                case 0...2: score -= 38
-                case 3...6: score -= 20
-                case 7...13: score -= 8
-                default: score += 4
-                }
-                score += 3 // Familiar movements keep a small usability advantage.
-            } else {
-                score += 7 // Introduce some variety without overpowering catalog quality.
-            }
-
-            let style = Self.movementStyle(for: template)
-            if !currentHasCompound && style == "Compound" { score += 9 }
-            if currentHasCompound && style == "Isolation" { score += 5 }
-
-            return ExerciseRecommendation(
-                template: template,
-                muscle: muscle,
-                score: score,
-                movementStyle: style,
-                reason: reason(muscle: muscle, daysSinceUse: daysSinceUse)
-            )
-        }
-
-        return Array(ranked.sorted {
-            if $0.score != $1.score { return $0.score > $1.score }
-            return $0.template.name.localizedStandardCompare($1.template.name) == .orderedAscending
-        }.prefix(limit))
-    }
-
-    static func movementStyle(for template: ExerciseTemplate) -> String {
-        if template.timed { return "Timed" }
-
-        let name = template.name.lowercased()
-        let compoundMarkers = [
-            "press", "squat", "deadlift", "row", "pull-up", "chin-up",
-            "lunge", "dip", "push-up", "step-up", "hip thrust"
-        ]
-        if compoundMarkers.contains(where: name.contains) { return "Compound" }
-        if template.bodyweight { return "Bodyweight" }
-        return "Isolation"
-    }
-
-    private func latestUseByExercise() -> [String: Date] {
-        var dates: [String: Date] = [:]
-        for session in sessions {
-            for exercise in session.exercises {
-                let key = exercise.name.lowercased()
-                if dates[key].map({ session.createdAt > $0 }) ?? true {
-                    dates[key] = session.createdAt
-                }
-            }
-        }
-        return dates
-    }
-
-    private func daysSince(_ date: Date) -> Int {
-        let calendar = Calendar.current
-        let start = calendar.startOfDay(for: min(date, now))
-        let end = calendar.startOfDay(for: now)
-        return max(calendar.dateComponents([.day], from: start, to: end).day ?? 0, 0)
-    }
-
-    private func reason(muscle: Muscle, daysSinceUse: Int?) -> String {
-        guard let daysSinceUse else {
-            return "A fresh choice from your \(muscle.label.lowercased()) library."
-        }
-        if daysSinceUse >= 14 {
-            return "Back in rotation after \(daysSinceUse) days."
-        }
-        return "Balances catalog quality with your recent training."
-    }
-}
-
 struct ExerciseFinderEntryCard: View {
     let title: String
     let subtitle: String
@@ -201,16 +51,14 @@ struct ExerciseFinderEntryCard: View {
 
 private enum ExerciseFinderPhase: Equatable {
     case idle
-    case charging
     case scanning
-    case narrowing
     case complete
-
-    var isSearching: Bool {
-        self == .charging || self == .scanning || self == .narrowing
-    }
 }
 
+/// Match reveal: pick a muscle, run a short scan, land on one clear result
+/// with the reasons behind it and the runners-up one tap away. Everything is
+/// laid out in a vertical stack — nothing is absolutely positioned — so long
+/// names, Dynamic Type and small screens reflow instead of colliding.
 struct ExerciseFinderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -221,18 +69,12 @@ struct ExerciseFinderView: View {
     let onSelect: (ExerciseTemplate) -> Void
 
     @State private var selectedMuscleID: String
-    @State private var recommendations: [ExerciseRecommendation] = []
+    @State private var candidates: [ExerciseRecommendation] = []
+    @State private var selector = ExerciseFinderSelector.live()
     @State private var phase: ExerciseFinderPhase = .idle
-    @State private var activeNodeID: String?
-    @State private var activeEdgeID: String?
-    @State private var visitedNodeIDs: Set<String> = []
-    @State private var visitedEdgeIDs: Set<String> = []
-    @State private var routeProgress: CGFloat = 0
-    @State private var finalistIDs: Set<String> = []
-    @State private var winner: ExerciseRecommendation?
-    @State private var alternativeOffset = 0
-    @State private var scanStep = 0
-    @State private var hubPulse = false
+    @State private var result: ExerciseFinderResult?
+    @State private var tickerIndex = 0
+    @State private var sweeping = false
     @State private var searchTask: Task<Void, Never>?
 
     init(
@@ -254,22 +96,28 @@ struct ExerciseFinderView: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { proxy in
-                ZStack {
-                    NativeBackground()
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 14) {
-                            musclePicker
-                            graph
-                                .frame(height: max(330, min(410, proxy.size.height * 0.5)))
-                            actionArea
+            ZStack {
+                NativeBackground()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        musclePicker
+                        stage
+                        actionArea
+                        // Runners-up sit below the primary actions so "Add" is
+                        // never pushed off a compact screen.
+                        if phase == .complete, let result, !result.alternates.isEmpty {
+                            // The pool can be wide when many candidates tie;
+                            // show the strongest few, the rest surface via Try another.
+                            alternates(Array(result.alternates.prefix(4)))
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
-                        .padding(.bottom, 24)
                     }
-                    .scrollIndicators(.hidden)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 28)
+                    .animation(reduceMotion ? nil : AppMotion.smooth, value: phase)
                 }
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("Exercise Finder")
             .navigationBarTitleDisplayMode(.inline)
@@ -289,8 +137,8 @@ struct ExerciseFinderView: View {
             .toolbarBackground(.visible, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
-        .onAppear(perform: refreshRecommendations)
-        .onChange(of: selectedMuscleID) { _, _ in refreshRecommendations() }
+        .onAppear(perform: refreshCandidates)
+        .onChange(of: selectedMuscleID) { _, _ in refreshCandidates() }
         .onDisappear { searchTask?.cancel() }
     }
 
@@ -298,10 +146,14 @@ struct ExerciseFinderView: View {
         library.muscle(selectedMuscleID)
     }
 
+    private var isSearching: Bool { phase == .scanning }
+
+    // MARK: Muscle picker
+
     private var musclePicker: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Text("Starting muscle group")
+                Text("Muscle group")
                     .cardLabel()
                 Spacer()
                 Text(selectedMuscle?.label ?? "Unavailable")
@@ -312,14 +164,14 @@ struct ExerciseFinderView: View {
                 HStack(spacing: 7) {
                     ForEach(library.catalogMuscles) { muscle in
                         Button {
-                            guard !phase.isSearching else { return }
+                            guard !isSearching else { return }
                             NativeFeedback.selection()
                             withAnimation(AppMotion.quick) { selectedMuscleID = muscle.id }
                         } label: {
                             Pill(text: muscle.label, icon: muscle.systemImage, isActive: selectedMuscleID == muscle.id)
                         }
                         .buttonStyle(TactileButtonStyle())
-                        .disabled(phase.isSearching)
+                        .disabled(isSearching)
                         .accessibilityAddTraits(selectedMuscleID == muscle.id ? .isSelected : [])
                         .accessibilityIdentifier("exercise-finder-muscle-\(muscle.id)")
                     }
@@ -329,409 +181,313 @@ struct ExerciseFinderView: View {
         }
     }
 
-    private var graph: some View {
-        GeometryReader { geometry in
-            let size = geometry.size
-            let layout = graphLayout(in: size)
-            let edges = graphEdges
+    // MARK: Stage
 
-            ZStack {
-                FinderDotGrid()
+    /// The single focal point: status strip, reticle, then the headline that
+    /// moves from "ready" → cycling names → the chosen exercise.
+    private var stage: some View {
+        VStack(spacing: 14) {
+            statusStrip
 
-                ForEach(edges) { edge in
-                    if let from = layout[edge.from], let to = layout[edge.to] {
-                        let isActive = activeEdgeID == edge.id
-                        let isVisited = visitedEdgeIDs.contains(edge.id)
-                        let isWinningPath = winningPathEdgeIDs.contains(edge.id)
-                        FinderConnection(from: from, to: to)
-                            .stroke(
-                                (isActive || isWinningPath) ? Theme.accent.opacity(0.28) : Theme.border.opacity(0.8),
-                                style: StrokeStyle(lineWidth: (isActive || isWinningPath) ? 5 : 1, lineCap: .round)
-                            )
-                            .blur(radius: (isActive || isWinningPath) ? 4 : 0)
-                        FinderConnection(from: from, to: to)
-                            .stroke(
-                                (isActive || isWinningPath) ? Theme.accent : (isVisited ? Theme.accent.opacity(0.48) : Theme.muted.opacity(0.42)),
-                                style: StrokeStyle(lineWidth: (isActive || isWinningPath) ? 1.7 : 1, lineCap: .round)
-                            )
-                    }
-                }
-
-                FinderGraphNode(
-                    title: hubTitle,
-                    subtitle: hubSubtitle,
-                    isHub: true,
-                    isGoal: false,
-                    isActive: activeNodeID == Self.rootNodeID,
-                    isVisited: visitedNodeIDs.contains(Self.rootNodeID),
-                    isFinalist: false,
-                    isWinner: false,
-                    isMuted: phase == .complete,
-                    isPulsing: hubPulse
-                )
-                .frame(width: 78, height: 78)
-                .position(layout[Self.rootNodeID] ?? .zero)
-                .accessibilityLabel("\(selectedMuscle?.label ?? "Muscle") muscle group")
-
-                ForEach(graphDecisionNodes) { node in
-                    FinderGraphNode(
-                        title: node.title,
-                        subtitle: node.subtitle,
-                        isHub: false,
-                        isGoal: false,
-                        isActive: activeNodeID == node.id,
-                        isVisited: visitedNodeIDs.contains(node.id),
-                        isFinalist: false,
-                        isWinner: false,
-                        isMuted: phase == .complete,
-                        isPulsing: false
-                    )
-                    .frame(width: 74, height: 74)
-                    .position(layout[node.id] ?? .zero)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(node.title) evaluation node")
-                }
-
-                ForEach(Array(recommendations.enumerated()), id: \.element.id) { _, recommendation in
-                    if layout[candidateNodeID(recommendation)] != nil {
-                        FinderGraphNode(
-                            title: shortName(recommendation.template.name),
-                            subtitle: recommendation.movementStyle,
-                            isHub: false,
-                            isGoal: false,
-                            isActive: activeNodeID == candidateNodeID(recommendation),
-                            isVisited: visitedNodeIDs.contains(candidateNodeID(recommendation)),
-                            isFinalist: finalistIDs.contains(recommendation.id),
-                            isWinner: winner?.id == recommendation.id,
-                            isMuted: phase == .complete && winner?.id != recommendation.id,
-                            isPulsing: false
-                        )
-                        .frame(width: 80, height: 80)
-                        .position(layout[candidateNodeID(recommendation)] ?? .zero)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(recommendation.template.name), \(recommendation.movementStyle)")
-                    }
-                }
-
-                FinderGraphNode(
-                    title: winner.map { shortName($0.template.name) } ?? "Best fit",
-                    subtitle: winner == nil ? "Destination" : "Matched",
-                    isHub: false,
-                    isGoal: true,
-                    isActive: activeNodeID == Self.goalNodeID,
-                    isVisited: visitedNodeIDs.contains(Self.goalNodeID),
-                    isFinalist: false,
-                    isWinner: winner != nil,
-                    isMuted: false,
-                    isPulsing: false
-                )
-                .frame(width: 68, height: 68)
-                .position(layout[Self.goalNodeID] ?? .zero)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(winner.map { "Best match: \($0.template.name)" } ?? "Best-match destination")
-
-                if let activeEdgeID,
-                   let edge = edges.first(where: { $0.id == activeEdgeID }),
-                   let from = layout[edge.from],
-                   let to = layout[edge.to] {
-                    FinderTraversalPulse(from: from, to: to, progress: routeProgress)
-                }
-
-                HStack(spacing: 8) {
-                    Image(systemName: phase == .complete ? "checkmark.circle.fill" : "point.topleft.down.curvedto.point.bottomright.up")
-                        .foregroundStyle(Theme.accent)
-                    Text(statusText)
-                    Spacer(minLength: 4)
-                    Text(statusProgress)
-                        .foregroundStyle(Theme.muted)
-                        .monospacedDigit()
-                }
-                .font(.caption2)
-                .foregroundStyle(Theme.muted2)
-                .padding(.horizontal, 12)
-                .position(x: size.width / 2, y: size.height - 16)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("exercise-finder-status")
-            }
-            .background(Theme.bg.opacity(0.72))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Theme.border.opacity(0.8))
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Exercise recommendation graph")
-    }
-
-    @ViewBuilder
-    private var actionArea: some View {
-        if recommendations.isEmpty {
-            ContentUnavailableView(
-                "No matches available",
-                systemImage: "dumbbell",
-                description: Text("Every exercise in this muscle group is already in the workout.")
+            FinderReticle(
+                phase: phase,
+                sweeping: sweeping,
+                reduceMotion: reduceMotion,
+                symbol: selectedMuscle?.systemImage ?? "dumbbell"
             )
-            .foregroundStyle(Theme.muted2)
-        } else if let winner {
-            FinderResultCard(recommendation: winner) {
-                alternativeOffset += 1
-                beginSearch()
-            } onAdd: {
-                NativeFeedback.success()
-                onSelect(winner.template)
-                dismiss()
-            }
-            .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.98)))
-        } else {
-            VStack(spacing: 9) {
-                Button {
-                    beginSearch()
-                } label: {
-                    Label(phase.isSearching ? "Finding your match…" : "Find best match", systemImage: "sparkles")
+            .frame(height: 150)
+            .frame(maxWidth: .infinity)
+            .accessibilityHidden(true)
+
+            headline
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Theme.surface.opacity(0.9))
+                .overlay {
+                    LinearGradient(
+                        colors: [Theme.accent.opacity(phase == .complete ? 0.16 : 0.07), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(phase.isSearching)
-                .accessibilityIdentifier("find-best-exercise-button")
-
-                Text("Uses your muscle choice, current workout and recent exercise history.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.muted2)
-                    .multilineTextAlignment(.center)
-            }
         }
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(phase == .complete ? Theme.accent.opacity(0.45) : Theme.border.opacity(0.9))
+        }
+        .shadow(color: Theme.accent.opacity(phase == .complete ? 0.16 : 0), radius: 28, y: 10)
+        .animation(reduceMotion ? nil : AppMotion.smooth, value: phase)
+        .accessibilityElement(children: .contain)
     }
 
-    private var hubTitle: String {
-        switch phase {
-        case .charging: return "Start"
-        case .scanning, .narrowing: return "Search"
-        case .complete: return "Origin"
-        case .idle: return selectedMuscle?.label ?? "Muscle"
+    private var statusStrip: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(phase == .complete ? Theme.success : Theme.accent)
+                .frame(width: 7, height: 7)
+                .opacity(isSearching && sweeping ? 0.35 : 1)
+                .animation(isSearching && !reduceMotion ? .easeInOut(duration: 0.4).repeatForever(autoreverses: true) : .default, value: sweeping)
+            Text(statusText)
+                .font(.system(.caption, design: .monospaced, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(1)
+                .foregroundStyle(phase == .complete ? Theme.success : Theme.accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 6)
+            Text(poolText)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(Theme.muted)
+                .lineLimit(1)
         }
-    }
-
-    private var hubSubtitle: String {
-        switch phase {
-        case .charging: return "Muscle group"
-        case .scanning: return "Traversing"
-        case .narrowing: return "Shortest path"
-        case .complete: return selectedMuscle?.label.uppercased() ?? "MUSCLE"
-        case .idle: return "Muscle group"
-        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("exercise-finder-status")
     }
 
     private var statusText: String {
         switch phase {
-        case .idle: return "Ready to trace the best route"
-        case .charging: return "Setting the starting node"
-        case .scanning: return "Exploring the decision graph"
-        case .narrowing: return "Locking the shortest path"
-        case .complete: return "Best exercise reached"
+        case .idle: return "Ready"
+        case .scanning: return "Scanning \(selectedMuscle?.label ?? "")"
+        case .complete: return result?.cycleRestarted == true ? "Rotation restarted" : "Match found"
         }
     }
 
-    private var statusProgress: String {
+    private var poolText: String {
+        switch candidates.count {
+        case 0: return "No options"
+        case 1: return "1 option"
+        default: return "\(candidates.count) options"
+        }
+    }
+
+    @ViewBuilder
+    private var headline: some View {
         switch phase {
-        case .idle: return "\(recommendations.count) endpoints"
-        case .charging: return "Origin"
-        case .scanning: return "\(scanStep)/\(scanningRoutes(for: recommendations).count) paths"
-        case .narrowing: return "\(finalistIDs.count) routes"
-        case .complete: return "Reached"
+        case .idle:
+            VStack(spacing: 6) {
+                Text(candidates.isEmpty ? "Nothing left to suggest" : "Find a \(selectedMuscle?.label.lowercased() ?? "muscle") match")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Theme.text)
+                    .multilineTextAlignment(.center)
+                Text(candidates.isEmpty
+                     ? "Every exercise in this group is already in your workout."
+                     : "Weighs what you've logged recently and what's already in today's workout.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted2)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
+
+        case .scanning:
+            VStack(spacing: 6) {
+                Text(tickerName)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Theme.text.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .contentTransition(.opacity)
+                    .id("ticker-\(tickerIndex)")
+                Text("Comparing \(candidates.count) options…")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted2)
+            }
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Scanning \(candidates.count) options")
+
+        case .complete:
+            if let result {
+                resultHeadline(result.selected)
+            }
         }
     }
 
-    private static let rootNodeID = ExerciseFinderGraphPlan.originNodeID
-    private static let historyNodeID = ExerciseFinderGraphPlan.historyNodeID
-    private static let patternNodeID = ExerciseFinderGraphPlan.patternNodeID
-    private static let goalNodeID = ExerciseFinderGraphPlan.goalNodeID
+    private var tickerName: String {
+        guard !candidates.isEmpty else { return "" }
+        return candidates[tickerIndex % candidates.count].template.name
+    }
 
-    private var graphDecisionNodes: [FinderGraphDecisionNode] {
-        var nodes = [FinderGraphDecisionNode(id: Self.historyNodeID, title: "Rotation", subtitle: "Recent use")]
-        if recommendations.count > 2 {
-            nodes.append(FinderGraphDecisionNode(id: Self.patternNodeID, title: "Fit", subtitle: "Movement"))
+    private func resultHeadline(_ recommendation: ExerciseRecommendation) -> some View {
+        VStack(spacing: 10) {
+            Text(recommendation.template.name)
+                .font(.title2.weight(.black))
+                .fontWidth(.condensed)
+                .foregroundStyle(Theme.text)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("exercise-finder-result-name")
+            Text(meta(for: recommendation))
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.muted2)
+                .multilineTextAlignment(.center)
+            Text(recommendation.reason)
+                .font(.subheadline)
+                .foregroundStyle(Theme.text.opacity(0.85))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if !recommendation.factors.isEmpty {
+                FinderFlowLayout(spacing: 6) {
+                    ForEach(recommendation.factors, id: \.self) { factor in
+                        FinderFactorChip(factor: factor)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Why this pick")
+            }
         }
-        return nodes
+        .frame(maxWidth: .infinity)
+        .transition(reduceMotion ? .opacity : .scale(scale: 0.94).combined(with: .opacity))
     }
 
-    private var graphEdges: [FinderGraphEdge] {
-        guard !recommendations.isEmpty else { return [] }
+    private func meta(for recommendation: ExerciseRecommendation) -> String {
+        let unit = recommendation.template.timed
+            ? (recommendation.template.minutes ? "min" : "sec")
+            : "reps"
+        return "\(recommendation.movementStyle) · \(recommendation.template.sets)×\(recommendation.template.reps) \(unit)"
+    }
 
-        var edges = [FinderGraphEdge(from: Self.rootNodeID, to: Self.historyNodeID)]
-        if recommendations.count > 2 {
-            edges.append(FinderGraphEdge(from: Self.rootNodeID, to: Self.patternNodeID))
+    // MARK: Alternates
+
+    private func alternates(_ items: [ExerciseRecommendation]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Also fits")
+                .cardLabel()
+            VStack(spacing: 6) {
+                ForEach(items) { item in
+                    Button {
+                        NativeFeedback.selection()
+                        guard let chosen = selector.choose(item, from: candidates) else { return }
+                        withAnimation(reduceMotion ? nil : AppMotion.smooth) { result = chosen }
+                        UIAccessibility.post(notification: .announcement, argument: "Selected \(item.template.name)")
+                    } label: {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.template.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.text)
+                                    .multilineTextAlignment(.leading)
+                                Text("\(item.movementStyle) · \(item.factors.first(where: \.isPositive)?.label ?? "Qualified")")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.muted2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 8)
+                            Image(systemName: "arrow.up.left")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .frame(minHeight: 44)
+                        .background(Theme.surface2.opacity(0.8))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.border))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(TactileButtonStyle())
+                    .accessibilityLabel("Use \(item.template.name) instead")
+                    .accessibilityIdentifier("exercise-finder-alternate-\(item.template.id)")
+                }
+            }
         }
-        edges += recommendations.enumerated().map { index, recommendation in
-            FinderGraphEdge(from: decisionNodeID(for: index), to: candidateNodeID(recommendation))
+    }
+
+    // MARK: Actions
+
+    @ViewBuilder
+    private var actionArea: some View {
+        if candidates.isEmpty {
+            Button {
+                dismiss()
+            } label: {
+                Text("Back to workout")
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        } else if phase == .complete, let result {
+            HStack(spacing: 9) {
+                if result.poolSize > 1 {
+                    Button("Try another") {
+                        beginSearch()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .accessibilityIdentifier("find-another-exercise-button")
+                }
+                Button("Add exercise") {
+                    NativeFeedback.success()
+                    onSelect(result.selected.template)
+                    dismiss()
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityIdentifier("add-recommended-exercise-button")
+            }
+        } else {
+            Button {
+                beginSearch()
+            } label: {
+                Label(isSearching ? "Scanning…" : "Find a match", systemImage: "sparkles")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(isSearching)
+            .accessibilityIdentifier("find-best-exercise-button")
         }
-        edges += recommendations.map { recommendation in
-            FinderGraphEdge(from: candidateNodeID(recommendation), to: Self.goalNodeID)
-        }
-        return edges
     }
 
-    private var winningPathEdgeIDs: Set<String> {
-        guard let winner,
-              let index = recommendations.firstIndex(where: { $0.id == winner.id }) else { return [] }
-        let decision = decisionNodeID(for: index)
-        let candidate = candidateNodeID(winner)
-        return [
-            FinderGraphEdge.id(from: Self.rootNodeID, to: decision),
-            FinderGraphEdge.id(from: decision, to: candidate),
-            FinderGraphEdge.id(from: candidate, to: Self.goalNodeID)
-        ]
-    }
+    // MARK: Search
 
-    private func graphLayout(in size: CGSize) -> [String: CGPoint] {
-        var positions: [String: CGPoint] = [
-            Self.rootNodeID: CGPoint(x: size.width * 0.13, y: size.height * 0.50),
-            Self.historyNodeID: CGPoint(x: size.width * 0.38, y: size.height * 0.30),
-            Self.patternNodeID: CGPoint(x: size.width * 0.38, y: size.height * 0.70),
-            Self.goalNodeID: CGPoint(x: size.width * 0.89, y: size.height * 0.50)
-        ]
-        for (index, recommendation) in recommendations.enumerated() {
-            positions[candidateNodeID(recommendation)] = CGPoint(
-                x: size.width * 0.65,
-                y: candidateYPosition(for: index, height: size.height)
-            )
-        }
-        return positions
-    }
-
-    private func candidateYPosition(for index: Int, height: CGFloat) -> CGFloat {
-        guard recommendations.count > 1 else { return height * 0.5 }
-        let clampedIndex = min(max(index, 0), recommendations.count - 1)
-        let progress = CGFloat(clampedIndex) / CGFloat(recommendations.count - 1)
-        return height * (0.13 + (0.74 * progress))
-    }
-
-    private func candidateNodeID(_ recommendation: ExerciseRecommendation) -> String {
-        "candidate/\(recommendation.id)"
-    }
-
-    private func decisionNodeID(for candidateIndex: Int) -> String {
-        ExerciseFinderGraphPlan.decisionNodeID(for: candidateIndex)
-    }
-
-    private func scanningRoutes(for candidates: [ExerciseRecommendation]) -> [ExerciseFinderGraphRoute] {
-        ExerciseFinderGraphPlan.scanRoutes(candidateNodeIDs: candidates.map(candidateNodeID))
-    }
-
-    private func shortName(_ name: String) -> String {
-        name
-            .replacingOccurrences(of: "Barbell ", with: "")
-            .replacingOccurrences(of: "Dumbbell ", with: "DB ")
-            .replacingOccurrences(of: " (Machine)", with: "")
-    }
-
-    private func refreshRecommendations() {
+    private func refreshCandidates() {
         searchTask?.cancel()
         let engine = ExerciseRecommendationEngine(
             library: library,
             sessions: sessions,
             currentExerciseNames: currentExerciseNames
         )
-        recommendations = engine.recommendations(for: selectedMuscleID)
+        candidates = engine.candidates(for: selectedMuscleID)
+        selector.reset()
         phase = .idle
-        activeNodeID = nil
-        activeEdgeID = nil
-        visitedNodeIDs = []
-        visitedEdgeIDs = []
-        routeProgress = 0
-        finalistIDs = []
-        winner = nil
-        alternativeOffset = 0
-        scanStep = 0
-        hubPulse = false
+        result = nil
+        tickerIndex = 0
+        sweeping = false
     }
 
     private func beginSearch() {
-        guard !recommendations.isEmpty else { return }
+        guard !candidates.isEmpty else { return }
         searchTask?.cancel()
-        let candidates = recommendations
-        let winnerIndex = alternativeOffset % candidates.count
-        let selectedWinner = candidates[winnerIndex]
+        // Decide first; the animation only reveals it.
+        guard let outcome = selector.select(from: candidates) else { return }
 
-        winner = nil
-        finalistIDs = []
-        activeNodeID = Self.rootNodeID
-        activeEdgeID = nil
-        visitedNodeIDs = [Self.rootNodeID]
-        visitedEdgeIDs = []
-        routeProgress = 0
-        scanStep = 0
-        phase = .charging
-        hubPulse = !reduceMotion
+        result = nil
+        phase = .scanning
+        tickerIndex = 0
         NativeFeedback.light()
 
         searchTask = Task { @MainActor in
-            if reduceMotion {
+            if reduceMotion || candidates.count == 1 {
                 guard await pause(milliseconds: 120) else { return }
             } else {
-                guard await pause(milliseconds: 430) else { return }
-                phase = .scanning
-                let routes = scanningRoutes(for: candidates)
-                for (index, route) in routes.enumerated() {
-                    guard await traverse(from: route.from, to: route.to, duration: 170) else { return }
-                    scanStep = index + 1
-                    guard await pause(milliseconds: index == routes.indices.last ? 220 : 80) else { return }
+                sweeping = true
+                let ticks = min(max(candidates.count * 2, 6), 12)
+                for tick in 0..<ticks {
+                    guard await pause(milliseconds: tick < ticks - 3 ? 85 : 150) else { return }
+                    tickerIndex = tick + 1
+                    if tick % 3 == 0 { NativeFeedback.selection() }
                 }
-
-                phase = .narrowing
-                let otherIndex = (winnerIndex + 1) % candidates.count
-                finalistIDs = [selectedWinner.id, candidates[otherIndex].id]
-                NativeFeedback.selection()
-                if otherIndex != winnerIndex {
-                    guard await traverse(
-                        from: decisionNodeID(for: otherIndex),
-                        to: candidateNodeID(candidates[otherIndex]),
-                        duration: 180
-                    ) else { return }
-                }
-                guard await traverse(
-                    from: decisionNodeID(for: winnerIndex),
-                    to: candidateNodeID(selectedWinner),
-                    duration: 210
-                ) else { return }
-                guard await pause(milliseconds: 180) else { return }
-                guard await traverse(
-                    from: candidateNodeID(selectedWinner),
-                    to: Self.goalNodeID,
-                    duration: 290
-                ) else { return }
+                sweeping = false
             }
 
-            withAnimation(AppMotion.smooth) {
+            withAnimation(reduceMotion ? nil : AppMotion.smooth) {
                 phase = .complete
-                hubPulse = false
-                activeNodeID = Self.goalNodeID
-                activeEdgeID = nil
-                finalistIDs = []
-                winner = selectedWinner
+                result = outcome
             }
             NativeFeedback.success()
-            UIAccessibility.post(notification: .announcement, argument: "Best match found: \(selectedWinner.template.name)")
+            UIAccessibility.post(notification: .announcement, argument: "Match found: \(outcome.selected.template.name). \(outcome.selected.reason)")
         }
-    }
-
-    @MainActor
-    private func traverse(from: String, to: String, duration: UInt64) async -> Bool {
-        guard !Task.isCancelled else { return false }
-        let edgeID = FinderGraphEdge.id(from: from, to: to)
-        guard graphEdges.contains(where: { $0.id == edgeID }) else { return false }
-        activeNodeID = from
-        activeEdgeID = edgeID
-        routeProgress = 0
-        withAnimation(.linear(duration: Double(duration) / 1_000)) {
-            routeProgress = 1
-        }
-        guard await pause(milliseconds: duration) else { return false }
-        visitedEdgeIDs.insert(edgeID)
-        visitedNodeIDs.insert(to)
-        withAnimation(AppMotion.quick) {
-            activeNodeID = to
-        }
-        return true
     }
 
     @MainActor
@@ -745,224 +501,159 @@ struct ExerciseFinderView: View {
     }
 }
 
-private struct FinderResultCard: View {
-    let recommendation: ExerciseRecommendation
-    let onTryAnother: () -> Void
-    let onAdd: () -> Void
+// MARK: - Reticle
+
+/// Concentric rings with a sweeping beam while scanning and a solid core once
+/// matched. Purely decorative; it never encodes anything the engine didn't do.
+private struct FinderReticle: View {
+    let phase: ExerciseFinderPhase
+    let sweeping: Bool
+    let reduceMotion: Bool
+    let symbol: String
+
+    @State private var angle: Double = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Theme.accent)
-                    Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.black)
-                }
-                .frame(width: 44, height: 44)
-                .shadow(color: Theme.accent.opacity(0.28), radius: 16)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Best match found")
-                        .cardLabel()
-                        .foregroundStyle(Theme.accent)
-                    Text(recommendation.template.name)
-                        .font(.headline)
-                        .foregroundStyle(Theme.text)
-                    Text(meta)
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted2)
-                }
-                Spacer(minLength: 0)
+        ZStack {
+            ForEach(0..<3, id: \.self) { ring in
+                Circle()
+                    .stroke(Theme.accent.opacity(ringOpacity(ring)), lineWidth: ring == 0 ? 1.4 : 1)
+                    .frame(width: ringSize(ring), height: ringSize(ring))
             }
 
-            Text(recommendation.reason)
-                .font(.subheadline)
-                .foregroundStyle(Theme.muted2)
+            if phase == .scanning && !reduceMotion {
+                AngularGradient(
+                    colors: [.clear, .clear, Theme.accent.opacity(0.05), Theme.accent.opacity(0.55)],
+                    center: .center
+                )
+                .clipShape(Circle())
+                .frame(width: ringSize(2), height: ringSize(2))
+                .rotationEffect(.degrees(angle))
+                .blendMode(.screen)
+            }
 
-            HStack(spacing: 9) {
-                Button("Try another", action: onTryAnother)
-                    .buttonStyle(SecondaryButtonStyle())
-                    .accessibilityIdentifier("find-another-exercise-button")
-                Button("Add exercise", action: onAdd)
-                    .buttonStyle(PrimaryButtonStyle())
-                    .accessibilityIdentifier("add-recommended-exercise-button")
+            core
+        }
+        .frame(maxWidth: .infinity)
+        .onChange(of: sweeping) { _, active in
+            guard !reduceMotion else { return }
+            if active {
+                angle = 0
+                withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { angle = 360 }
+            } else {
+                withAnimation(AppMotion.quick) { angle = 0 }
             }
         }
-        .cardStyle()
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Theme.accent.opacity(0.34))
-        }
-        .accessibilityElement(children: .contain)
     }
 
-    private var meta: String {
-        let unit = recommendation.template.timed
-            ? (recommendation.template.minutes ? "min" : "sec")
-            : "reps"
-        return "\(recommendation.movementStyle) · \(recommendation.template.sets)×\(recommendation.template.reps) \(unit)"
+    private var core: some View {
+        ZStack {
+            Circle()
+                .fill(phase == .complete ? Theme.accent : Theme.surface2)
+                .shadow(color: Theme.accent.opacity(phase == .complete ? 0.6 : 0.18), radius: phase == .complete ? 22 : 12)
+            Circle()
+                .stroke(phase == .complete ? Theme.accent : Theme.accent.opacity(0.55), lineWidth: 1.5)
+            Image(systemName: phase == .complete ? "checkmark" : symbol)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(phase == .complete ? .black : Theme.accent)
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .frame(width: 64, height: 64)
+        .scaleEffect(phase == .complete ? 1.08 : (phase == .scanning ? 0.96 : 1))
+        .animation(reduceMotion ? nil : AppMotion.smooth, value: phase)
+    }
+
+    private func ringSize(_ ring: Int) -> CGFloat {
+        [92, 118, 146][ring]
+    }
+
+    private func ringOpacity(_ ring: Int) -> Double {
+        switch phase {
+        case .idle: return [0.45, 0.28, 0.16][ring]
+        case .scanning: return [0.7, 0.42, 0.24][ring]
+        case .complete: return [0.85, 0.35, 0.14][ring]
+        }
     }
 }
 
-private struct FinderGraphNode: View {
-    let title: String
-    let subtitle: String
-    let isHub: Bool
-    let isGoal: Bool
-    let isActive: Bool
-    let isVisited: Bool
-    let isFinalist: Bool
-    let isWinner: Bool
-    let isMuted: Bool
-    let isPulsing: Bool
+// MARK: - Factor chips
+
+private struct FinderFactorChip: View {
+    let factor: ExerciseRecommendationFactor
 
     var body: some View {
-        VStack(spacing: 4) {
-            if isHub {
-                Image(systemName: "ellipsis")
-                    .font(.caption2.weight(.bold))
-            }
-            Text(title)
-                .font(isHub ? .caption.weight(.semibold) : .caption2.weight(.semibold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.72)
-                .multilineTextAlignment(.center)
-            Text(subtitle)
-                .font(.system(.caption2, design: .monospaced, weight: .medium))
-                .textCase(.uppercase)
+        HStack(spacing: 4) {
+            Image(systemName: factor.systemImage)
+                .font(.system(size: 10, weight: .semibold))
+            Text(factor.label)
+                .font(.caption2.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .foregroundStyle(isWinner ? Color.black.opacity(0.62) : (isHub ? Theme.accent.opacity(0.78) : Theme.muted))
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(isWinner ? Color.black : Theme.text)
-        .background {
-            Circle().fill(fill)
-        }
-        .overlay {
-            Circle().stroke(border, lineWidth: isWinner || isActive ? 1.5 : 1)
-        }
-        .shadow(color: Theme.accent.opacity(primaryGlow), radius: isWinner ? 17 : 10)
-        .shadow(color: Theme.accent.opacity(secondaryGlow), radius: isWinner ? 34 : 22)
-        .scaleEffect(scale)
-        .opacity(isMuted ? 0.26 : 1)
-        .animation(.easeInOut(duration: 0.2), value: isActive)
-        .animation(AppMotion.smooth, value: isWinner)
-        .animation(AppMotion.quick, value: isMuted)
-        .animation(isPulsing ? .easeInOut(duration: 0.46).repeatForever(autoreverses: true) : AppMotion.quick, value: isPulsing)
+        .foregroundStyle(factor.isPositive ? Theme.accent : Theme.muted2)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(factor.isPositive ? Theme.accentDim : Theme.surface2)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(factor.isPositive ? Theme.accent.opacity(0.4) : Theme.border))
+        .accessibilityLabel(factor.label)
+    }
+}
+
+/// Wraps chips onto new lines instead of letting a long factor list clip or
+/// overflow at large Dynamic Type.
+struct FinderFlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        return arrange(width: width, subviews: subviews).size
     }
 
-    private var fill: some ShapeStyle {
-        if isWinner { return AnyShapeStyle(Theme.accent) }
-        return AnyShapeStyle(
-            RadialGradient(
-                colors: [Theme.accent.opacity(isActive || isVisited || isFinalist || isHub ? 0.14 : (isGoal ? 0.06 : 0.035)), Theme.surface],
-                center: .center,
-                startRadius: 0,
-                endRadius: 54
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let placement = arrange(width: bounds.width, subviews: subviews)
+        // Center each row within the available width.
+        for (index, frame) in placement.frames.enumerated() {
+            let rowOffset = (bounds.width - placement.rowWidths[placement.rows[index]]) / 2
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + frame.minX + max(rowOffset, 0), y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(frame.size)
             )
-        )
+        }
     }
 
-    private var border: Color {
-        if isWinner { return Theme.accent }
-        if isActive { return Theme.accent.opacity(0.95) }
-        if isVisited || isFinalist || isHub { return Theme.accent.opacity(0.65) }
-        return Theme.muted.opacity(0.52)
+    private struct Arrangement {
+        var frames: [CGRect] = []
+        var rows: [Int] = []
+        var rowWidths: [CGFloat] = []
+        var size: CGSize = .zero
     }
 
-    private var primaryGlow: Double {
-        if isWinner { return 0.72 }
-        if isActive { return 0.58 }
-        if isVisited || isFinalist || isHub { return 0.28 }
-        return 0
-    }
+    private func arrange(width: CGFloat, subviews: Subviews) -> Arrangement {
+        var arrangement = Arrangement()
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var row = 0
+        var rowWidth: CGFloat = 0
 
-    private var secondaryGlow: Double {
-        if isWinner { return 0.32 }
-        if isActive { return 0.22 }
-        if isVisited || isHub { return 0.11 }
-        return 0
-    }
-
-    private var scale: CGFloat {
-        if isWinner { return 1.12 }
-        if isActive { return 1.07 }
-        if isPulsing { return 1.045 }
-        if isMuted { return 0.94 }
-        return 1
-    }
-}
-
-private struct FinderConnection: Shape {
-    let from: CGPoint
-    let to: CGPoint
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: from)
-        path.addLine(to: to)
-        return path
-    }
-}
-
-private struct FinderGraphDecisionNode: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String
-}
-
-private struct FinderGraphEdge: Identifiable {
-    let from: String
-    let to: String
-
-    var id: String { Self.id(from: from, to: to) }
-
-    static func id(from: String, to: String) -> String {
-        "\(from)→\(to)"
-    }
-}
-
-/// A single traveling signal makes the recommendation process legible: it
-/// leaves the selected muscle, visits each decision branch, then lands on the
-/// chosen exercise. The result itself is deterministic; this only visualizes it.
-private struct FinderTraversalPulse: View {
-    let from: CGPoint
-    let to: CGPoint
-    let progress: CGFloat
-
-    var body: some View {
-        Circle()
-            .fill(Theme.accent)
-            .frame(width: 11, height: 11)
-            .shadow(color: Theme.accent.opacity(0.95), radius: 9)
-            .shadow(color: Theme.accent.opacity(0.54), radius: 20)
-            .position(
-                x: from.x + ((to.x - from.x) * progress),
-                y: from.y + ((to.y - from.y) * progress)
-            )
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
-    }
-}
-
-private struct FinderDotGrid: View {
-    var body: some View {
-        Canvas { context, size in
-            var x: CGFloat = 9
-            while x < size.width {
-                var y: CGFloat = 9
-                while y < size.height {
-                    let dot = Path(ellipseIn: CGRect(x: x, y: y, width: 1.2, height: 1.2))
-                    context.fill(dot, with: .color(Theme.muted.opacity(0.14)))
-                    y += 19
-                }
-                x += 19
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                arrangement.rowWidths.append(rowWidth)
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+                row += 1
+                rowWidth = 0
             }
+            arrangement.frames.append(CGRect(x: x, y: y, width: size.width, height: size.height))
+            arrangement.rows.append(row)
+            x += size.width + spacing
+            rowWidth = x - spacing
+            rowHeight = max(rowHeight, size.height)
         }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        arrangement.rowWidths.append(rowWidth)
+        arrangement.size = CGSize(width: width.isFinite ? width : rowWidth, height: y + rowHeight)
+        return arrangement
     }
 }

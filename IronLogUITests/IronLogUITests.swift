@@ -42,6 +42,26 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(element.isHittable && element.frame.maxY <= safeBottom)
     }
 
+    /// Add Exercise opens on the library intent; the custom field lives behind
+    /// "Add your own", one tap away and never below a long catalog list.
+    private func openCustomExerciseEntry() {
+        let customMode = app.buttons["add-exercise-mode-custom"]
+        XCTAssertTrue(customMode.waitForExistence(timeout: 3))
+        scrollToHittable(customMode)
+        customMode.tap()
+        let exerciseField = app.textFields["new-exercise-name-field"]
+        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
+        XCTAssertTrue(exerciseField.isHittable, "custom name field must be reachable without scrolling past the catalog")
+    }
+
+    private func addCustomExercise(_ name: String) {
+        openCustomExerciseEntry()
+        let exerciseField = app.textFields["new-exercise-name-field"]
+        exerciseField.tap()
+        exerciseField.typeText(name)
+        app.buttons["confirm-add-exercise-button"].tap()
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
@@ -68,12 +88,7 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
         app.buttons["start-free-workout-button"].tap()
 
-        let exerciseField = app.textFields["new-exercise-name-field"]
-        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
-        scrollToHittable(exerciseField)
-        exerciseField.tap()
-        exerciseField.typeText("Push Ups")
-        app.buttons["confirm-add-exercise-button"].tap()
+        addCustomExercise("Push Ups")
 
         let repsField = app.textFields["set-reps-input"].firstMatch
         XCTAssertTrue(repsField.waitForExistence(timeout: 3))
@@ -96,12 +111,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["Today"].tap()
         XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
         app.buttons["start-free-workout-button"].tap()
-        let exerciseField = app.textFields["new-exercise-name-field"]
-        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
-        scrollToHittable(exerciseField)
-        exerciseField.tap()
-        exerciseField.typeText("Push Ups")
-        app.buttons["confirm-add-exercise-button"].tap()
+        addCustomExercise("Push Ups")
 
         // Exercise removal always asks, even before any set is filled in.
         let removeExercise = app.buttons["remove-exercise-button"].firstMatch
@@ -137,12 +147,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["Today"].tap()
         XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
         app.buttons["start-free-workout-button"].tap()
-        let exerciseField = app.textFields["new-exercise-name-field"]
-        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
-        scrollToHittable(exerciseField)
-        exerciseField.tap()
-        exerciseField.typeText("Push Ups")
-        app.buttons["confirm-add-exercise-button"].tap()
+        addCustomExercise("Push Ups")
 
         app.buttons["set-type-button"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Add Custom Remark"].waitForExistence(timeout: 2))
@@ -161,12 +166,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["Today"].tap()
         XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
         app.buttons["start-free-workout-button"].tap()
-        let exerciseField = app.textFields["new-exercise-name-field"]
-        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
-        scrollToHittable(exerciseField)
-        exerciseField.tap()
-        exerciseField.typeText("Push Ups")
-        app.buttons["confirm-add-exercise-button"].tap()
+        addCustomExercise("Push Ups")
 
         let saveRoutine = app.buttons["save-routine-button"]
         XCTAssertTrue(saveRoutine.waitForExistence(timeout: 3))
@@ -207,11 +207,9 @@ final class IronLogUITests: XCTestCase {
         app.buttons["Close settings"].tap()
         app.buttons["Today"].tap()
         app.buttons["start-free-workout-button"].tap()
-        let exerciseField = app.textFields["new-exercise-name-field"]
-        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
-        app.swipeUp()
+        openCustomExerciseEntry()
         app.buttons["Weight + Reps"].tap()
-        scrollToHittable(exerciseField)
+        let exerciseField = app.textFields["new-exercise-name-field"]
         exerciseField.tap()
         exerciseField.typeText("Bench Press")
         app.buttons["confirm-add-exercise-button"].tap()
@@ -223,12 +221,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["Today"].tap()
         XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
         app.buttons["start-free-workout-button"].tap()
-        let exerciseField = app.textFields["new-exercise-name-field"]
-        XCTAssertTrue(exerciseField.waitForExistence(timeout: 3))
-        scrollToHittable(exerciseField)
-        exerciseField.tap()
-        exerciseField.typeText("Push Ups")
-        app.buttons["confirm-add-exercise-button"].tap()
+        addCustomExercise("Push Ups")
         let repsField = app.textFields["set-reps-input"].firstMatch
         XCTAssertTrue(repsField.waitForExistence(timeout: 3))
         repsField.tap()
@@ -346,6 +339,87 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Barbell Bench Press"].waitForExistence(timeout: 3))
     }
 
+    // MARK: Add Exercise
+
+    private func startFreeWorkout() {
+        XCTAssertTrue(app.buttons["Today"].waitForExistence(timeout: 6))
+        app.buttons["Today"].tap()
+        XCTAssertTrue(app.buttons["start-free-workout-button"].waitForExistence(timeout: 6))
+        app.buttons["start-free-workout-button"].tap()
+        XCTAssertTrue(app.buttons["add-exercise-mode-browse"].waitForExistence(timeout: 3))
+    }
+
+    func testAddExerciseMuscleFilterStaysCompactAndOpensFullBrowser() {
+        startFreeWorkout()
+
+        // A free workout has no target muscle, so the library opens on the hint.
+        XCTAssertFalse(app.buttons["browse-all-exercises-button"].exists)
+        app.buttons["Chest exercises"].tap()
+
+        // Inline preview is bounded: a handful of rows plus a "See all" affordance.
+        let seeAll = app.buttons["browse-all-exercises-button"]
+        XCTAssertTrue(seeAll.waitForExistence(timeout: 3))
+        let inlineRows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'exercise-template-'"))
+        XCTAssertLessThanOrEqual(inlineRows.count, 5)
+        XCTAssertTrue(seeAll.label.contains("chest"))
+
+        // The custom entry is still reachable with no long catalog scroll.
+        let customMode = app.buttons["add-exercise-mode-custom"]
+        XCTAssertTrue(customMode.isHittable)
+
+        // The rest of the catalog lives in a dedicated scroller.
+        seeAll.tap()
+        XCTAssertTrue(app.buttons["close-exercise-browser-button"].waitForExistence(timeout: 3))
+        let browserRows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'browse-exercise-'"))
+        XCTAssertGreaterThan(browserRows.count, 5)
+        app.buttons["browse-exercise-Incline Dumbbell Press"].tap()
+
+        XCTAssertFalse(app.buttons["close-exercise-browser-button"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Incline Dumbbell Press"].waitForExistence(timeout: 3))
+    }
+
+    func testAddExerciseSearchSelectsFromPreviewAndKeepsContextAcrossIntents() {
+        startFreeWorkout()
+
+        let search = app.textFields["exercise-template-search-field"]
+        XCTAssertTrue(search.waitForExistence(timeout: 3))
+        search.tap()
+        search.typeText("walking lunge")
+        let row = app.buttons["exercise-template-Walking Lunges"]
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+
+        // Switching to "Add your own" and back keeps the typed query.
+        app.buttons["add-exercise-mode-custom"].tap()
+        XCTAssertTrue(app.textFields["new-exercise-name-field"].waitForExistence(timeout: 2))
+        XCTAssertFalse(row.exists)
+        app.buttons["add-exercise-mode-browse"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 2))
+        XCTAssertEqual(app.textFields["exercise-template-search-field"].value as? String, "walking lunge")
+
+        row.tap()
+        XCTAssertTrue(app.staticTexts["Walking Lunges"].waitForExistence(timeout: 3))
+
+        // A nonsense query shows the empty state rather than nothing.
+        app.buttons["show-add-exercise-button"].tap()
+        let search2 = app.textFields["exercise-template-search-field"]
+        XCTAssertTrue(search2.waitForExistence(timeout: 3))
+        search2.tap()
+        search2.typeText("zzzz")
+        XCTAssertTrue(app.staticTexts["No matching exercises"].waitForExistence(timeout: 2))
+    }
+
+    func testAddExerciseCloseDismissesTheCard() {
+        startFreeWorkout()
+        addCustomExercise("Push Ups")
+        app.buttons["show-add-exercise-button"].tap()
+        XCTAssertTrue(app.buttons["add-exercise-mode-browse"].waitForExistence(timeout: 2))
+
+        app.buttons["close-add-exercise-button"].tap()
+        XCTAssertFalse(app.buttons["add-exercise-mode-browse"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.buttons["show-add-exercise-button"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Push Ups"].exists)
+    }
+
     func testExerciseFinderStartsFromMuscleAndAddsItsMatch() {
         XCTAssertTrue(app.buttons["exercise-finder-entry-button"].waitForExistence(timeout: 6))
         app.buttons["exercise-finder-entry-button"].tap()
@@ -356,9 +430,45 @@ final class IronLogUITests: XCTestCase {
 
         let addRecommendation = app.buttons["add-recommended-exercise-button"]
         XCTAssertTrue(addRecommendation.waitForExistence(timeout: 6))
+
+        // The pick is relevance-weighted and varied, so read whatever was
+        // matched rather than expecting a fixed catalog entry.
+        let resultName = app.staticTexts["exercise-finder-result-name"]
+        XCTAssertTrue(resultName.waitForExistence(timeout: 2))
+        let matchedName = resultName.label
+        XCTAssertFalse(matchedName.isEmpty)
+        XCTAssertTrue(app.buttons["find-another-exercise-button"].exists)
+
         addRecommendation.tap()
 
         XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts["Barbell Overhead Press"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts[matchedName].waitForExistence(timeout: 4))
+    }
+
+    func testExerciseFinderTryAnotherAvoidsImmediateRepeat() {
+        XCTAssertTrue(app.buttons["exercise-finder-entry-button"].waitForExistence(timeout: 6))
+        app.buttons["exercise-finder-entry-button"].tap()
+
+        XCTAssertTrue(app.buttons["exercise-finder-muscle-chest"].waitForExistence(timeout: 3))
+        app.buttons["exercise-finder-muscle-chest"].tap()
+        app.buttons["find-best-exercise-button"].tap()
+
+        let resultName = app.staticTexts["exercise-finder-result-name"]
+        XCTAssertTrue(resultName.waitForExistence(timeout: 6))
+        let first = resultName.label
+
+        app.buttons["find-another-exercise-button"].tap()
+        let changed = NSPredicate(format: "label != %@", first)
+        expectation(for: changed, evaluatedWith: resultName)
+        waitForExpectations(timeout: 6)
+        XCTAssertNotEqual(resultName.label, first)
+
+        // Switching muscle groups resets to the idle state for the new pool.
+        app.buttons["exercise-finder-muscle-back"].tap()
+        XCTAssertTrue(app.buttons["find-best-exercise-button"].waitForExistence(timeout: 3))
+        XCTAssertFalse(resultName.exists)
+
+        app.buttons["close-exercise-finder-button"].tap()
+        XCTAssertTrue(app.staticTexts["Today"].waitForExistence(timeout: 4))
     }
 }
