@@ -118,7 +118,7 @@ final class EvidenceCaptureTests: XCTestCase {
         }
 
         app.swipeUp()
-        snap("scrolled")
+        snap("alternates")
     }
 
     /// The live log with a logged exercise and one completed set.

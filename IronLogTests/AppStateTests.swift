@@ -378,26 +378,28 @@ final class AppStateTests: XCTestCase {
         })
     }
 
-    func testFinderGraphPlanUsesOnlyValidBranchesForReducedCandidateCounts() {
-        let oneCandidate = ExerciseFinderGraphPlan.scanRoutes(candidateNodeIDs: ["candidate/one"])
-        XCTAssertEqual(oneCandidate, [
-            ExerciseFinderGraphRoute(from: "origin", to: "history"),
-            ExerciseFinderGraphRoute(from: "history", to: "candidate/one")
-        ])
-
-        let twoCandidates = ExerciseFinderGraphPlan.scanRoutes(candidateNodeIDs: ["candidate/one", "candidate/two"])
-        XCTAssertEqual(twoCandidates, [
-            ExerciseFinderGraphRoute(from: "origin", to: "history"),
-            ExerciseFinderGraphRoute(from: "history", to: "candidate/one"),
-            ExerciseFinderGraphRoute(from: "history", to: "candidate/two")
-        ])
-
-        let fullPlan = ExerciseFinderGraphPlan.scanRoutes(
-            candidateNodeIDs: ["candidate/one", "candidate/two", "candidate/three", "candidate/four", "candidate/five"]
+    private func finderLibrary(_ names: [String], bodyweight: Set<String> = []) -> ExerciseLibrary {
+        let shoulder = Muscle(id: "shoulders", label: "Shoulders", systemImage: "figure.arms.open")
+        let templates = names.map {
+            ExerciseTemplate(name: $0, sets: 3, reps: "8–10", tip: "", bodyweight: bodyweight.contains($0))
+        }
+        return ExerciseLibrary(
+            splits: [],
+            muscles: [shoulder],
+            splitDays: [:],
+            workouts: [:],
+            library: ["shoulders": templates]
         )
-        XCTAssertEqual(fullPlan.count, 7)
-        XCTAssertEqual(fullPlan[3], ExerciseFinderGraphRoute(from: "origin", to: "pattern"))
-        XCTAssertEqual(fullPlan.last, ExerciseFinderGraphRoute(from: "pattern", to: "candidate/five"))
+    }
+
+    private func finderSession(_ names: [String], daysAgo: Int, now: Date) -> WorkoutSession {
+        WorkoutSession(
+            createdAt: now.addingTimeInterval(-Double(daysAgo) * 86_400),
+            muscle: "shoulders",
+            split: nil,
+            note: nil,
+            exercises: names.map { LoggedExercise(name: $0, bodyweight: false, timed: false, sets: []) }
+        )
     }
 
     func testExerciseFinderStaysWithinMuscleAndExcludesCurrentWorkout() {
@@ -408,49 +410,194 @@ final class AppStateTests: XCTestCase {
             currentExerciseNames: ["Barbell Overhead Press"]
         )
 
-        let matches = engine.recommendations(for: "shoulders")
+        let matches = engine.candidates(for: "shoulders")
 
-        XCTAssertEqual(matches.count, 5)
+        XCTAssertEqual(matches.count, (app.library.library["shoulders"]?.count ?? 0) - 1)
         XCTAssertTrue(matches.allSatisfy { $0.muscle.id == "shoulders" })
         XCTAssertFalse(matches.contains { $0.template.name == "Barbell Overhead Press" })
         XCTAssertEqual(Set(matches.map(\.id)).count, matches.count)
+        XCTAssertTrue(matches.allSatisfy { (0...1).contains($0.score) })
+    }
+
+    func testExerciseFinderScoresAreNotDrivenByCatalogPosition() {
+        // Identical history for every entry: the catalog order must not decide
+        // the ranking, only names (as a stable tie-break) and factors.
+        let library = finderLibrary(["Zulu Raise", "Alpha Raise", "Mid Raise"])
+        let engine = ExerciseRecommendationEngine(library: library, sessions: [], currentExerciseNames: [])
+
+        let candidates = engine.candidates(for: "shoulders")
+
+        XCTAssertEqual(Set(candidates.map(\.score)).count, 1)
+        XCTAssertEqual(candidates.map(\.template.name), ["Alpha Raise", "Mid Raise", "Zulu Raise"])
+        XCTAssertTrue(candidates.allSatisfy { $0.factors == [.neverLogged] })
     }
 
     func testExerciseFinderRotatesAwayFromVeryRecentExercise() {
         let now = Date(timeIntervalSince1970: 2_000_000)
-        let shoulder = Muscle(id: "shoulders", label: "Shoulders", systemImage: "figure.arms.open")
-        let first = ExerciseTemplate(name: "Primary Press", sets: 4, reps: "6–8", tip: "")
-        let second = ExerciseTemplate(name: "Alternate Press", sets: 3, reps: "8–10", tip: "")
-        let library = ExerciseLibrary(
-            splits: [],
-            muscles: [shoulder],
-            splitDays: [:],
-            workouts: [:],
-            library: ["shoulders": [first, second]]
-        )
-        let recent = WorkoutSession(
-            createdAt: now.addingTimeInterval(-86_400),
-            muscle: "shoulders",
-            split: nil,
-            note: nil,
-            exercises: [LoggedExercise(name: first.name, bodyweight: false, timed: false, sets: [])]
-        )
+        let library = finderLibrary(["Primary Raise", "Alternate Raise"])
+        let recent = finderSession(["Primary Raise"], daysAgo: 1, now: now)
 
-        let freshRanking = ExerciseRecommendationEngine(
-            library: library,
-            sessions: [],
-            currentExerciseNames: [],
-            now: now
-        ).recommendations(for: "shoulders")
-        let rotatedRanking = ExerciseRecommendationEngine(
+        let rotated = ExerciseRecommendationEngine(
             library: library,
             sessions: [recent],
             currentExerciseNames: [],
             now: now
-        ).recommendations(for: "shoulders")
+        ).candidates(for: "shoulders")
 
-        XCTAssertEqual(freshRanking.first?.template.name, first.name)
-        XCTAssertEqual(rotatedRanking.first?.template.name, second.name)
+        XCTAssertEqual(rotated.first?.template.name, "Alternate Raise")
+        XCTAssertEqual(rotated.last?.factors, [.trainedRecently(days: 1)])
+        XCTAssertLessThan(rotated.last!.score, rotated.first!.score)
+    }
+
+    func testExerciseFinderReasonsMatchFactors() {
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        let library = finderLibrary(["Rested Press", "Fresh Raise", "Busy Raise"])
+        let sessions = [
+            finderSession(["Rested Press"], daysAgo: 21, now: now),
+            finderSession(["Busy Raise"], daysAgo: 4, now: now),
+            finderSession(["Busy Raise"], daysAgo: 9, now: now),
+            finderSession(["Busy Raise"], daysAgo: 15, now: now)
+        ]
+        let candidates = ExerciseRecommendationEngine(
+            library: library,
+            sessions: sessions,
+            currentExerciseNames: [],
+            now: now
+        ).candidates(for: "shoulders")
+        let byName = Dictionary(uniqueKeysWithValues: candidates.map { ($0.template.name, $0) })
+
+        XCTAssertEqual(byName["Rested Press"]?.factors, [.restedFor(days: 21), .addsCompound])
+        XCTAssertEqual(byName["Rested Press"]?.reason, "Back in rotation after 21 days.")
+        XCTAssertEqual(byName["Fresh Raise"]?.factors, [.neverLogged])
+        XCTAssertEqual(byName["Fresh Raise"]?.reason, "A fresh pick you haven't logged yet.")
+        XCTAssertEqual(byName["Busy Raise"]?.factors, [.trainedRecently(days: 4), .frequentlyUsed(count: 3)])
+        // Only negative factors: the copy falls back to a neutral line rather
+        // than inventing a reason.
+        XCTAssertEqual(byName["Busy Raise"]?.reason, "A solid shoulders option from your library.")
+    }
+
+    func testExerciseFinderComplementsCurrentWorkout() {
+        let library = finderLibrary(["Overhead Press", "Lateral Raise", "Arnold Press"])
+        let withoutCompound = ExerciseRecommendationEngine(library: library, sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+        let withCompound = ExerciseRecommendationEngine(library: library, sessions: [], currentExerciseNames: ["Arnold Press"])
+            .candidates(for: "shoulders")
+
+        XCTAssertEqual(withoutCompound.first?.movementStyle, "Compound")
+        XCTAssertTrue(withoutCompound.first!.factors.contains(.addsCompound))
+        XCTAssertEqual(withoutCompound.last?.template.name, "Lateral Raise")
+        XCTAssertEqual(withCompound.map(\.template.name), ["Lateral Raise", "Overhead Press"])
+        XCTAssertTrue(withCompound.first!.factors.contains(.complementsCompound))
+        XCTAssertFalse(withCompound.last!.factors.contains(.addsCompound))
+    }
+
+    func testExerciseFinderSelectorHandlesEmptyAndSinglePools() {
+        var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: 1))
+        XCTAssertNil(selector.select(from: []))
+
+        let single = ExerciseRecommendationEngine(library: finderLibrary(["Only Raise"]), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+        for _ in 0..<3 {
+            let result = selector.select(from: single)
+            XCTAssertEqual(result?.selected.template.name, "Only Raise")
+            XCTAssertEqual(result?.alternates, [])
+            XCTAssertEqual(result?.poolSize, 1)
+        }
+    }
+
+    func testExerciseFinderSelectorTraversesPoolBeforeRepeating() {
+        let names = ["A Raise", "B Raise", "C Raise", "D Raise", "E Raise"]
+        let candidates = ExerciseRecommendationEngine(library: finderLibrary(names), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+        var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: 7))
+
+        var firstCycle: [String] = []
+        for _ in names.indices {
+            let result = selector.select(from: candidates)!
+            XCTAssertFalse(result.cycleRestarted)
+            XCTAssertEqual(result.poolSize, names.count)
+            XCTAssertEqual(result.alternates.count, names.count - 1)
+            XCTAssertFalse(result.alternates.contains(result.selected))
+            firstCycle.append(result.selected.template.name)
+        }
+        XCTAssertEqual(Set(firstCycle), Set(names), "every viable candidate is shown before any repeat")
+
+        let restarted = selector.select(from: candidates)!
+        XCTAssertTrue(restarted.cycleRestarted)
+        XCTAssertNotEqual(restarted.selected.template.name, firstCycle.last, "no immediate repeat on restart")
+    }
+
+    func testExerciseFinderSelectorIsReproducibleForSameSeed() {
+        let names = ["A Raise", "B Raise", "C Raise", "D Raise"]
+        let candidates = ExerciseRecommendationEngine(library: finderLibrary(names), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+
+        func run(seed: UInt64) -> [String] {
+            var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: seed))
+            return (0..<8).map { _ in selector.select(from: candidates)!.selected.template.name }
+        }
+
+        XCTAssertEqual(run(seed: 42), run(seed: 42))
+        XCTAssertNotEqual(run(seed: 42), run(seed: 43))
+    }
+
+    func testExerciseFinderSelectorVariesAcrossSeeds() {
+        let names = ["A Raise", "B Raise", "C Raise", "D Raise", "E Raise"]
+        let candidates = ExerciseRecommendationEngine(library: finderLibrary(names), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+
+        let firstPicks = Set((0..<40).map { seed -> String in
+            var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: UInt64(seed)))
+            return selector.select(from: candidates)!.selected.template.name
+        })
+
+        XCTAssertGreaterThan(firstPicks.count, 1, "the first pick is not tied to catalog order")
+    }
+
+    func testExerciseFinderSelectorResetForgetsHistory() {
+        let candidates = ExerciseRecommendationEngine(library: finderLibrary(["A Raise", "B Raise", "C Raise"]), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+        var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: 3))
+        for _ in 0..<3 { _ = selector.select(from: candidates) }
+
+        selector.reset()
+
+        XCTAssertFalse(selector.select(from: candidates)!.cycleRestarted)
+    }
+
+    func testExerciseFinderSelectorNeverLeavesTheViablePool() {
+        // The excluded exercise is filtered before selection and can't re-enter.
+        let library = finderLibrary(["A Raise", "B Raise", "C Raise", "Excluded Raise"])
+        let candidates = ExerciseRecommendationEngine(library: library, sessions: [], currentExerciseNames: ["Excluded Raise"])
+            .candidates(for: "shoulders")
+        var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: 11))
+
+        for _ in 0..<12 {
+            let result = selector.select(from: candidates)!
+            XCTAssertNotEqual(result.selected.template.name, "Excluded Raise")
+            XCTAssertFalse(result.alternates.contains { $0.template.name == "Excluded Raise" })
+        }
+    }
+
+    func testExerciseFinderSelectorChoosesAlternateOnlyFromPool() {
+        let candidates = ExerciseRecommendationEngine(library: finderLibrary(["A Raise", "B Raise", "C Raise"]), sessions: [], currentExerciseNames: [])
+            .candidates(for: "shoulders")
+        var selector = ExerciseFinderSelector(generator: SeededRandomNumberGenerator(seed: 5))
+        let result = selector.select(from: candidates)!
+        let alternate = result.alternates[0]
+
+        let chosen = selector.choose(alternate, from: candidates)
+        XCTAssertEqual(chosen?.selected, alternate)
+        XCTAssertFalse(chosen!.alternates.contains(alternate))
+
+        let outsider = ExerciseRecommendation(
+            template: ExerciseTemplate(name: "Outsider", sets: 3, reps: "10", tip: ""),
+            muscle: alternate.muscle,
+            score: 1,
+            movementStyle: "Isolation",
+            factors: []
+        )
+        XCTAssertNil(selector.choose(outsider, from: candidates))
     }
 
     func testCatalogBodyweightExerciseAddsAsBodyweight() {

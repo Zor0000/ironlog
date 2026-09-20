@@ -43,6 +43,7 @@
 		CD712D9F513C9ADCF86E9518 /* IronLogUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 899F06F1968D97F14BD885E8 /* IronLogUITests.swift */; };
 		D3B6A583F212C9566A5EC796 /* ConfirmActionModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BD1B0716FEAA0A7D27A95F6 /* ConfirmActionModal.swift */; };
 		D6609B6FCD5A616C7B4752E3 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8080B3EB9CF08F43637FB44C /* AppStateTests.swift */; };
+		E504920059FC9159B61C62A8 /* ExerciseRecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7241789ED4D1D18ADA8A4827 /* ExerciseRecommendationEngine.swift */; };
 		E5E08C8533C308B56FD75B70 /* WidgetPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FD6857688C1FFE46565FAC /* WidgetPalette.swift */; };
 		E8FB58DF8CD106A498B94E9E /* SupabaseWireFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4AB0AF5E7CB33AF4B41D558 /* SupabaseWireFormatTests.swift */; };
 		F7DDEF65A56526D4848FCB2A /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECDB41C749882B25E25C00AA /* SupabaseService.swift */; };
@@ -103,6 +104,7 @@
 		50EA0588620B15D8527DEBAC /* IronLogWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogWidgetBundle.swift; sourceTree = "<group>"; };
 		70BC36223073AEFE8DA47054 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		711C4FABB63E224B314E6E71 /* UITestHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestHooks.swift; sourceTree = "<group>"; };
+		7241789ED4D1D18ADA8A4827 /* ExerciseRecommendationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseRecommendationEngine.swift; sourceTree = "<group>"; };
 		77FD0FF6F621454F8735020E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8080B3EB9CF08F43637FB44C /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		899F06F1968D97F14BD885E8 /* IronLogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogUITests.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 			isa = PBXGroup;
 			children = (
 				9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */,
+				7241789ED4D1D18ADA8A4827 /* ExerciseRecommendationEngine.swift */,
 				DC4D54847F3760FF9E68C832 /* LocalStore.swift */,
 				ECDB41C749882B25E25C00AA /* SupabaseService.swift */,
 				711C4FABB63E224B314E6E71 /* UITestHooks.swift */,
@@ -429,6 +432,7 @@
 				D3B6A583F212C9566A5EC796 /* ConfirmActionModal.swift in Sources */,
 				64CA6939BEE500E4FEF2C10F /* ExerciseFinderView.swift in Sources */,
 				89AD41ECC9F5BCC5598FDC3B /* ExerciseLibrary.swift in Sources */,
+				E504920059FC9159B61C62A8 /* ExerciseRecommendationEngine.swift in Sources */,
 				40E46254FAA5036F5235C2EE /* HistoryView.swift in Sources */,
 				AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */,
 				08588AF6FD889AEA84981EB5 /* LiveWorkoutEngine.swift in Sources */,
