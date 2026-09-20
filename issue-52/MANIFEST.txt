@@ -1,0 +1,9 @@
+generated: 2026-09-20T19:56:03Z
+commit: a777b1d
+seed: 7
+scenarios: SplitPicker
+device compact: iPhone 17e · iOS-26-5 (1350C17E-FF84-4699-B2EC-2188F7953A19)
+device standard: iPhone 17 Pro · iOS-27-0 (16C8016D-BBAC-44BE-BC4B-D3BA50DCF528)
+device large: iPhone 18 Pro Max · iOS-27-0 (CF45F7DD-83D7-4E2D-B1CA-68CD58852E07)
+sizes: default,ax  reduce-motion: 0  locale: en_US  tz: UTC
+xcode: Xcode 27.0 Build version 27A266a 
