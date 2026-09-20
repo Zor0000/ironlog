@@ -4,20 +4,25 @@ import XCTest
 final class FuelBuddyResponseValidatorTests: XCTestCase {
     private let requestID = UUID(uuidString: "8C7E1A3E-6B0B-4C7C-9C3B-1B9B5B3E2F10")!
 
-    private func request(candidates: [String] = ["chana-masala", "vegetable-pulao", "palak-paneer"], maxFoods: Int = 3, maxBytes: Int = 8192) -> FuelBuddyLLMRequest {
-        FuelBuddyLLMRequest(
-            policyVersion: FuelBuddySafetyPolicy.version,
+    private let candidates = [
+        FuelBuddyCandidate(foodID: "chana-masala", displayName: "Chana Masala", facts: ["cuisine:indian", "diet:vegetarian", "prep:15-min", "variety:not-served-recently"]),
+        FuelBuddyCandidate(foodID: "vegetable-pulao", displayName: "Vegetable Pulao", facts: ["cuisine:indian", "diet:vegetarian", "prep:20-min", "variety:new-cuisine-this-week"]),
+        FuelBuddyCandidate(foodID: "palak-paneer", displayName: "Palak Paneer", facts: ["cuisine:indian", "diet:vegetarian", "prep:25-min"])
+    ]
+
+    private func request(text: String = "indian vegetarian dinner", candidates: [FuelBuddyCandidate]? = nil, maxFoods: Int = 3, maxBytes: Int = 8192, policyVersion: String = FuelBuddySafetyPolicy.version) -> FuelBuddyPresentationRequest {
+        FuelBuddyPresentationRequest(
+            policyVersion: policyVersion,
             requestID: requestID,
-            stage: .presentation,
-            userText: "indian vegetarian dinner",
+            userText: FuelBuddyRequestRedactor.redact(text),
             mealContext: FuelBuddyMealContext(mealType: .dinner, cuisines: ["indian"]),
             profileContext: FuelBuddyProfileContext(ruleTags: ["vegetarian"]),
-            candidateFoodIDs: candidates,
+            candidates: candidates ?? self.candidates,
             limits: FuelBuddyRequestLimits(timeoutMilliseconds: 50, maxResponseBytes: maxBytes, maxFoods: maxFoods)
         )
     }
 
-    private func context(_ request: FuelBuddyLLMRequest, rules: @escaping (String) -> Bool = { _ in true }) -> FuelBuddyValidationContext {
+    private func context(_ request: FuelBuddyPresentationRequest, rules: @escaping (String) -> Bool = { _ in true }) -> FuelBuddyValidationContext {
         FuelBuddyValidationContext(request: request, passesCurrentRules: rules)
     }
 
@@ -27,47 +32,45 @@ final class FuelBuddyResponseValidatorTests: XCTestCase {
 
     private let validBody = """
     { "schemaVersion": 1, "requestID": "REQ", "status": "ok",
-      "foods": [{ "foodID": "chana-masala", "rationale": "quick and different from the dal" },
-                { "foodID": "vegetable-pulao", "rationale": "fresh cuisine this week" }],
-      "explanation": "Two quick vegetarian dinners.", "tradeOffs": ["Pulao needs the full 20 minutes."],
-      "refusalReason": null }
+      "foods": [{ "foodID": "chana-masala", "rationaleFacts": ["prep:15-min", "variety:not-served-recently"] },
+                { "foodID": "vegetable-pulao", "rationaleFacts": ["variety:new-cuisine-this-week"] }],
+      "explanation": "Two quick Indian dinners that steer away from what you had this week.",
+      "tradeOffs": [{ "foodID": "vegetable-pulao", "fact": "prep:20-min" }],
+      "declineReason": null }
     """
 
-    // MARK: Accepts
-
-    func testValidResponseIsAccepted() throws {
-        let result = FuelBuddyResponseValidator.validate(data: json(validBody), context: context(request()))
-        let validated = try result.get()
-        guard case .foods(let foods, let explanation, let tradeOffs) = validated.outcome else { return XCTFail("expected foods") }
-        XCTAssertEqual(foods.map(\.foodID), ["chana-masala", "vegetable-pulao"])
-        XCTAssertEqual(explanation, "Two quick vegetarian dinners.")
-        XCTAssertEqual(tradeOffs.count, 1)
-    }
-
-    func testRefusalAndEmptyAreAcceptedAsSafeStates() throws {
-        let refused = json("""
-        { "schemaVersion": 1, "requestID": "REQ", "status": "refused", "foods": [], "explanation": "", "tradeOffs": [], "refusalReason": "unsafeRequest" }
-        """)
-        let empty = json("""
-        { "schemaVersion": 1, "requestID": "REQ", "status": "empty", "foods": [], "explanation": "", "tradeOffs": [], "refusalReason": "noCandidates" }
-        """)
-        XCTAssertEqual(try FuelBuddyResponseValidator.validate(data: refused, context: context(request())).get().outcome, .refused(.unsafeRequest))
-        XCTAssertEqual(try FuelBuddyResponseValidator.validate(data: empty, context: context(request())).get().outcome, .empty)
-    }
-
-    // MARK: Rejects
-
-    private func failure(_ body: String, request: FuelBuddyLLMRequest? = nil, rules: @escaping (String) -> Bool = { _ in true }) -> FuelBuddyDiagnostic? {
+    private func failure(_ body: String, request: FuelBuddyPresentationRequest? = nil, rules: @escaping (String) -> Bool = { _ in true }) -> FuelBuddyDiagnostic? {
         if case .failure(let diagnostic) = FuelBuddyResponseValidator.validate(data: json(body), context: context(request ?? self.request(), rules: rules)) {
             return diagnostic
         }
         return nil
     }
 
+    // MARK: Accepts
+
+    func testValidResponseIsAcceptedWithCatalogNamesAndFacts() throws {
+        let validated = try FuelBuddyResponseValidator.validate(data: json(validBody), context: context(request())).get()
+        XCTAssertEqual(validated.foods.map(\.foodID), ["chana-masala", "vegetable-pulao"])
+        XCTAssertEqual(validated.foods.map(\.displayName), ["Chana Masala", "Vegetable Pulao"])
+        XCTAssertEqual(validated.foods[0].rationaleFacts, ["prep:15-min", "variety:not-served-recently"])
+        XCTAssertEqual(validated.foods[1].tradeOffFacts, ["prep:20-min"])
+        XCTAssertEqual(validated.explanation, "Two quick Indian dinners that steer away from what you had this week.")
+    }
+
+    func testEmptyRationaleAndNoTradeOffsAreFine() {
+        let body = """
+        { "schemaVersion": 1, "requestID": "REQ", "status": "ok", "foods": [{ "foodID": "chana-masala", "rationaleFacts": [] }], "explanation": "", "tradeOffs": [], "declineReason": null }
+        """
+        XCTAssertNil(failure(body))
+    }
+
+    // MARK: Shape
+
     func testMalformedJSONIsRejected() {
         XCTAssertEqual(failure("{ not json"), .malformedJSON)
         XCTAssertEqual(failure("[]"), .malformedJSON)
         XCTAssertEqual(failure("{ \"schemaVersion\": 1, \"requestID\": \"REQ\" }"), .malformedJSON)
+        XCTAssertEqual(failure("Sure! Here are some options: 1. Chana masala"), .malformedJSON)
     }
 
     func testUnknownSchemaVersionIsRejectedBeforeDecoding() {
@@ -75,50 +78,7 @@ final class FuelBuddyResponseValidatorTests: XCTestCase {
     }
 
     func testForeignRequestIDIsRejected() {
-        let body = validBody.replacingOccurrences(of: "REQ", with: UUID().uuidString)
-        XCTAssertEqual(failure(body), .requestIDMismatch)
-    }
-
-    func testUnknownFoodIDIsRejected() {
-        let body = validBody.replacingOccurrences(of: "vegetable-pulao", with: "butter-chicken")
-        XCTAssertEqual(failure(body), .unknownFoodID("butter-chicken"))
-    }
-
-    func testDuplicateFoodIDIsRejected() {
-        let body = validBody.replacingOccurrences(of: "vegetable-pulao", with: "chana-masala")
-        XCTAssertEqual(failure(body), .duplicateFoodID("chana-masala"))
-    }
-
-    func testTooManyFoodsIsRejected() {
-        XCTAssertEqual(failure(validBody, request: request(maxFoods: 1)), .tooManyFoods(count: 2))
-    }
-
-    func testFoodThatNoLongerPassesRulesIsRejected() {
-        // Profile changed after the candidates were computed: the validator
-        // re-checks against the current rules and refuses the whole answer.
-        XCTAssertEqual(failure(validBody, rules: { $0 != "vegetable-pulao" }), .foodFailsCurrentRules("vegetable-pulao"))
-    }
-
-    func testInventedNutrientValuesAreRejected() {
-        let body = validBody.replacingOccurrences(of: "quick and different from the dal", with: "about 320 kcal with 18 g protein")
-        XCTAssertEqual(failure(body), .forbiddenLanguage(field: "foods.rationale"))
-    }
-
-    func testCaloriePrescriptionInExplanationIsRejected() {
-        let body = validBody.replacingOccurrences(of: "Two quick vegetarian dinners.", with: "Aim for 1200 calories a day.")
-        XCTAssertEqual(failure(body), .forbiddenLanguage(field: "explanation"))
-    }
-
-    func testMedicalOrSupplementLanguageIsRejected() {
-        let medical = validBody.replacingOccurrences(of: "Two quick vegetarian dinners.", with: "This will treat my condition.")
-        let supplement = validBody.replacingOccurrences(of: "Pulao needs the full 20 minutes.", with: "Add a whey supplement.")
-        XCTAssertEqual(failure(medical), .forbiddenLanguage(field: "explanation"))
-        XCTAssertEqual(failure(supplement), .forbiddenLanguage(field: "tradeOffs"))
-    }
-
-    func testOverlongTextIsRejected() {
-        let body = validBody.replacingOccurrences(of: "Two quick vegetarian dinners.", with: String(repeating: "x", count: 401))
-        XCTAssertEqual(failure(body), .textTooLong(field: "explanation"))
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "REQ", with: UUID().uuidString)), .requestIDMismatch)
     }
 
     func testOversizedPayloadIsRejectedBeforeParsing() {
@@ -126,41 +86,173 @@ final class FuelBuddyResponseValidatorTests: XCTestCase {
         XCTAssertEqual(failure(padded), .responseTooLarge(bytes: json(padded).count))
     }
 
+    func testDeclinedIsAWellFormedFallbackNotADecision() {
+        let declined = """
+        { "schemaVersion": 1, "requestID": "REQ", "status": "declined", "foods": [], "explanation": "", "tradeOffs": [], "declineReason": "unsafeRequest" }
+        """
+        XCTAssertEqual(failure(declined), .modelDeclined)
+    }
+
     func testInconsistentStatusIsRejected() {
-        let refusedWithFoods = validBody.replacingOccurrences(of: "\"status\": \"ok\"", with: "\"status\": \"refused\"")
-        let okWithReason = validBody.replacingOccurrences(of: "\"refusalReason\": null", with: "\"refusalReason\": \"outOfScope\"")
+        let declinedWithFoods = validBody.replacingOccurrences(of: "\"status\": \"ok\"", with: "\"status\": \"declined\"")
+        let okWithReason = validBody.replacingOccurrences(of: "\"declineReason\": null", with: "\"declineReason\": \"outOfScope\"")
         let okWithoutFoods = """
-        { "schemaVersion": 1, "requestID": "REQ", "status": "ok", "foods": [], "explanation": "", "tradeOffs": [], "refusalReason": null }
+        { "schemaVersion": 1, "requestID": "REQ", "status": "ok", "foods": [], "explanation": "", "tradeOffs": [], "declineReason": null }
         """
-        let refusedWithoutReason = """
-        { "schemaVersion": 1, "requestID": "REQ", "status": "refused", "foods": [], "explanation": "", "tradeOffs": [], "refusalReason": null }
+        let declinedWithoutReason = """
+        { "schemaVersion": 1, "requestID": "REQ", "status": "declined", "foods": [], "explanation": "", "tradeOffs": [], "declineReason": null }
         """
-        XCTAssertEqual(failure(refusedWithFoods), .inconsistentStatus)
+        XCTAssertEqual(failure(declinedWithFoods), .inconsistentStatus)
         XCTAssertEqual(failure(okWithReason), .inconsistentStatus)
         XCTAssertEqual(failure(okWithoutFoods), .inconsistentStatus)
-        XCTAssertEqual(failure(refusedWithoutReason), .missingRefusalReason)
+        XCTAssertEqual(failure(declinedWithoutReason), .inconsistentStatus)
+    }
+
+    // MARK: Foods and order
+
+    func testUnknownFoodIDIsRejected() {
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "vegetable-pulao", with: "butter-chicken")), .unknownFoodID)
+    }
+
+    func testDuplicateFoodIDIsRejected() {
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "\"foodID\": \"vegetable-pulao\", \"rationaleFacts\"", with: "\"foodID\": \"chana-masala\", \"rationaleFacts\"")), .duplicateFoodID)
+    }
+
+    func testTooManyFoodsIsRejected() {
+        XCTAssertEqual(failure(validBody, request: request(maxFoods: 1)), .tooManyFoods(count: 2))
+    }
+
+    func testReorderedOrSkippedCandidatesAreRejected() {
+        let reordered = """
+        { "schemaVersion": 1, "requestID": "REQ", "status": "ok",
+          "foods": [{ "foodID": "vegetable-pulao", "rationaleFacts": [] }, { "foodID": "chana-masala", "rationaleFacts": [] }],
+          "explanation": "", "tradeOffs": [], "declineReason": null }
+        """
+        let skipped = """
+        { "schemaVersion": 1, "requestID": "REQ", "status": "ok",
+          "foods": [{ "foodID": "palak-paneer", "rationaleFacts": [] }],
+          "explanation": "", "tradeOffs": [], "declineReason": null }
+        """
+        XCTAssertEqual(failure(reordered), .orderMismatch)
+        XCTAssertEqual(failure(skipped), .orderMismatch)
+    }
+
+    func testFoodThatNoLongerPassesRulesIsRejected() {
+        // Profile changed after the candidates were computed: the validator
+        // re-checks against the current rules and refuses the whole answer.
+        XCTAssertEqual(failure(validBody, rules: { $0 != "vegetable-pulao" }), .foodFailsCurrentRules)
+    }
+
+    // MARK: Facts
+
+    func testFactNotInTheRequestIsRejected() {
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "\"prep:15-min\"", with: "\"nutrition:high-protein\"")), .unapprovedFact)
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "\"fact\": \"prep:20-min\"", with: "\"fact\": \"prep:5-min\"")), .unapprovedFact)
+    }
+
+    func testFactFromAnotherCandidateIsRejected() {
+        // "variety:not-served-recently" belongs to chana-masala, not pulao.
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "\"fact\": \"prep:20-min\"", with: "\"fact\": \"variety:not-served-recently\"")), .unapprovedFact)
+    }
+
+    func testTradeOffForAFoodNotInTheAnswerIsRejected() {
+        XCTAssertEqual(failure(validBody.replacingOccurrences(of: "\"foodID\": \"vegetable-pulao\", \"fact\"", with: "\"foodID\": \"palak-paneer\", \"fact\"")), .unknownFoodID)
+    }
+
+    // MARK: Explanation screen
+
+    private func explanation(_ text: String) -> FuelBuddyDiagnostic? {
+        failure(validBody.replacingOccurrences(of: "Two quick Indian dinners that steer away from what you had this week.", with: text))
+    }
+
+    func testInventedNutrientValuesAreRejected() {
+        XCTAssertEqual(explanation("About 320 kcal with 18 g protein."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("Covers 40% of your daily fibre."), .forbiddenLanguage)
+    }
+
+    func testCaloriePrescriptionIsRejected() {
+        XCTAssertEqual(explanation("Aim for 1200 calories a day."), .forbiddenLanguage)
+    }
+
+    func testMedicalAndSupplementLanguageIsRejected() {
+        XCTAssertEqual(explanation("This treats your condition."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("It can treat diabetes."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("Pair with a whey supplement."), .forbiddenLanguage)
+    }
+
+    func testIngredientAndAllergenClaimsAreRejected() {
+        XCTAssertEqual(explanation("Top with peanuts."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("Serve with butter chicken."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("This option is peanut-free."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("Contains no dairy."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("Turmeric reduces inflammation."), .forbiddenLanguage)
+    }
+
+    func testUnverifiablePrepTimeAndCostClaimsAreRejected() {
+        XCTAssertEqual(explanation("Ready in 5 minutes."), .forbiddenLanguage)
+        XCTAssertEqual(explanation("The cheaper choice tonight."), .forbiddenLanguage)
+    }
+
+    func testExplanationAboutOrderIsAllowed() {
+        XCTAssertNil(explanation("Leading with the one you haven't had in a while, then something from a different cuisine than this week."))
+        XCTAssertNil(explanation("Both keep to your twenty-minute window."))
+    }
+
+    func testOverlongExplanationIsRejected() {
+        XCTAssertEqual(explanation(String(repeating: "x", count: 401)), .textTooLong)
     }
 
     func testValidatorNeverRepairsAResponse() {
         // One bad food out of two: the whole answer is rejected rather than
         // trimmed, so the explanation can't end up describing a removed item.
-        let body = validBody.replacingOccurrences(of: "vegetable-pulao", with: "not-in-catalog")
-        if case .success = FuelBuddyResponseValidator.validate(data: json(body), context: context(request())) {
+        if case .success = FuelBuddyResponseValidator.validate(data: json(validBody.replacingOccurrences(of: "vegetable-pulao", with: "not-in-catalog")), context: context(request())) {
             XCTFail("must not partially accept")
         }
     }
 
-    // MARK: Gate + fallback
+    // MARK: Intent validation
+
+    private var intentRequest: FuelBuddyIntentRequest {
+        FuelBuddyIntentRequest(policyVersion: FuelBuddySafetyPolicy.version, requestID: requestID, userText: FuelBuddyRequestRedactor.redact("quick lunch"), knownCuisines: ["indian", "thai"], knownMealTags: ["quick"], limits: FuelBuddyRequestLimits())
+    }
+
+    func testIntentResponseMustUseAllowlistedTags() throws {
+        let ok = json("""
+        { "schemaVersion": 1, "requestID": "REQ", "status": "ok", "mealContext": { "mealType": "lunch", "cuisines": ["thai"], "mealTags": ["quick"], "budget": "any", "varietyIntent": "none" } }
+        """)
+        let unknownCuisine = json("""
+        { "schemaVersion": 1, "requestID": "REQ", "status": "ok", "mealContext": { "mealType": "lunch", "cuisines": ["martian"], "mealTags": [], "budget": "any", "varietyIntent": "none" } }
+        """)
+        let declined = json("""
+        { "schemaVersion": 1, "requestID": "REQ", "status": "declined" }
+        """)
+        XCTAssertEqual(try FuelBuddyResponseValidator.validate(data: ok, request: intentRequest).get().mealContext.cuisines, ["thai"])
+        guard case .failure(let a) = FuelBuddyResponseValidator.validate(data: unknownCuisine, request: intentRequest) else { return XCTFail() }
+        XCTAssertEqual(a, .unapprovedTag)
+        guard case .failure(let b) = FuelBuddyResponseValidator.validate(data: declined, request: intentRequest) else { return XCTFail() }
+        XCTAssertEqual(b, .modelDeclined)
+    }
+
+    // MARK: Gate
 
     private struct StubProvider: FuelBuddyLLMProvider {
-        let handler: @Sendable (FuelBuddyLLMRequest) async throws -> Data
-        func send(_ request: FuelBuddyLLMRequest) async throws -> Data { try await handler(request) }
+        let handler: @Sendable () async throws -> Data
+        func send(_ request: FuelBuddyPresentationRequest) async throws -> Data { try await handler() }
+        func send(_ request: FuelBuddyIntentRequest) async throws -> Data { try await handler() }
+    }
+
+    /// Records whether the provider was ever called.
+    private final class SpyProvider: FuelBuddyLLMProvider, @unchecked Sendable {
+        private(set) var calls = 0
+        let body: Data
+        init(body: Data) { self.body = body }
+        func send(_ request: FuelBuddyPresentationRequest) async throws -> Data { calls += 1; return body }
+        func send(_ request: FuelBuddyIntentRequest) async throws -> Data { calls += 1; return body }
     }
 
     func testGateReturnsModelAnswerWhenValid() async {
-        let body = json(validBody)
-        let gate = FuelBuddyGate<String>(provider: StubProvider { _ in body })
-        let answer = await gate.answer(request: request(), local: "local", passesCurrentRules: { _ in true })
+        let gate = FuelBuddyGate(provider: SpyProvider(body: json(validBody)))
+        let answer = await gate.presentation(request: request(), local: "local", passesCurrentRules: { _ in true })
         guard case .model(let validated) = answer.source else { return XCTFail("expected model answer, got \(answer.source)") }
         XCTAssertEqual(validated.requestID, requestID)
         XCTAssertEqual(answer.local, "local")
@@ -168,47 +260,104 @@ final class FuelBuddyResponseValidatorTests: XCTestCase {
 
     func testGateFallsBackWithDiagnosticOnEachFailure() async {
         let cases: [(String, StubProvider, FuelBuddyDiagnostic)] = [
-            ("malformed", StubProvider { _ in Data("nope".utf8) }, .malformedJSON),
-            ("unknown id", StubProvider { [validBody] _ in Data(validBody.replacingOccurrences(of: "REQ", with: "8C7E1A3E-6B0B-4C7C-9C3B-1B9B5B3E2F10").replacingOccurrences(of: "chana-masala", with: "pizza").utf8) }, .unknownFoodID("pizza")),
-            ("unavailable", StubProvider { _ in throw FuelBuddyProviderError.unavailable }, .providerUnavailable),
-            ("rate limited", StubProvider { _ in throw FuelBuddyProviderError.rateLimited }, .providerRateLimited),
-            ("timeout", StubProvider { _ in
+            ("malformed", StubProvider { Data("nope".utf8) }, .malformedJSON),
+            ("unknown id", StubProvider { [json, validBody] in json(validBody.replacingOccurrences(of: "chana-masala", with: "pizza")) }, .unknownFoodID),
+            ("declined", StubProvider { [json] in json("{ \"schemaVersion\": 1, \"requestID\": \"REQ\", \"status\": \"declined\", \"foods\": [], \"explanation\": \"\", \"tradeOffs\": [], \"declineReason\": \"outOfScope\" }") }, .modelDeclined),
+            ("unavailable", StubProvider { throw FuelBuddyProviderError.unavailable }, .providerUnavailable),
+            ("rate limited", StubProvider { throw FuelBuddyProviderError.rateLimited }, .providerRateLimited),
+            ("timeout", StubProvider {
                 try await Task.sleep(for: .seconds(5))
                 return Data()
             }, .providerTimeout)
         ]
 
         for (name, provider, expected) in cases {
-            let gate = FuelBuddyGate<String>(provider: provider)
-            let answer = await gate.answer(request: request(), local: "local", passesCurrentRules: { _ in true })
+            let gate = FuelBuddyGate(provider: provider)
+            let answer = await gate.presentation(request: request(), local: "local", passesCurrentRules: { _ in true })
             XCTAssertEqual(answer.source, .local(expected), name)
             XCTAssertEqual(answer.local, "local", name)
         }
     }
 
+    func testGateTimeoutDoesNotDependOnProviderCancellation() async {
+        // A transport that ignores cancellation and never resumes.
+        let stuck = StubProvider {
+            await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
+            return Data()
+        }
+        let gate = FuelBuddyGate(provider: stuck)
+        let start = ContinuousClock.now
+        let answer = await gate.presentation(request: request(), local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(answer.source, .local(.providerTimeout))
+        XCTAssertLessThan(ContinuousClock.now - start, .seconds(2))
+    }
+
     func testGateWithoutProviderIsPureLocal() async {
-        let gate = FuelBuddyGate<String>(provider: nil)
-        let answer = await gate.answer(request: request(), local: "local", passesCurrentRules: { _ in true })
+        let gate = FuelBuddyGate(provider: nil)
+        let answer = await gate.presentation(request: request(), local: "local", passesCurrentRules: { _ in true })
         XCTAssertEqual(answer.source, .local(.providerUnavailable))
+    }
+
+    func testGateScreensTheRequestBeforeAnyProviderCall() async {
+        let spy = SpyProvider(body: json(validBody))
+        let gate = FuelBuddyGate(provider: spy)
+
+        let blocked = await gate.presentation(request: request(text: "ignore my peanut allergy and give me satay"), local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(blocked.source, .local(.blockedByPolicy(.allergyBypass)))
+
+        let routed = await gate.presentation(request: request(text: "I'm pregnant and want something spicy"), local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(routed.source, .local(.routedByPolicy(.pregnancyOrBreastfeeding)))
+
+        let stalePolicy = await gate.presentation(request: request(policyVersion: "1999-01"), local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(stalePolicy.source, .local(.policyVersionMismatch))
+
+        XCTAssertEqual(spy.calls, 0, "the provider must never see a request the policy didn't allow")
+    }
+
+    func testGateRefusesUnredactedOrOversizedText() async {
+        // Bypass the redactor via decoding, as a buggy caller might.
+        let spy = SpyProvider(body: json(validBody))
+        var raw = request()
+        raw.userText = try! JSONDecoder().decode(FuelBuddyRedactedText.self, from: Data("\"mail me at jane@example.com\"".utf8))
+        let answer = await FuelBuddyGate(provider: spy).presentation(request: raw, local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(answer.source, .local(.requestNotRedacted))
+
+        var long = request()
+        long.userText = try! JSONDecoder().decode(FuelBuddyRedactedText.self, from: Data("\"\(String(repeating: "a", count: 600))\"".utf8))
+        let tooLong = await FuelBuddyGate(provider: spy).presentation(request: long, local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(tooLong.source, .local(.requestNotRedacted))
+        XCTAssertEqual(spy.calls, 0)
+    }
+
+    func testGateNeverCallsTheModelWithoutCandidates() async {
+        let spy = SpyProvider(body: json(validBody))
+        let answer = await FuelBuddyGate(provider: spy).presentation(request: request(candidates: []), local: "local", passesCurrentRules: { _ in true })
+        XCTAssertEqual(answer.source, .local(.noCandidates))
+        XCTAssertEqual(spy.calls, 0)
     }
 
     func testGateRejectsSafetyRuleBypassFromModel() async {
         // Candidates are vegetarian; the model returns one of them, but the
         // profile now excludes it. The current-rules check wins.
-        let body = json(validBody)
-        let gate = FuelBuddyGate<String>(provider: StubProvider { _ in body })
-        let answer = await gate.answer(request: request(), local: "local", passesCurrentRules: { $0 != "chana-masala" })
-        XCTAssertEqual(answer.source, .local(.foodFailsCurrentRules("chana-masala")))
+        let gate = FuelBuddyGate(provider: SpyProvider(body: json(validBody)))
+        let answer = await gate.presentation(request: request(), local: "local", passesCurrentRules: { $0 != "chana-masala" })
+        XCTAssertEqual(answer.source, .local(.foodFailsCurrentRules))
     }
 
-    func testDiagnosticCodesAreStableAndNonSensitive() {
+    func testDiagnosticCodesAreStableAndCarryNoText() {
         let diagnostics: [FuelBuddyDiagnostic] = [
-            .providerUnavailable, .providerTimeout, .providerRateLimited, .responseTooLarge(bytes: 1),
-            .malformedJSON, .schemaVersionMismatch(received: 9), .requestIDMismatch, .unknownFoodID("x"),
-            .duplicateFoodID("x"), .tooManyFoods(count: 9), .foodFailsCurrentRules("x"),
-            .forbiddenLanguage(field: "f"), .textTooLong(field: "f"), .inconsistentStatus, .missingRefusalReason
+            .blockedByPolicy(.allergyBypass), .routedByPolicy(.under18), .requestNotRedacted, .policyVersionMismatch, .noCandidates,
+            .tooManyCandidates(count: 13), .providerUnavailable, .providerTimeout, .providerRateLimited, .responseTooLarge(bytes: 1),
+            .malformedJSON, .schemaVersionMismatch(received: 9), .requestIDMismatch, .inconsistentStatus, .modelDeclined,
+            .tooManyFoods(count: 9), .orderMismatch, .unknownFoodID, .duplicateFoodID, .foodFailsCurrentRules,
+            .unapprovedFact, .unapprovedTag, .forbiddenLanguage, .textTooLong
         ]
         XCTAssertEqual(Set(diagnostics.map(\.code)).count, diagnostics.count)
-        XCTAssertTrue(diagnostics.allSatisfy { $0.code.range(of: #"^[a-z_]+$"#, options: .regularExpression) != nil })
+        XCTAssertTrue(diagnostics.allSatisfy { $0.code.range(of: #"^[a-zA-Z0-9_:]+$"#, options: .regularExpression) != nil })
+        // The mirror description contains only enum names and integers — no
+        // user, model or catalog strings.
+        for diagnostic in diagnostics {
+            XCTAssertFalse(String(describing: diagnostic).contains("\""), "\(diagnostic) carries a string payload")
+        }
     }
 }
