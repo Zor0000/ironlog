@@ -190,7 +190,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.sessions[0].exercises.count, 1)
         XCTAssertEqual(app.sessions[0].exercises[0].sets[0].reps, 12)
         XCTAssertFalse(app.hasActiveWorkout)
-        XCTAssertEqual(app.selectedTab, .history)
+        XCTAssertEqual(app.selectedTab, .progress)
+        XCTAssertEqual(app.progressSection, .history)
     }
 
     /// Loaded calisthenics: weight is optional on a bodyweight move, not

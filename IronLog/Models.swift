@@ -2,7 +2,14 @@
 import Foundation
 
 enum WorkoutTab: Hashable {
-    case workouts, log, run, history, stats
+    case workouts, log, run, progress, ironFuel
+}
+
+enum ProgressSection: String, CaseIterable, Identifiable {
+    case stats = "Stats"
+    case history = "History"
+
+    var id: Self { self }
 }
 
 enum AuthMode {
@@ -506,6 +513,9 @@ struct AppSnapshot: Codable {
     var routines: [SavedRoutine]?
     /// Canonical KG; nil until the user sets it, and what calorie estimates need.
     var bodyWeight: Double?
+    /// Private, independently deletable IronFuel profile. Optional preserves
+    /// snapshots written before the Nutrition Passport existed.
+    var nutritionPassport: NutritionPassport?
 }
 
 // ─────────────────────────────────────────────────────────────

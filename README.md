@@ -2,7 +2,7 @@
 
 > **Launching soon** — a focused, free gym and running tracker for iPhone.
 
-IronLog makes it easy to plan a workout, log every set, record a run, and see the progress you have earned. It is a native SwiftUI app backed by Supabase—no ads, no third-party SDKs, and no unnecessary noise.
+IronLog makes it easy to plan a workout, log every set, record a run, see the progress you have earned, and get food ideas that respect your rules. It is a native SwiftUI app backed by Supabase—no ads and no unnecessary noise.
 
 ## Built to keep momentum
 
@@ -10,6 +10,7 @@ IronLog makes it easy to plan a workout, log every set, record a run, and see th
 - **Record every run** — capture time, distance, elevation gain, and terrain for runs, walks, treadmill sessions, and trails.
 - **Keep the full story** — revisit past sessions, personal records, and notes whenever you need them.
 - **See your progress** — follow sessions, streaks, total sets, training volume, and exercise-specific trends.
+- **Fuel without guesswork** — create a private Nutrition Passport and request catalog-grounded meal options that always honor its hard rules.
 
 ## Inside IronLog
 
@@ -17,8 +18,8 @@ IronLog makes it easy to plan a workout, log every set, record a run, and see th
   <tr>
     <td width="25%" align="center"><img src="images/workout-logger.png" alt="Workout logger with completed sets" width="100%" /><br /><strong>Workout logger</strong><br />Find exercises and log sets as you go.</td>
     <td width="25%" align="center"><img src="images/run.png" alt="Run logging screen" width="100%" /><br /><strong>Run logging</strong><br />Capture distance, elevation, and terrain.</td>
-    <td width="25%" align="center"><img src="images/history.png" alt="Workout history screen" width="100%" /><br /><strong>History</strong><br />Your past sessions, exercises, and notes.</td>
-    <td width="25%" align="center"><img src="images/stats.png" alt="Stats dashboard" width="100%" /><br /><strong>Stats</strong><br />Sessions, streaks, volume, and progress.</td>
+    <td width="25%" align="center"><img src="images/progress.png" alt="Progress screen with Stats and History switcher" width="100%" /><br /><strong>Progress</strong><br />Stats and full session history in one place.</td>
+    <td width="25%" align="center"><img src="images/ironfuel.png" alt="IronFuel Nutrition Passport and Energy Firewall" width="100%" /><br /><strong>IronFuel</strong><br />Private rules and compatible food options.</td>
   </tr>
 </table>
 
@@ -31,7 +32,8 @@ IronLog makes it easy to plan a workout, log every set, record a run, and see th
 - **Rest timer** — restarts from the preset each time you complete a set
 - **Lock-screen Live Activity** (iOS) — log sets from the Lock Screen / Dynamic Island without unlocking
 - **Draft persistence** — an in-progress workout survives app restarts
-- **History, personal records & stats** — sessions, streaks, volume, auto-detected PRs
+- **Progress** — switch between chronological history and sessions, streaks, volume, trends, and auto-detected PRs
+- **IronFuel** — private Nutrition Passport, safety gates, deterministic hard-rule filtering, and offline catalog fallback
 - **Water tracker** — daily 8-glass counter
 - **Auth + cloud sync** — Supabase Auth (email/password) with Row Level Security
 

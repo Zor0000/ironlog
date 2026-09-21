@@ -34,6 +34,7 @@
 		586A4E4D212F3DEFBA23208B /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6A9C4AB88330A9FFC30C0FEC /* Supabase */; };
 		58A60CB92D3DAAB3CC526CF0 /* MealVarietyRotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BF3BB555EEAAD75F5DF605E /* MealVarietyRotation.swift */; };
 		5D79E86B76434E58A2643117 /* IronFuelSafetyEvaluationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 827998B1DFF6F66DA79E1E6D /* IronFuelSafetyEvaluationTests.swift */; };
+		5DEF5DF54316B3D8276BF6BF /* NutritionPassport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F07608D79BD4B7F31FA3162D /* NutritionPassport.swift */; };
 		61ADA5DC4C1853B691BF60CF /* MealVarietyRotationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56872AB402DE97431C5A796A /* MealVarietyRotationTests.swift */; };
 		64CA6939BEE500E4FEF2C10F /* ExerciseFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABADC5F4EB91E23D49DEB387 /* ExerciseFinderView.swift */; };
 		6586E9525AD36B8EE56067DE /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */; };
@@ -49,6 +50,7 @@
 		AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32F525BCBC44EAA20594F626 /* IronLogApp.swift */; };
 		B9E536454FAC929BCCCADD0E /* FuelBuddyLLMContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F2CA90E9BCF385638C6AF0 /* FuelBuddyLLMContract.swift */; };
 		BC53AD15BE0350BD7BCE40B3 /* UITestHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711C4FABB63E224B314E6E71 /* UITestHooks.swift */; };
+		BE04EFEDA3E6AD6848363555 /* IronFuelFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9BA1CBD5BB054C38FA0592 /* IronFuelFeatureTests.swift */; };
 		BFAC9AD4ADD2C0450067503A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F11C8514ADE4D2439119EAE /* AppState.swift */; };
 		C74A51E43D9CFC111A2F057B /* workouts.json in Resources */ = {isa = PBXBuildFile; fileRef = 291F4F340219B29BC3D35562 /* workouts.json */; };
 		C777AAF9A2A56B16A62EE814 /* LiveWorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 161CE7C4F77A49D3CE2C12AD /* LiveWorkoutModels.swift */; };
@@ -59,6 +61,8 @@
 		E504920059FC9159B61C62A8 /* ExerciseRecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7241789ED4D1D18ADA8A4827 /* ExerciseRecommendationEngine.swift */; };
 		E5E08C8533C308B56FD75B70 /* WidgetPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FD6857688C1FFE46565FAC /* WidgetPalette.swift */; };
 		E8FB58DF8CD106A498B94E9E /* SupabaseWireFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4AB0AF5E7CB33AF4B41D558 /* SupabaseWireFormatTests.swift */; };
+		EB34922052D5AFCC84E5602B /* IronFuelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AB30A0C0EBBE1F8BD74DF0 /* IronFuelView.swift */; };
+		EF6A584C6C33D72F7C826F20 /* ProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4755EC59F1B185F0DE7699F1 /* ProgressView.swift */; };
 		F7DDEF65A56526D4848FCB2A /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECDB41C749882B25E25C00AA /* SupabaseService.swift */; };
 		FE1A1655FD01A13F3A60D279 /* LiveWorkoutReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FA8048B05382C85289E072 /* LiveWorkoutReducerTests.swift */; };
 /* End PBXBuildFile section */
@@ -116,8 +120,10 @@
 		3546CCF1405ECC208820E429 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		37378367E8AB016F5036B714 /* fuel-buddy-requests.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fuel-buddy-requests.json"; sourceTree = "<group>"; };
 		381D2DE6CA1AB5E9ED39F06B /* IronLogTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = IronLogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3C9BA1CBD5BB054C38FA0592 /* IronFuelFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronFuelFeatureTests.swift; sourceTree = "<group>"; };
 		3DF5DF01CB79888532C5FB38 /* fuel-buddy-model-outputs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fuel-buddy-model-outputs.json"; sourceTree = "<group>"; };
 		441C62BADB42E11E1E95BE05 /* FuelBuddySafetyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelBuddySafetyPolicy.swift; sourceTree = "<group>"; };
+		4755EC59F1B185F0DE7699F1 /* ProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressView.swift; sourceTree = "<group>"; };
 		47BD2BA9DE192DFF44B03330 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		4BD1B0716FEAA0A7D27A95F6 /* ConfirmActionModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmActionModal.swift; sourceTree = "<group>"; };
 		4C17152A1613E6DC4EE2C2EB /* FuelBuddyResponseValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelBuddyResponseValidatorTests.swift; sourceTree = "<group>"; };
@@ -134,6 +140,7 @@
 		83F2CA90E9BCF385638C6AF0 /* FuelBuddyLLMContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelBuddyLLMContract.swift; sourceTree = "<group>"; };
 		899F06F1968D97F14BD885E8 /* IronLogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronLogUITests.swift; sourceTree = "<group>"; };
 		8B8AC012C1D9C2E0DBDE5761 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		96AB30A0C0EBBE1F8BD74DF0 /* IronFuelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronFuelView.swift; sourceTree = "<group>"; };
 		9F11C8514ADE4D2439119EAE /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		9F51479A1DC5C136BA892255 /* ExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrary.swift; sourceTree = "<group>"; };
 		A4AB0AF5E7CB33AF4B41D558 /* SupabaseWireFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseWireFormatTests.swift; sourceTree = "<group>"; };
@@ -153,6 +160,7 @@
 		E4C4FD635EC34C0285006A34 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		E8CE2AF611F38E9FC8BED5A7 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		ECDB41C749882B25E25C00AA /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		F07608D79BD4B7F31FA3162D /* NutritionPassport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionPassport.swift; sourceTree = "<group>"; };
 		F830999CB1A3A3A28457DE94 /* EvidenceCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceCaptureTests.swift; sourceTree = "<group>"; };
 		FC6C857F480AB04F72B2C84F /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutActivityAttributes.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -261,7 +269,9 @@
 				4BD1B0716FEAA0A7D27A95F6 /* ConfirmActionModal.swift */,
 				ABADC5F4EB91E23D49DEB387 /* ExerciseFinderView.swift */,
 				E4C4FD635EC34C0285006A34 /* HistoryView.swift */,
+				96AB30A0C0EBBE1F8BD74DF0 /* IronFuelView.swift */,
 				47BD2BA9DE192DFF44B03330 /* LogView.swift */,
+				4755EC59F1B185F0DE7699F1 /* ProgressView.swift */,
 				B15884452B261DC7C80276FD /* RootView.swift */,
 				1CFB9A623DBC89D3D0FCD0C8 /* SettingsView.swift */,
 				824D0E6DDB3462C2C1F7A58F /* SplitPickerView.swift */,
@@ -277,6 +287,7 @@
 				8080B3EB9CF08F43637FB44C /* AppStateTests.swift */,
 				1EBF085CBFB21677D66A94AF /* FuelBuddyLLMContractTests.swift */,
 				4C17152A1613E6DC4EE2C2EB /* FuelBuddyResponseValidatorTests.swift */,
+				3C9BA1CBD5BB054C38FA0592 /* IronFuelFeatureTests.swift */,
 				827998B1DFF6F66DA79E1E6D /* IronFuelSafetyEvaluationTests.swift */,
 				17FA8048B05382C85289E072 /* LiveWorkoutReducerTests.swift */,
 				56872AB402DE97431C5A796A /* MealVarietyRotationTests.swift */,
@@ -294,6 +305,7 @@
 				B8C941B6CD9DE140815AA56A /* FuelBuddyResponseValidator.swift */,
 				441C62BADB42E11E1E95BE05 /* FuelBuddySafetyPolicy.swift */,
 				7BF3BB555EEAAD75F5DF605E /* MealVarietyRotation.swift */,
+				F07608D79BD4B7F31FA3162D /* NutritionPassport.swift */,
 			);
 			path = IronFuel;
 			sourceTree = "<group>";
@@ -456,9 +468,9 @@
 			projectRoot = "";
 			targets = (
 				68F127FF37A8B7D8E5F786A1 /* IronLog */,
+				BF608C48049FC178E1DFFE44 /* IronLogWidgetExtension */,
 				2B52870E96751A366903E3A9 /* IronLogTests */,
 				7D9FEC9EEFAF3AC447420808 /* IronLogUITests */,
-				BF608C48049FC178E1DFFE44 /* IronLogWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -493,6 +505,7 @@
 				D6609B6FCD5A616C7B4752E3 /* AppStateTests.swift in Sources */,
 				402BF1C9D350089D12242F31 /* FuelBuddyLLMContractTests.swift in Sources */,
 				4E539C476965DAF2238A0B3F /* FuelBuddyResponseValidatorTests.swift in Sources */,
+				BE04EFEDA3E6AD6848363555 /* IronFuelFeatureTests.swift in Sources */,
 				5D79E86B76434E58A2643117 /* IronFuelSafetyEvaluationTests.swift in Sources */,
 				FE1A1655FD01A13F3A60D279 /* LiveWorkoutReducerTests.swift in Sources */,
 				61ADA5DC4C1853B691BF60CF /* MealVarietyRotationTests.swift in Sources */,
@@ -516,6 +529,7 @@
 				57D6CFD92F94D23E3955F8B8 /* FuelBuddyResponseValidator.swift in Sources */,
 				4A2564376F62DFC41BC36947 /* FuelBuddySafetyPolicy.swift in Sources */,
 				40E46254FAA5036F5235C2EE /* HistoryView.swift in Sources */,
+				EB34922052D5AFCC84E5602B /* IronFuelView.swift in Sources */,
 				AECBB84B4BFC57B1AAA028A9 /* IronLogApp.swift in Sources */,
 				08588AF6FD889AEA84981EB5 /* LiveWorkoutEngine.swift in Sources */,
 				9944DCF00295EBEF41988DB5 /* LiveWorkoutModels.swift in Sources */,
@@ -523,6 +537,8 @@
 				155D6800F3C97B9369B2CF34 /* LogView.swift in Sources */,
 				58A60CB92D3DAAB3CC526CF0 /* MealVarietyRotation.swift in Sources */,
 				4BF4EC4A428C81E53EAC8263 /* Models.swift in Sources */,
+				5DEF5DF54316B3D8276BF6BF /* NutritionPassport.swift in Sources */,
+				EF6A584C6C33D72F7C826F20 /* ProgressView.swift in Sources */,
 				3D7D652FC06E0A25C2009B4B /* RootView.swift in Sources */,
 				2A44DFB3109C1CEEF94579E7 /* RunView.swift in Sources */,
 				56640A7727CE4B5BE2516B31 /* SettingsView.swift in Sources */,

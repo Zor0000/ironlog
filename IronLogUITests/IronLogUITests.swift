@@ -98,7 +98,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["set-done-button"].firstMatch.tap()
         app.buttons["finish-workout-button"].tap()
 
-        XCTAssertTrue(app.staticTexts["History"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["History"].waitForExistence(timeout: 4))
         // Collapsed card shows date + split only; expanding reveals exercises.
         XCTAssertTrue(app.staticTexts["1 set · Free Workout · local"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.staticTexts["Push Ups"].exists)
@@ -216,6 +216,37 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["LB"].waitForExistence(timeout: 3))
     }
 
+    func testProgressSwitchesBetweenStatsAndHistoryAndRemembersSelection() {
+        XCTAssertTrue(app.buttons["Progress"].waitForExistence(timeout: 6))
+        app.buttons["Progress"].tap()
+        XCTAssertTrue(app.staticTexts["Sessions"].waitForExistence(timeout: 3))
+
+        app.buttons["History"].tap()
+        XCTAssertTrue(app.buttons["Set Up Sync"].waitForExistence(timeout: 3))
+
+        app.buttons["Today"].tap()
+        app.buttons["Progress"].tap()
+        XCTAssertTrue(app.buttons["Set Up Sync"].waitForExistence(timeout: 3))
+    }
+
+    func testIronFuelGatesFirstUseAndPassportCanBeDeleted() {
+        XCTAssertTrue(app.buttons["IronFuel"].waitForExistence(timeout: 6))
+        app.buttons["IronFuel"].tap()
+        XCTAssertTrue(app.buttons["create-nutrition-passport-button"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["fuel-buddy-submit-button"].exists)
+
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_IronFuelPassport", "ready"]
+        app.launch()
+        app.buttons["IronFuel"].tap()
+        XCTAssertTrue(app.buttons["edit-nutrition-passport-button"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textFields["fuel-buddy-request-field"].exists)
+        app.buttons["delete-nutrition-passport-button"].tap()
+        XCTAssertTrue(app.buttons["Delete Passport"].waitForExistence(timeout: 2))
+        app.buttons["Delete Passport"].tap()
+        XCTAssertTrue(app.buttons["create-nutrition-passport-button"].waitForExistence(timeout: 3))
+    }
+
     func testHistoryCardOpensEditSheetAndSavesChanges() {
         // Log a quick workout first.
         app.buttons["Today"].tap()
@@ -287,7 +318,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["Done"].tap()
 
         app.buttons["save-manual-cardio-button"].tap()
-        XCTAssertTrue(app.staticTexts["History"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["History"].waitForExistence(timeout: 4))
         let subtitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "3.00 km")).firstMatch
         XCTAssertTrue(subtitle.waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["history-card-toggle"].firstMatch.label.contains("Run"))

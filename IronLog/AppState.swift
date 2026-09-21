@@ -6,6 +6,10 @@ final class AppState: ObservableObject {
     @Published var library = ExerciseLibrary.bundled
     @Published var user: UserProfile?
     @Published var selectedTab: WorkoutTab = .workouts
+    /// Intentionally session-only: Progress remembers the user's last view
+    /// while the app is open without turning a simple UI choice into user data.
+    @Published var progressSection: ProgressSection = .stats
+    @Published var nutritionPassport: NutritionPassport?
     @Published var authMessage: String?
     @Published var isPasswordRecovery = false
     @Published var toast: String?
@@ -193,6 +197,7 @@ final class AppState: ObservableObject {
 
         #if DEBUG
         applyDemoSeedIfRequested()
+        applyIronFuelUITestSeedIfRequested()
         if ProcessInfo.processInfo.arguments.contains("UITest_ShowAuth") {
             showAuth()
         }
@@ -797,7 +802,8 @@ final class AppState: ObservableObject {
         sessions.insert(session, at: 0)
         resetActiveWorkout()
         persistAll(clearDraft: true)
-        selectedTab = .history
+        progressSection = .history
+        selectedTab = .progress
         showToast("Workout saved")
 
         if supabase.isAuthenticated {
@@ -835,6 +841,18 @@ final class AppState: ObservableObject {
         persistAll()
     }
 
+    func saveNutritionPassport(_ passport: NutritionPassport) {
+        nutritionPassport = passport
+        persistAll()
+        showToast(passport.isComplete ? "Nutrition Passport saved" : "Passport progress saved")
+    }
+
+    func deleteNutritionPassport() {
+        nutritionPassport = nil
+        persistAll()
+        showToast("Nutrition Passport deleted")
+    }
+
     /// Save a run/walk logged by hand as its own session. It carries no
     /// exercises, so it bypasses `finishWorkout`'s set validation entirely; the
     /// streak and the History timeline pick it up like any other session.
@@ -854,7 +872,8 @@ final class AppState: ObservableObject {
         // A back-dated run belongs where its date puts it, not at the top.
         sessions.sort { $0.createdAt > $1.createdAt }
         persistAll()
-        selectedTab = .history
+        progressSection = .history
+        selectedTab = .progress
         showToast("\(activity.kind.label) saved")
         if supabase.isAuthenticated {
             Task { await syncPending() }
@@ -1181,7 +1200,8 @@ final class AppState: ObservableObject {
             hasOnboarded: (account.hasOnboarded == true || guest.hasOnboarded == true),
             timerPreset: account.timerPreset ?? guest.timerPreset,
             routines: routinesByID.values.sorted { $0.createdAt < $1.createdAt },
-            bodyWeight: account.bodyWeight ?? guest.bodyWeight
+            bodyWeight: account.bodyWeight ?? guest.bodyWeight,
+            nutritionPassport: account.nutritionPassport ?? guest.nutritionPassport
         )
     }
 
@@ -1199,6 +1219,7 @@ final class AppState: ObservableObject {
         currentWeightUnit = unitPreference
         bodyWeight = snapshot.bodyWeight
         currentBodyWeight = snapshot.bodyWeight ?? 0
+        nutritionPassport = snapshot.nutritionPassport
         timerMax = snapshot.timerPreset ?? 90
         timerSecs = timerMax
         hasOnboarded = snapshot.hasOnboarded ?? false
@@ -1364,7 +1385,8 @@ final class AppState: ObservableObject {
             hasOnboarded: hasOnboarded,
             timerPreset: timerMax,
             routines: routines,
-            bodyWeight: bodyWeight
+            bodyWeight: bodyWeight,
+            nutritionPassport: nutritionPassport
         )
     }
 
@@ -1407,7 +1429,7 @@ final class AppState: ObservableObject {
 #if DEBUG
 // ─────────────────────────────────────────────────────────────
 //  DEMO SEED  (App Store / marketing screenshots only)
-//  Populates the in-memory store with realistic data so the four tabs and the
+//  Populates the in-memory store with realistic data so the five tabs and the
 //  Lock-Screen Live Activity look "lived in" for capture. Gated behind launch
 //  arguments AND `#if DEBUG`, so it is impossible to reach in a release build,
 //  and it never writes to disk (no `persistAll`), so it can't clobber real data.
@@ -1417,6 +1439,36 @@ final class AppState: ObservableObject {
 //    xcrun simctl launch booted com.parthjadhav.ironlog -seedDemo YES -seedActive YES -seedTab log
 // ─────────────────────────────────────────────────────────────
 extension AppState {
+    func applyIronFuelUITestSeedIfRequested() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "UITest_IronFuelPassport"),
+              arguments.indices.contains(index + 1) else { return }
+        switch arguments[index + 1] {
+        case "ready", "routed":
+            nutritionPassport = NutritionPassport(
+                sexContext: .preferNotToSay,
+                goals: [.supportTraining, .steadyEnergy],
+                dietaryIdentity: .vegetarian,
+                allergies: ["peanut"],
+                neverSuggest: ["mushroom"],
+                preferredCuisines: ["Indian"],
+                budget: .value,
+                maxCookingMinutes: 25,
+                cookingAbility: .basic,
+                mealsPerDay: 4,
+                isMinor: arguments[index + 1] == "routed",
+                safetyReviewedAt: Date()
+            )
+        case "incomplete":
+            nutritionPassport = NutritionPassport(
+                sexContext: .preferNotToSay,
+                goals: [.supportTraining]
+            )
+        default:
+            break
+        }
+    }
+
     func applyDemoSeedIfRequested() {
         let defaults = UserDefaults.standard
         guard !ProcessInfo.processInfo.arguments.contains("UITest_ResetStore") else { return }
@@ -1433,6 +1485,21 @@ extension AppState {
         // Body weight so the Run tab's calorie estimate is populated.
         bodyWeight = 70
         currentBodyWeight = 70
+        nutritionPassport = NutritionPassport(
+            sexContext: .preferNotToSay,
+            goals: [.supportTraining, .improveRecovery, .steadyEnergy],
+            targetSource: .none,
+            dietaryIdentity: .vegetarian,
+            allergies: ["peanut"],
+            neverSuggest: ["mushroom"],
+            preferredCuisines: ["Indian", "Mediterranean"],
+            budget: .value,
+            maxCookingMinutes: 25,
+            cookingAbility: .basic,
+            mealsPerDay: 4,
+            availableFoods: ["rice", "dal", "yogurt"],
+            safetyReviewedAt: Date()
+        )
 
         let calendar = Calendar.current
         func day(_ offset: Int) -> Date {
@@ -1530,8 +1597,13 @@ extension AppState {
         case "workouts": selectedTab = .workouts
         case "log": selectedTab = .log
         case "run": selectedTab = .run
-        case "history": selectedTab = .history
-        case "stats": selectedTab = .stats
+        case "history":
+            progressSection = .history
+            selectedTab = .progress
+        case "stats", "progress":
+            progressSection = .stats
+            selectedTab = .progress
+        case "ironfuel": selectedTab = .ironFuel
         default: break
         }
     }

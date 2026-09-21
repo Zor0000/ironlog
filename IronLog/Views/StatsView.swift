@@ -5,11 +5,14 @@ struct StatsView: View {
     @EnvironmentObject private var app: AppState
     @State private var chartExercise: String?
     @State private var showAllRecords = false
+    var showTitle = true
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                TitleBlock(title: "Your Stats", subtitle: "Keep grinding, \(app.user?.displayName ?? "athlete")")
+                if showTitle {
+                    TitleBlock(title: "Your Stats", subtitle: "Keep grinding, \(app.user?.displayName ?? "athlete")")
+                }
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                     StatCard(value: "\(app.sessions.count)", label: "Sessions")
                         .entrance(0)
