@@ -9,11 +9,14 @@ struct HistoryView: View {
     @EnvironmentObject private var app: AppState
     @State private var deleteTarget: WorkoutSession?
     @State private var editTarget: WorkoutSession?
+    var showTitle = true
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                TitleBlock(title: "History", subtitle: "All your past sessions")
+                if showTitle {
+                    TitleBlock(title: "History", subtitle: "All your past sessions")
+                }
                 HStack(spacing: 10) {
                     Text(app.syncMessage)
                         .font(.system(size: 12, weight: .medium))

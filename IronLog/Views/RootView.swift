@@ -419,8 +419,8 @@ struct AppShellView: View {
                 WorkoutsView().tag(WorkoutTab.workouts)
                 LogView().tag(WorkoutTab.log)
                 RunView().tag(WorkoutTab.run)
-                HistoryView().tag(WorkoutTab.history)
-                StatsView().tag(WorkoutTab.stats)
+                ProgressView().tag(WorkoutTab.progress)
+                IronFuelView().tag(WorkoutTab.ironFuel)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(AppMotion.screen, value: app.selectedTab)
@@ -429,8 +429,8 @@ struct AppShellView: View {
                 navButton(.workouts, "Workouts", "list.bullet")
                 navButton(.log, "Today", "timer")
                 navButton(.run, "Run", "figure.run")
-                navButton(.history, "History", "calendar")
-                navButton(.stats, "Stats", "chart.bar")
+                navButton(.progress, "Progress", "chart.line.uptrend.xyaxis")
+                navButton(.ironFuel, "IronFuel", "fork.knife")
             }
             .padding(.horizontal, 6)
             .padding(.top, 9)
@@ -508,14 +508,16 @@ struct AppShellView: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.title3.weight(.medium))
                     .scaleEffect(isActive ? 1.08 : 1)
                     .symbolEffect(.bounce, value: isActive)
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.caption2.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .background {
                 if isActive {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -527,6 +529,8 @@ struct AppShellView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(TactileButtonStyle())
+        .accessibilityIdentifier("main-tab-\(label.lowercased())")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 

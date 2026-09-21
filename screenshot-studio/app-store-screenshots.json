@@ -35,15 +35,15 @@
         "screenshot": "/screenshots/01-workouts.png"
       },
       {
-        "id": "il_stats",
+        "id": "il_progress",
         "layout": "device-top",
         "label": {
-          "en": "SEE PROGRESS"
+          "en": "YOUR STORY, TOGETHER"
         },
         "headline": {
-          "en": "Streaks, PRs and\nvolume, visualized."
+          "en": "Stats and history.\nOne clear view."
         },
-        "screenshot": "/screenshots/04-stats.png",
+        "screenshot": "/screenshots/04-progress.png",
         "inverted": true
       },
       {
@@ -55,7 +55,19 @@
         "headline": {
           "en": "Every session,\nsynced to the cloud."
         },
-        "screenshot": "/screenshots/03-history.png"
+        "screenshot": "/screenshots/05-progress-history.png"
+      },
+      {
+        "id": "il_ironfuel",
+        "layout": "device-top",
+        "label": {
+          "en": "FUEL WITH YOUR RULES"
+        },
+        "headline": {
+          "en": "Food ideas that\nnever cross the line."
+        },
+        "screenshot": "/screenshots/06-ironfuel.png",
+        "inverted": true
       }
     ],
     "android": [
