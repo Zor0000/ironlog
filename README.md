@@ -10,7 +10,7 @@ IronLog makes it easy to plan a workout, log every set, record a run, see the pr
 - **Record every run** — capture time, distance, elevation gain, and terrain for runs, walks, treadmill sessions, and trails.
 - **Keep the full story** — revisit past sessions, personal records, and notes whenever you need them.
 - **See your progress** — follow sessions, streaks, total sets, training volume, and exercise-specific trends.
-- **Fuel without guesswork** — create a private Nutrition Passport and request catalog-grounded meal options that always honor its hard rules.
+- **Food ideas with your rules** — create a private Nutrition Passport and screen catalog meal options against your restrictions; check actual labels and cross-contact for allergies.
 
 ## Inside IronLog
 
@@ -35,7 +35,11 @@ IronLog makes it easy to plan a workout, log every set, record a run, see the pr
 - **Progress** — switch between chronological history and sessions, streaks, volume, trends, and auto-detected PRs
 - **IronFuel** — private Nutrition Passport, safety gates, deterministic hard-rule filtering, and offline catalog fallback
 - **Water tracker** — daily 8-glass counter
-- **Auth + cloud sync** — Supabase Auth (email/password) with Row Level Security
+- **Auth + cloud sync** — Supabase Auth (email/password or optional Google sign-in) with Row Level Security
+
+## Privacy at a glance
+
+Without an account, entries stay on this iPhone. With an account, saved workouts, runs/walks, records, routines, and their notes sync through Supabase; a guest workout is uploaded after sign-in. IronLog does not collect or upload GPS or location data. The Nutrition Passport, IronFuel queries and recommendations, body weight, water log, and unfinished workout draft stay on-device even while signed in. The app links the Supabase Swift SDK and Liveline; it has no advertising or analytics SDK. See the [privacy policy](privacy.html) and [App Store privacy checklist](docs/ios-release.md#app-store-privacy-checklist) before setting the App Store Connect privacy answers.
 
 ## Tech Stack
 

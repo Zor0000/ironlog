@@ -153,7 +153,7 @@ enum FuelBuddyRecommendationEngine {
                    ingredients: ["soy", "tofu", "rice", "ginger"], ruleTags: ["vegan", "vegetarian", "halal"],
                    approvedFacts: ["20 minute preparation", "East Asian cuisine", "one-bowl meal"]),
         FuelOption(id: "chicken-wrap", name: "Chicken hummus wrap", cuisine: "Mediterranean", prepMinutes: 15, budget: .flexible,
-                   ingredients: ["chicken", "sesame", "wheat", "hummus"], ruleTags: ["halal"],
+                   ingredients: ["chicken", "chickpea", "sesame", "wheat", "hummus"], ruleTags: ["halal"],
                    approvedFacts: ["15 minute preparation", "Mediterranean cuisine", "assembly-friendly"]),
         FuelOption(id: "yogurt-oats", name: "Fruit and yogurt oats", cuisine: "Everyday", prepMinutes: 5, budget: .value,
                    ingredients: ["milk", "yogurt", "oats", "fruit"], ruleTags: ["vegetarian", "halal"],
@@ -181,6 +181,13 @@ enum FuelBuddyRecommendationEngine {
             return .routed("This request needs support from a qualified clinician or dietitian. Fuel Buddy will not improvise a recommendation.")
         case .allowed:
             break
+        }
+
+        // Free text is not a reliable source of structured dietary constraints.
+        // Fail closed and ask the user to save them before offering catalog food.
+        let restrictionPattern = #"\b(allerg\w*|intoleran\w*|celiac|coeliac|gluten|dairy|lactose|vegan|vegetarian|jain|halal|kosher|avoid\w*|without|exclude\w*|restrict\w*|sensitiv\w*|react\w*|omit\w*|except|pescatarian|pescetarian|no|not|free|cannot|can.t|don.t|won.t)\b"#
+        if query.range(of: restrictionPattern, options: [.regularExpression, .caseInsensitive]) != nil {
+            return .blocked("Save any allergies or dietary restrictions in your Nutrition Passport first, then request a meal without restriction instructions. Fuel Buddy cannot safely interpret those instructions from free text.")
         }
 
         let matches = catalog
@@ -220,7 +227,7 @@ enum FuelBuddyRecommendationEngine {
             .map(normalize)
             .filter { !$0.isEmpty }
         let optionTerms = option.ingredients.map(normalize) + [normalize(option.name)]
-        guard !forbidden.contains(where: { rule in optionTerms.contains(where: { $0.contains(rule) || rule.contains($0) }) }) else {
+        guard !forbidden.contains(where: { rule in optionTerms.contains(where: { matchesRule(rule, ingredient: $0) }) }) else {
             return false
         }
         guard option.prepMinutes <= passport.maxCookingMinutes else { return false }
@@ -232,6 +239,32 @@ enum FuelBuddyRecommendationEngine {
 
     private static func normalize(_ value: String) -> String {
         value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Match common food-family names as well as ingredient spellings. A
+    /// simple substring check misses "dairy" versus milk or "groundnut"
+    /// versus peanut. This remains a catalog filter, not a label or
+    /// cross-contact verification for a prepared food.
+    private static func matchesRule(_ rule: String, ingredient: String) -> Bool {
+        let singular = rule.hasSuffix("s") && rule.count > 3 ? String(rule.dropLast()) : rule
+        if ingredient.contains(rule) || rule.contains(ingredient)
+            || ingredient.contains(singular) || singular.contains(ingredient) { return true }
+        let families: [Set<String>] = [
+            ["dairy", "milk", "lactose", "paneer", "yogurt", "curd", "cheese"],
+            ["gluten", "wheat", "roti", "wrap", "oat"],
+            ["soy", "soya", "tofu"],
+            ["peanut", "groundnut", "nut"],
+            ["chickpea", "garbanzo", "hummus"],
+            ["sesame", "tahini"],
+            ["fish", "seafood", "salmon"]
+        ]
+        return families.contains { family in
+            (family.contains(rule) || family.contains(singular)) && ingredient.split(whereSeparator: { !$0.isLetter }).contains { word in
+                let term = String(word)
+                let singularTerm = term.hasSuffix("s") && term.count > 3 ? String(term.dropLast()) : term
+                return family.contains(term) || family.contains(singularTerm)
+            }
+        }
     }
 
     private static func blockedCopy(_ reason: FuelBuddySafetyPolicy.BlockReason) -> String {

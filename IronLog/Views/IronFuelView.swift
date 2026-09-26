@@ -52,6 +52,9 @@ struct IronFuelView: View {
                 }
             }
         }
+        .onChange(of: app.nutritionPassport) { _, _ in
+            outcome = nil
+        }
     }
 
     private var firewallCard: some View {
@@ -263,6 +266,9 @@ struct IronFuelView: View {
             Text("Why these: ranked only by approved catalog facts such as cuisine, preparation time, budget, and your recorded preferences.")
                 .font(.system(size: 10))
                 .foregroundStyle(Theme.muted)
+            Text("For allergies, check the actual product label and cross-contact risk before eating. Catalog filters cannot verify either.")
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.accent)
         }
     }
 

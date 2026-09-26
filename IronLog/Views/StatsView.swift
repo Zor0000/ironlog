@@ -42,7 +42,8 @@ struct StatsView: View {
 
     private var volumeText: String {
         let volume = displayWeight(app.stats.volume)
-        return volume >= 1000 ? String(format: "%.1fk", volume / 1000) : "\(Int(volume.rounded()))"
+        guard volume.isFinite, volume >= 0 else { return "--" }
+        return volume >= 1000 ? String(format: "%.1fk", volume / 1000) : clean(volume.rounded())
     }
 
     // MARK: Per-exercise progress chart

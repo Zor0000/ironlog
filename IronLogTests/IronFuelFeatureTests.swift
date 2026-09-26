@@ -52,6 +52,15 @@ final class IronFuelFeatureTests: XCTestCase {
         )
     }
 
+    func testRequestOnlyRestrictionsFailClosed() {
+        for query in ["quick dinner, allergic to peanuts", "dairy-free breakfast", "no milk please",
+                      "vegan dinner", "avoid sesame", "without wheat", "I cannot eat oats",
+                      "gluten intolerance", "kosher meal", "I react to peanuts", "omit dairy", "don’t use milk"] {
+            let result = FuelBuddyRecommendationEngine.recommend(passport: passport(), query: query)
+            guard case .blocked = result else { return XCTFail("Unsafe request: \(query)") }
+        }
+    }
+
     func testProfessionalGateRoutesInsteadOfRecommending() {
         let outcome = FuelBuddyRecommendationEngine.recommend(
             passport: passport(minor: true),
@@ -66,6 +75,26 @@ final class IronFuelFeatureTests: XCTestCase {
             FuelBuddyRecommendationEngine.recommend(passport: profile, query: "dinner"),
             .noCompatibleResult
         )
+    }
+
+    func testFoodFamilyRestrictionsExcludeCatalogIngredients() {
+        let cases: [(String, String)] = [
+            ("dairy", "paneer-roti"),
+            ("gluten", "paneer-roti"),
+            ("gluten", "yogurt-oats"),
+            ("nuts", "jain-poha"),
+            ("garbanzo", "chicken-wrap"),
+            ("sesame", "chicken-wrap")
+        ]
+        for (allergy, optionID) in cases {
+            guard let option = FuelBuddyRecommendationEngine.catalog.first(where: { $0.id == optionID }) else {
+                return XCTFail("Missing catalog option \(optionID)")
+            }
+            XCTAssertFalse(
+                FuelBuddyRecommendationEngine.passesHardRules(option, passport: passport(allergies: [allergy])),
+                "\(allergy) should exclude \(optionID)"
+            )
+        }
     }
 
     func testPassportPersistsInSnapshotAndCanBeDeletedIndependently() throws {

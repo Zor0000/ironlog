@@ -52,7 +52,7 @@ struct WorkoutsView: View {
             set: { if !$0 { routineToDelete = nil } }
         ), presenting: routineToDelete) { routine in
             Button("Delete Routine", role: .destructive) {
-                app.deleteRoutine(routine.id)
+                Task { await app.deleteRoutine(routine.id) }
                 routineToDelete = nil
             }
             Button("Cancel", role: .cancel) { routineToDelete = nil }
@@ -469,5 +469,7 @@ struct BackButton: View {
 }
 
 func clean(_ number: Double) -> String {
-    number.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(number)) : String(format: "%.1f", number)
+    guard number.isFinite else { return "--" }
+    return number.truncatingRemainder(dividingBy: 1) == 0 && abs(number) < Double(Int.max)
+        ? String(Int(number)) : String(format: "%.1f", number)
 }

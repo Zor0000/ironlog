@@ -74,17 +74,30 @@ final class SupabaseWireFormatTests: XCTestCase {
         ])
     }
 
+    func testStableSessionIDAndBackdatedCreationCrossTheWire() throws {
+        let body = RemoteSessionInsert(id: "11111111-1111-1111-1111-111111111111",
+            createdAt: "2026-01-15T08:30:00Z", userID: "u1", muscleGroup: nil,
+            splitType: "Run", note: nil, activityType: "run", distanceM: 5000,
+            durationS: 1800, route: nil, elevationGainM: nil, terrain: nil, calories: nil)
+        let payload = try json(body)
+        XCTAssertEqual(payload["id"] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(payload["created_at"] as? String, "2026-01-15T08:30:00Z")
+    }
+
     /// A strength session omits the cardio keys rather than sending nulls, and
     /// omits `muscle_group` for any workout that spans more than one muscle.
     /// Both rely on those columns being nullable — they were NOT NULL until the
     /// routines migration, so free workouts and multi-muscle days could not
     /// back up at all.
-    func testStrengthSessionOmitsCardioAndUnknownMuscle() throws {
+    func testStrengthSessionClearsOptionalColumnsOnUpsert() throws {
         let body = RemoteSessionInsert(
             userID: "u1", muscleGroup: nil, splitType: "Free Workout", note: nil,
             activityType: nil, distanceM: nil, durationS: nil, route: nil
         )
-        XCTAssertEqual(Set(try json(body).keys), ["user_id", "split_type"])
+        let payload = try json(body)
+        for key in ["note", "muscle_group", "activity_type", "distance_m", "duration_s", "route", "terrain", "calories"] {
+            XCTAssertTrue(payload[key] is NSNull, "Missing explicit null for \(key)")
+        }
     }
 
     func testSetInsertCarriesOrderingAndExerciseFlags() throws {

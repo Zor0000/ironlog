@@ -23,14 +23,33 @@ struct RunView: View {
     }
 
     private var overriddenCalories: Int? {
-        guard let value = decimalEntry(calorieOverride), value > 0 else { return nil }
-        return Int(value.rounded())
+        guard let value = decimalEntry(calorieOverride) else { return nil }
+        return boundedInteger(value, in: EntryLimit.calories)
     }
 
     private var activity: CardioActivity? {
         guard var base = baseActivity else { return nil }
+        guard calorieOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || overriddenCalories != nil else { return nil }
         base.calories = overriddenCalories ?? base.calories
         return base
+    }
+
+    private var entryError: String? {
+        if !minutes.isEmpty && !(decimalEntry(minutes).map(EntryLimit.cardioMinutes.contains) ?? false) {
+            return "Enter 0.1–1,440 minutes."
+        }
+        if !distance.isEmpty {
+            guard let value = decimalEntry(distance), EntryLimit.distanceMetres.contains(value * currentDistanceUnit.metres) else {
+                return "Enter a distance up to 1,000 km."
+            }
+        }
+        if !elevation.isEmpty {
+            guard let value = decimalEntry(elevation), boundedInteger(value, in: EntryLimit.elevationMetres) != nil else {
+                return "Enter elevation gain up to 20,000 m."
+            }
+        }
+        if !calorieOverride.isEmpty && overriddenCalories == nil { return "Enter 1–50,000 kcal or clear the override." }
+        return nil
     }
 
     var body: some View {
@@ -49,6 +68,11 @@ struct RunView: View {
                     field("Time", unit: "minutes", text: $minutes, placeholder: "30", identifier: "run-minutes-field")
                     field("Distance (optional)", unit: currentDistanceUnit.label, text: $distance, placeholder: "5.0", identifier: "run-distance-field")
                     field("Elevation Gain (optional)", unit: "m", text: $elevation, placeholder: "45", identifier: "run-elevation-field")
+                    if let entryError {
+                        Text(entryError)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.danger)
+                    }
                 }
                 .cardStyle()
 
@@ -71,15 +95,18 @@ struct RunView: View {
                 previewCard
 
                 Button {
-                    NativeFeedback.success()
                     guard let activity else { return }
-                    app.saveRun(activity, at: date)
-                    minutes = ""
-                    distance = ""
-                    elevation = ""
-                    terrain = nil
-                    calorieOverride = ""
-                    date = Date()
+                    let savedAt = date
+                    Task {
+                        guard await app.saveRun(activity, at: savedAt) else { return }
+                        NativeFeedback.success()
+                        minutes = ""
+                        distance = ""
+                        elevation = ""
+                        terrain = nil
+                        calorieOverride = ""
+                        date = Date()
+                    }
                 } label: {
                     Label("Save \(kind.label)", systemImage: "checkmark")
                 }

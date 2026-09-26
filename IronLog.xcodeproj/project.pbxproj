@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0453CA49D82F830C4F7DE01B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */; };
+		0453CA49D82F830C4F7DE01C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C0AE20400F50A238B47E8B26 /* PrivacyInfo.xcprivacy */; };
 		08588AF6FD889AEA84981EB5 /* LiveWorkoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC71076D6360E4263A5BCDA0 /* LiveWorkoutEngine.swift */; };
 		0CAEC92A90D144116D7DB4AD /* WorkoutLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB0AE277F6C66B475B0C3C0 /* WorkoutLiveActivityIntents.swift */; };
 		134767663E0B1150546AA6EF /* EvidenceCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F830999CB1A3A3A28457DE94 /* EvidenceCaptureTests.swift */; };
@@ -151,6 +152,7 @@
 		BA7B0C3CDFB7A63DD8DDDB50 /* IronLog.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IronLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BE559FE293B780F2CEFB2966 /* IronLogWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = IronLogWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0AE20400F50A238B47E8B25 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C0AE20400F50A238B47E8B26 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C6B7BFB5AE4DCB4999D4620B /* WorkoutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutsView.swift; sourceTree = "<group>"; };
 		C900D2DC3721D95BB94BDCC8 /* IronLogUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = IronLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8ADC01A0B1CEE349A4C8E3E /* WorkoutLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLiveActivity.swift; sourceTree = "<group>"; };
@@ -226,6 +228,7 @@
 			isa = PBXGroup;
 			children = (
 				0904A8691F961A230EC804CD /* Info.plist */,
+				C0AE20400F50A238B47E8B26 /* PrivacyInfo.xcprivacy */,
 				50EA0588620B15D8527DEBAC /* IronLogWidgetBundle.swift */,
 				17FD6857688C1FFE46565FAC /* WidgetPalette.swift */,
 				D8ADC01A0B1CEE349A4C8E3E /* WorkoutLiveActivity.swift */,
@@ -413,6 +416,7 @@
 			buildConfigurationList = 6832DAAFFAD9540543A9BEF7 /* Build configuration list for PBXNativeTarget "IronLogWidgetExtension" */;
 			buildPhases = (
 				63162A326ED2538B1D130BB6 /* Sources */,
+				1B942C1739898590E4B0039C /* Resources */,
 			);
 			buildRules = (
 			);
@@ -492,6 +496,14 @@
 			files = (
 				2DF6CBDB5849AFD14155EFF1 /* fuel-buddy-model-outputs.json in Resources */,
 				257AF764E653C1ECA188EA6F /* fuel-buddy-requests.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1B942C1739898590E4B0039C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0453CA49D82F830C4F7DE01C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

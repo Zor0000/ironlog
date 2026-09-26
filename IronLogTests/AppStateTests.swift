@@ -50,7 +50,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertFalse(app.todayExercises[0].sets[0].done)
         XCTAssertEqual(app.validCompletedSetCount, 0)
-        XCTAssertEqual(app.toast, "Enter reps before marking the set done")
+        XCTAssertEqual(app.toast, "Enter 0.5–1,000 reps before marking the set done")
     }
 
     func testWeightedSetRequiresWeightAndSanitizesDecimalInput() {
@@ -65,7 +65,7 @@ final class AppStateTests: XCTestCase {
         app.toggleDone(exerciseID: exerciseID, setID: setID)
 
         XCTAssertFalse(app.todayExercises[0].sets[0].done)
-        XCTAssertEqual(app.toast, "Enter weight and reps before marking the set done")
+        XCTAssertEqual(app.toast, "Enter 0–1,000 kg and 0.5–1,000 reps before marking the set done")
 
         app.updateSet(exerciseID: exerciseID, setID: setID, weight: "100..5kg")
         app.toggleDone(exerciseID: exerciseID, setID: setID)
@@ -944,8 +944,9 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.personalRecords["Pull Ups"]?.reps, 7.5)
     }
 
-    /// `reps` doubles as seconds for a timed move, where halves are noise.
-    func testTimedSetsStayWholeNumbers() {
+    /// A pasted decimal must not silently become ten times longer. Seconds
+    /// remain whole; minutes can represent a half-minute exactly.
+    func testTimedSecondsRejectFractionsInsteadOfChangingTheirValue() {
         let app = AppState()
         app.startFreeWorkout()
         app.addExercise(template: ExerciseTemplate(name: "Plank", sets: 1, reps: "45", tip: "",
@@ -954,7 +955,9 @@ final class AppStateTests: XCTestCase {
         let setID = app.todayExercises[0].sets[0].id
 
         app.updateSet(exerciseID: exerciseID, setID: setID, reps: "45.5")
-        XCTAssertEqual(app.todayExercises[0].sets[0].reps, "455", "the decimal point is stripped, not snapped")
+        XCTAssertEqual(app.todayExercises[0].sets[0].reps, "45.5")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        XCTAssertFalse(app.todayExercises[0].sets[0].done)
     }
 
     /// `LocalStore.load` turns any decode failure into an empty snapshot, so
@@ -1356,7 +1359,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(app.routines[0].name, "Anshul's Leg Day", "the original name and its casing stand")
     }
 
-    func testMultipleRoutinesCoexist() {
+    func testMultipleRoutinesCoexist() async {
         let app = stapleWorkout()
         app.saveRoutine(name: "Anshul's Leg Day")
         app.discardWorkout()
@@ -1366,7 +1369,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(app.routines.map(\.name), ["Anshul's Leg Day", "Anshul's Pull Day"])
 
-        app.deleteRoutine(app.routines[0].id)
+        await app.deleteRoutine(app.routines[0].id)
         XCTAssertEqual(app.routines.map(\.name), ["Anshul's Pull Day"])
     }
 
@@ -1512,9 +1515,9 @@ final class AppStateTests: XCTestCase {
 
     /// A saved run joins the History timeline and the streak, contributes no
     /// sets or volume, and stays out of the cloud queue.
-    func testSavedRunBecomesALocalCardioSession() {
+    func testSavedRunBecomesALocalCardioSession() async {
         let app = AppState()
-        app.saveRun(CardioActivity(kind: .run, duration: 1_800, distance: 5_000, route: []))
+        await app.saveRun(CardioActivity(kind: .run, duration: 1_800, distance: 5_000, route: []))
 
         XCTAssertEqual(app.sessions.count, 1)
         let session = app.sessions[0]
@@ -1595,10 +1598,10 @@ final class AppStateTests: XCTestCase {
     }
 
     /// A back-dated manual run belongs where its date puts it, not on top.
-    func testBackDatedRunSortsIntoTheTimeline() {
+    func testBackDatedRunSortsIntoTheTimeline() async {
         let app = AppState()
-        app.saveRun(CardioActivity(kind: .run, duration: 600, distance: 2_000, route: []))
-        app.saveRun(
+        await app.saveRun(CardioActivity(kind: .run, duration: 600, distance: 2_000, route: []))
+        await app.saveRun(
             CardioActivity(kind: .walk, duration: 1_800, distance: 3_000, route: []),
             at: Date().addingTimeInterval(-86_400)
         )
@@ -1642,20 +1645,20 @@ final class AppStateTests: XCTestCase {
             AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: label, exercises: [])])
         }
 
-        await store.save(snapshot("Guest"), ownerID: nil)
-        await store.save(snapshot("Account A"), ownerID: "user-a")
-        await store.save(snapshot("Account B"), ownerID: "user-b")
+        try await store.save(snapshot("Guest"), ownerID: nil)
+        try await store.save(snapshot("Account A"), ownerID: "user-a")
+        try await store.save(snapshot("Account B"), ownerID: "user-b")
 
-        let guest = await store.load(ownerID: nil)
-        let accountA = await store.load(ownerID: "user-a")
-        let accountB = await store.load(ownerID: "user-b")
+        let guest = try await store.load(ownerID: nil)
+        let accountA = try await store.load(ownerID: "user-a")
+        let accountB = try await store.load(ownerID: "user-b")
         XCTAssertEqual(guest.sessions.first?.split, "Guest")
         XCTAssertEqual(accountA.sessions.first?.split, "Account A")
         XCTAssertEqual(accountB.sessions.first?.split, "Account B")
 
-        await store.clear(ownerID: "user-a")
-        let clearedAccountA = await store.load(ownerID: "user-a")
-        let unchangedAccountB = await store.load(ownerID: "user-b")
+        try await store.clear(ownerID: "user-a")
+        let clearedAccountA = try await store.load(ownerID: "user-a")
+        let unchangedAccountB = try await store.load(ownerID: "user-b")
         XCTAssertTrue(clearedAccountA.sessions.isEmpty)
         XCTAssertEqual(unchangedAccountB.sessions.first?.split, "Account B")
     }
@@ -1668,21 +1671,442 @@ final class AppStateTests: XCTestCase {
         let store = LocalStore(directory: directory)
         let legacy = AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "Legacy", exercises: [])])
 
-        await store.save(legacy, ownerID: nil)
-        await store.migrateLegacyStoreIfNeeded(to: "user-a")
+        try await store.save(legacy, ownerID: nil)
+        try await store.migrateLegacyStoreIfNeeded(to: "user-a")
 
-        let migratedGuest = await store.load(ownerID: nil)
-        let migratedAccount = await store.load(ownerID: "user-a")
+        let migratedGuest = try await store.load(ownerID: nil)
+        let migratedAccount = try await store.load(ownerID: "user-a")
         XCTAssertTrue(migratedGuest.sessions.isEmpty)
         XCTAssertEqual(migratedAccount.sessions.first?.split, "Legacy")
 
         let newGuest = AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "New Guest", exercises: [])])
-        await store.save(newGuest, ownerID: nil)
-        await store.migrateLegacyStoreIfNeeded(to: "user-a")
+        try await store.save(newGuest, ownerID: nil)
+        try await store.migrateLegacyStoreIfNeeded(to: "user-a")
 
-        let retainedGuest = await store.load(ownerID: nil)
-        let retainedAccount = await store.load(ownerID: "user-a")
+        let retainedGuest = try await store.load(ownerID: nil)
+        let retainedAccount = try await store.load(ownerID: "user-a")
         XCTAssertEqual(retainedGuest.sessions.first?.split, "New Guest")
         XCTAssertEqual(retainedAccount.sessions.first?.split, "Legacy")
+
+        // An account with only a recovery copy is still an existing account;
+        // migrating the guest over it would misattribute two people's data.
+        let before = Set(try FileManager.default.contentsOfDirectory(atPath: directory.path))
+        let firstB = AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "Account B recovery", exercises: [])])
+        try await store.save(firstB, ownerID: "user-b")
+        try await store.save(AppSnapshot(sessions: []), ownerID: "user-b")
+        let added = Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)).subtracting(before)
+        let accountBPrimary = try XCTUnwrap(added.first { $0.hasPrefix("store-") && $0.hasSuffix(".json") })
+        try FileManager.default.removeItem(at: directory.appendingPathComponent(accountBPrimary))
+        try await store.migrateLegacyStoreIfNeeded(to: "user-b")
+        let recoveredB = try await store.load(ownerID: "user-b")
+        let untouchedGuest = try await store.load(ownerID: nil)
+        XCTAssertEqual(recoveredB.sessions.first?.split, "Account B recovery")
+        XCTAssertEqual(untouchedGuest.sessions.first?.split, "New Guest")
+    }
+}
+
+private final class OfflineCloud: SupabaseService {
+    var profile: UserProfile?
+    var offline = false
+    var remoteSessions: [WorkoutSession] = []
+    var remoteRoutines: [SavedRoutine] = []
+    var deletedSessionIDs: [String] = []
+    var deletedRoutineIDs: [UUID] = []
+    var uploadedRecordSets: [[PersonalRecord]] = []
+    var loseNextUploadResponse = false
+    var loseDeleteResponses = 0
+    var loseWorkoutWipeResponses = 0
+    var workoutWipeCalls = 0
+
+    override var currentUser: UserProfile? { profile }
+    override var isAuthenticated: Bool { profile != nil }
+    override func restoreSessionIfNeeded() async {}
+    override func signOut() async { profile = nil }
+    override func pullSessions() async throws -> [WorkoutSession] {
+        if offline { throw URLError(.notConnectedToInternet) }
+        return remoteSessions
+    }
+    override func pullRoutines() async throws -> [SavedRoutine] {
+        if offline { throw URLError(.notConnectedToInternet) }
+        return remoteRoutines
+    }
+    override func deleteCloudSession(_ cloudID: String) async throws {
+        if offline { throw URLError(.notConnectedToInternet) }
+        deletedSessionIDs.append(cloudID)
+        remoteSessions.removeAll { $0.cloudID == cloudID }
+        if loseDeleteResponses > 0 {
+            loseDeleteResponses -= 1
+            throw URLError(.networkConnectionLost)
+        }
+    }
+    override func deleteCloudRoutine(_ id: UUID) async throws {
+        if offline { throw URLError(.notConnectedToInternet) }
+        deletedRoutineIDs.append(id)
+        remoteRoutines.removeAll { $0.id == id }
+    }
+    override func backup(session local: WorkoutSession, records: [PersonalRecord]) async throws -> String {
+        if offline { throw URLError(.notConnectedToInternet) }
+        let id = local.cloudID ?? local.id.uuidString.lowercased()
+        remoteSessions.removeAll { $0.cloudID == id }
+        var remote = local
+        remote.cloudID = id
+        remote.syncState = .synced
+        remoteSessions.append(remote)
+        if loseNextUploadResponse {
+            loseNextUploadResponse = false
+            throw URLError(.networkConnectionLost)
+        }
+        return id
+    }
+    override func backup(routine: SavedRoutine) async throws {
+        if offline { throw URLError(.notConnectedToInternet) }
+        remoteRoutines.removeAll { $0.id == routine.id }
+        remoteRoutines.append(routine)
+    }
+    override func replacePersonalRecords(_ records: [PersonalRecord]) async throws {
+        if offline { throw URLError(.notConnectedToInternet) }
+        uploadedRecordSets.append(records)
+    }
+    override func deleteWorkoutData() async throws {
+        if offline { throw URLError(.notConnectedToInternet) }
+        workoutWipeCalls += 1
+        remoteSessions = []
+        remoteRoutines = []
+        uploadedRecordSets.append([])
+        if loseWorkoutWipeResponses > 0 {
+            loseWorkoutWipeResponses -= 1
+            throw URLError(.networkConnectionLost)
+        }
+    }
+}
+
+@MainActor
+final class ReleaseReadinessTests: XCTestCase {
+    private func directory() throws -> URL {
+        // Screenshot capture can leave this launch preference behind on a
+        // reused simulator; it would replace the test's loaded account state.
+        UserDefaults.standard.removeObject(forKey: "seedDemo")
+        UserDefaults.standard.removeObject(forKey: "seedActive")
+        let result = FileManager.default.temporaryDirectory
+            .appendingPathComponent("IronLogReleaseTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: result, withIntermediateDirectories: true)
+        return result
+    }
+
+    func testRetryBackoffRemainsAvailableAfterFourthFailure() {
+        XCTAssertEqual((0..<8).map { AppState.syncRetryDelay(attempt: $0) }, [5, 15, 45, 120, 120, 120, 120, 120])
+        XCTAssertEqual(AppState.syncRetryDelay(attempt: Int.max), 120)
+    }
+
+    func testForegroundRetriesOfflineDeletionWithoutRelaunch() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        let id = UUID()
+        let session = WorkoutSession(id: id, cloudID: id.uuidString.lowercased(), createdAt: Date(), split: "Strength", exercises: [], syncState: .synced)
+        cloud.remoteSessions = [session]
+        try await store.save(AppSnapshot(sessions: [session]), ownerID: "account-a")
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        cloud.offline = true
+        await app.deleteSession(id)
+        cloud.offline = false
+        await app.resumeForegroundSync()
+        XCTAssertTrue(cloud.remoteSessions.isEmpty)
+        XCTAssertTrue(cloud.deletedSessionIDs.contains(id.uuidString.lowercased()))
+    }
+
+    func testTransientSaveCanBeRetriedWithoutLosingPendingChanges() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let app = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        // Replace the directory with a file to reproduce a temporary I/O failure.
+        try FileManager.default.removeItem(at: folder)
+        try Data().write(to: folder)
+        app.setWater(index: 2)
+        for _ in 0..<100 {
+            if app.storageError != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNotNil(app.storageError)
+        try FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        await app.retryStorage()
+        XCTAssertNil(app.storageError)
+        let snapshot = try await store.load()
+        XCTAssertEqual(snapshot.waterByDay[Date().dayKey], 3)
+    }
+
+    func testRetryCannotOverwriteFutureSnapshot() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let data = Data(#"{"schemaVersion":999}"#.utf8)
+        let file = folder.appendingPathComponent("store.json")
+        try data.write(to: file)
+        let app = AppState(localStore: LocalStore(directory: folder), supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        await app.retryStorage()
+        XCTAssertNotNil(app.storageError)
+        XCTAssertEqual(try Data(contentsOf: file), data)
+    }
+
+    func testRejectedSessionEditReturnsFailure() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let session = WorkoutSession(createdAt: Date(), split: "Strength", note: "Keep me", exercises: [], syncState: .localOnly)
+        let store = LocalStore(directory: folder)
+        try await store.save(AppSnapshot(sessions: [session]))
+        let app = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        let accepted = await app.updateSession(id: session.id, exercises: [], note: "")
+        XCTAssertFalse(accepted)
+        XCTAssertEqual(app.sessions.first?.note, "Keep me")
+    }
+
+    func testBulkWorkoutDeletionStaysPendingAcrossOfflineRelaunchAndLostResponse() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        let session = WorkoutSession(createdAt: Date(), split: "Strength", exercises: [], syncState: .synced)
+        let routine = SavedRoutine(name: "Leg Day", exercises: [])
+        cloud.remoteSessions = [session]
+        cloud.remoteRoutines = [routine]
+        try await store.save(AppSnapshot(sessions: [session], routines: [routine]), ownerID: "account-a")
+        cloud.offline = true
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        let deleted = await app.deleteWorkoutData()
+        XCTAssertTrue(deleted)
+        XCTAssertTrue(app.sessions.isEmpty)
+        XCTAssertTrue(app.routines.isEmpty)
+        let pending = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(pending.pendingWorkoutWipe)
+
+        cloud.offline = false
+        cloud.loseWorkoutWipeResponses = 1
+        let relaunched = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await relaunched.boot()
+        XCTAssertTrue(relaunched.sessions.isEmpty)
+        XCTAssertTrue(relaunched.routines.isEmpty)
+        let stillPending = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(stillPending.pendingWorkoutWipe)
+        await relaunched.syncNow()
+        XCTAssertEqual(cloud.workoutWipeCalls, 2)
+        XCTAssertTrue(cloud.remoteSessions.isEmpty)
+        XCTAssertTrue(cloud.remoteRoutines.isEmpty)
+        let settled = try await store.load(ownerID: "account-a")
+        XCTAssertFalse(settled.pendingWorkoutWipe)
+    }
+
+    func testOfflineSessionDeletionSurvivesRelaunchAndPull() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        let id = UUID()
+        let saved = WorkoutSession(id: id, cloudID: id.uuidString.lowercased(), userID: "account-a",
+            createdAt: Date(), split: "Strength", exercises: [], syncState: .synced)
+        cloud.remoteSessions = [saved]
+        try await store.save(AppSnapshot(sessions: [saved]), ownerID: "account-a")
+        cloud.offline = true
+        let first = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await first.boot()
+        XCTAssertEqual(first.sessions.map(\.id), [id], "boot: \(first.sessions), user: \(String(describing: first.user)), storage: \(String(describing: first.storageError))")
+        await first.deleteSession(id)
+        XCTAssertTrue(first.sessions.isEmpty)
+        let pending = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(pending.pendingCloudSessionDeletions.contains(id.uuidString.lowercased()))
+        XCTAssertTrue(pending.deletedCloudSessionIDs.contains(id.uuidString.lowercased()))
+
+        // Recovery must never bring back the pre-delete backup.
+        let primary = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.hasPrefix("store-") && $0.pathExtension == "json" }!
+        try Data("{broken".utf8).write(to: primary)
+
+        cloud.offline = false
+        let relaunched = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await relaunched.boot()
+        XCTAssertTrue(relaunched.sessions.isEmpty)
+        XCTAssertTrue(cloud.remoteSessions.isEmpty)
+        XCTAssertTrue(cloud.deletedSessionIDs.contains(id.uuidString.lowercased()))
+        XCTAssertEqual(cloud.uploadedRecordSets.last?.count, 0)
+        let settled = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(settled.pendingCloudSessionDeletions.isEmpty)
+        XCTAssertTrue(settled.deletedCloudSessionIDs.contains(id.uuidString.lowercased()))
+        await relaunched.syncNow()
+        XCTAssertTrue(relaunched.sessions.isEmpty)
+    }
+
+    func testLostUploadResponseAndRepeatedDeleteDoNotDuplicateOrResurrect() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        let id = UUID()
+        let pending = WorkoutSession(id: id, userID: "account-a", createdAt: Date(),
+            split: "Run", exercises: [], syncState: .pending,
+            activity: CardioActivity(kind: .run, duration: 600, distance: 2000, route: []))
+        try await store.save(AppSnapshot(sessions: [pending]), ownerID: "account-a")
+        cloud.loseNextUploadResponse = true
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        XCTAssertEqual(cloud.remoteSessions.count, 1)
+        await app.syncNow()
+        XCTAssertEqual(cloud.remoteSessions.count, 1)
+        XCTAssertEqual(app.sessions.count, 1)
+        cloud.loseDeleteResponses = 2
+        await app.deleteSession(id)
+        XCTAssertTrue(app.sessions.isEmpty)
+        let afterLostResponse = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(afterLostResponse.pendingCloudSessionDeletions.contains(id.uuidString.lowercased()))
+        await app.syncNow()
+        XCTAssertTrue(cloud.remoteSessions.isEmpty)
+        XCTAssertTrue(app.sessions.isEmpty)
+        let settled = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(settled.pendingCloudSessionDeletions.isEmpty)
+    }
+
+    func testRoutineTombstoneIsAccountScopedAndRetried() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let routine = SavedRoutine(name: "Leg Day", exercises: [ExerciseTemplate(name: "Squat", sets: 3, reps: "5", tip: "")])
+        let other = SavedRoutine(name: "Pull Day", exercises: [ExerciseTemplate(name: "Row", sets: 3, reps: "8", tip: "")])
+        try await store.save(AppSnapshot(routines: [routine]), ownerID: "account-a")
+        try await store.save(AppSnapshot(routines: [other]), ownerID: "account-b")
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        cloud.remoteRoutines = [routine]
+        cloud.offline = true
+        let first = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await first.boot()
+        await first.deleteRoutine(routine.id)
+        await first.signOut() // waits for the queued account-scoped save
+        let pending = try await store.load(ownerID: "account-a")
+        XCTAssertTrue(pending.deletedRoutineIDs.contains(routine.id))
+
+        cloud.profile = UserProfile(id: "account-b", email: "b@example.com", fullName: "B")
+        cloud.offline = false
+        cloud.remoteRoutines = [other]
+        let switched = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await switched.boot()
+        XCTAssertEqual(switched.routines.map(\.name), ["Pull Day"])
+        XCTAssertFalse(cloud.deletedRoutineIDs.contains(routine.id))
+
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        cloud.remoteRoutines = [routine]
+        let returned = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await returned.boot()
+        XCTAssertTrue(returned.routines.isEmpty)
+        XCTAssertTrue(cloud.deletedRoutineIDs.contains(routine.id))
+    }
+
+    func testCorruptSnapshotRecoversPreviousSaveAndPreservesDamagedFile() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let previous = AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "Previous", exercises: [])])
+        try await store.save(previous)
+        try await store.save(AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "Latest", exercises: [])]))
+        try Data("{broken".utf8).write(to: folder.appendingPathComponent("store.json"))
+        let recovered = try await store.load()
+        XCTAssertEqual(recovered.sessions.first?.split, "Previous")
+        let didRecover = await store.didRecoverFromBackup
+        XCTAssertTrue(didRecover)
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: folder.path).contains { $0.contains("damaged-") })
+    }
+
+    func testFutureVersionBlocksLoadAndOverwrite() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let url = folder.appendingPathComponent("store.json")
+        let future = Data(#"{"schemaVersion":999,"sessions":[]}"#.utf8)
+        try future.write(to: url)
+        do { _ = try await store.load(); XCTFail("Future snapshot must be rejected") }
+        catch LocalStore.StoreError.futureVersion {}
+        do { try await store.save(AppSnapshot()); XCTFail("Future snapshot must not be replaced") }
+        catch LocalStore.StoreError.futureVersion {}
+        XCTAssertEqual(try Data(contentsOf: url), future)
+    }
+
+    func testMissingFieldsAndUnknownFieldsDecodeWithoutLosingSessions() throws {
+        let json = Data(#"{"sessions":[],"newerOptionalField":"ignored"}"#.utf8)
+        let snapshot = try JSONDecoder().decode(AppSnapshot.self, from: json)
+        XCTAssertTrue(snapshot.sessions.isEmpty)
+        XCTAssertTrue(snapshot.pendingCloudSessionDeletions.isEmpty)
+        XCTAssertEqual(snapshot.schemaVersion, AppSnapshot.currentSchemaVersion)
+
+        let historical = Data(#"{"sessions":[{"createdAt":"2026-01-01T00:00:00Z","split":"PPL","exercises":[{"name":"Squat","sets":[{"reps":5}]}]}]}"#.utf8)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let migrated = try decoder.decode(AppSnapshot.self, from: historical)
+        XCTAssertEqual(migrated.sessions.first?.split, "PPL")
+        XCTAssertEqual(migrated.sessions.first?.exercises.first?.sets.first?.reps, 5)
+        XCTAssertEqual(migrated.sessions.first?.syncState, .pending)
+    }
+
+    func testInterruptedAtomicReplacementCanRecoverFromBackup() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        try await store.save(AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "Before", exercises: [])]))
+        try await store.save(AppSnapshot(sessions: [WorkoutSession(createdAt: Date(), split: "After", exercises: [])]))
+        try FileManager.default.removeItem(at: folder.appendingPathComponent("store.json"))
+        let recovered = try await store.load()
+        XCTAssertEqual(recovered.sessions.first?.split, "Before")
+    }
+
+    func testExtremeAndMalformedNumericEntriesNeverConvertToInt() {
+        currentWeightUnit = .kg
+        currentBodyWeight = 70
+        for value in ["999999999999999999999999", "1e309", "-12", "2,3,4", "abc", "1441"] {
+            XCTAssertNil(manualCardio(kind: .run, minutes: value, distance: "5"), value)
+        }
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "1e309"))
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "999999999999999999"))
+        XCTAssertNil(manualCardio(kind: .run, minutes: "30", distance: "5", elevation: "999999999999999999"))
+        XCTAssertNil(estimateCalories(kind: .run, durationSeconds: Int.max, distanceMetres: .infinity, elevationGainMetres: Int.max, bodyWeightKg: .infinity))
+        XCTAssertNil(boundedInteger(Double.greatestFiniteMagnitude, in: 1...50_000))
+        XCTAssertEqual(manualCardio(kind: .run, minutes: "30,5", distance: "5,5")?.duration, 1830)
+        XCTAssertEqual(manualCardio(kind: .run, minutes: "30,5", distance: "5,5")?.distance, 5500)
+        XCTAssertEqual(manualCardio(kind: .run, minutes: ",5", distance: ".5")?.duration, 30)
+        XCTAssertEqual(displayDurationToSeconds(Int.max, minutes: true), 0)
+        XCTAssertNil(decimalEntry("NaN"))
+        XCTAssertNil(decimalEntry("Infinity"))
+        XCTAssertEqual(decimalEntry(".5"), 0.5)
+        currentBodyWeight = 0
+    }
+
+    func testTimedSetAndBodyWeightBounds() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let app = AppState(localStore: LocalStore(directory: folder), supabase: OfflineCloud(), allowDebugSeeds: false)
+        app.startFreeWorkout()
+        app.addExercise(template: ExerciseTemplate(name: "Bike", sets: 1, reps: "", tip: "", timed: true, minutes: true))
+        let exercise = app.todayExercises[0]
+        let set = exercise.sets[0]
+        app.updateSet(exerciseID: exercise.id, setID: set.id, reps: "999999999999999999")
+        app.toggleDone(exerciseID: exercise.id, setID: set.id)
+        XCTAssertFalse(app.todayExercises[0].sets[0].done)
+        app.updateSet(exerciseID: exercise.id, setID: set.id, reps: "1,5")
+        app.toggleDone(exerciseID: exercise.id, setID: set.id)
+        XCTAssertTrue(app.todayExercises[0].sets[0].done)
+        await app.finishWorkout(note: "")
+        XCTAssertEqual(app.sessions.first?.exercises.first?.sets.first?.reps, 90)
+
+        app.setBodyWeight(70)
+        app.setBodyWeight(Double.greatestFiniteMagnitude)
+        XCTAssertEqual(app.bodyWeight, 70)
+        app.setBodyWeight(nil)
+        XCTAssertNil(app.bodyWeight)
     }
 }

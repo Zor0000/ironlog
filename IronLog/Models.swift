@@ -141,6 +141,19 @@ struct WorkoutSet: Identifiable, Codable, Hashable {
     }
 }
 
+extension WorkoutSet {
+    enum CodingKeys: String, CodingKey { case id, weight, reps, done, type, remark }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        weight = try c.decodeIfPresent(String.self, forKey: .weight) ?? ""
+        reps = try c.decodeIfPresent(String.self, forKey: .reps) ?? ""
+        done = try c.decodeIfPresent(Bool.self, forKey: .done) ?? false
+        type = try c.decodeIfPresent(SetType.self, forKey: .type)
+        remark = try c.decodeIfPresent(String.self, forKey: .remark)
+    }
+}
+
 struct ActiveExercise: Identifiable, Codable, Hashable {
     var id = UUID()
     var name: String
@@ -164,6 +177,21 @@ struct ActiveExercise: Identifiable, Codable, Hashable {
     /// Duration entered in whole minutes rather than seconds. Only ever true for
     /// a `timed` move, so it is safe to pass straight to the duration helpers.
     var usesMinutes: Bool { minutes == true }
+}
+
+extension ActiveExercise {
+    enum CodingKeys: String, CodingKey { case id, name, bodyweight, timed, minutes, custom, expanded, sets }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        bodyweight = try c.decodeIfPresent(Bool.self, forKey: .bodyweight) ?? false
+        timed = try c.decodeIfPresent(Bool.self, forKey: .timed) ?? false
+        minutes = try c.decodeIfPresent(Bool.self, forKey: .minutes)
+        custom = try c.decodeIfPresent(Bool.self, forKey: .custom) ?? false
+        expanded = try c.decodeIfPresent(Bool.self, forKey: .expanded) ?? true
+        sets = try c.decodeIfPresent([WorkoutSet].self, forKey: .sets) ?? []
+    }
 }
 
 struct WorkoutDraft: Codable, Equatable {
@@ -190,6 +218,17 @@ struct SavedRoutine: Identifiable, Codable, Hashable {
     var exercises: [ExerciseTemplate]
 }
 
+extension SavedRoutine {
+    enum CodingKeys: String, CodingKey { case id, name, createdAt, exercises }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? .distantPast
+        exercises = try c.decodeIfPresent([ExerciseTemplate].self, forKey: .exercises) ?? []
+    }
+}
+
 struct LoggedSet: Identifiable, Codable, Hashable {
     var id = UUID()
     var weight: Double?
@@ -208,6 +247,18 @@ struct LoggedSet: Identifiable, Codable, Hashable {
     var isWorkingSet: Bool { type?.countsAsVolume ?? true }
 }
 
+extension LoggedSet {
+    enum CodingKeys: String, CodingKey { case id, weight, reps, type, remark }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        weight = try c.decodeIfPresent(Double.self, forKey: .weight)
+        reps = try c.decode(Double.self, forKey: .reps)
+        type = try c.decodeIfPresent(SetType.self, forKey: .type)
+        remark = try c.decodeIfPresent(String.self, forKey: .remark)
+    }
+}
+
 struct LoggedExercise: Identifiable, Codable, Hashable {
     var id = UUID()
     var name: String
@@ -221,6 +272,19 @@ struct LoggedExercise: Identifiable, Codable, Hashable {
 
     /// See `ActiveExercise.usesMinutes`.
     var usesMinutes: Bool { minutes == true }
+}
+
+extension LoggedExercise {
+    enum CodingKeys: String, CodingKey { case id, name, bodyweight, timed, minutes, sets }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        bodyweight = try c.decodeIfPresent(Bool.self, forKey: .bodyweight) ?? false
+        timed = try c.decodeIfPresent(Bool.self, forKey: .timed) ?? false
+        minutes = try c.decodeIfPresent(Bool.self, forKey: .minutes)
+        sets = try c.decodeIfPresent([LoggedSet].self, forKey: .sets) ?? []
+    }
 }
 
 struct WorkoutSession: Identifiable, Codable, Hashable {
@@ -238,6 +302,25 @@ struct WorkoutSession: Identifiable, Codable, Hashable {
     var activity: CardioActivity?
 
     var isCardio: Bool { activity != nil }
+}
+
+extension WorkoutSession {
+    enum CodingKeys: String, CodingKey {
+        case id, cloudID, userID, createdAt, muscle, split, note, exercises, syncState, activity
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        cloudID = try c.decodeIfPresent(String.self, forKey: .cloudID)
+        userID = try c.decodeIfPresent(String.self, forKey: .userID)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        muscle = try c.decodeIfPresent(String.self, forKey: .muscle)
+        split = try c.decodeIfPresent(String.self, forKey: .split)
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+        exercises = try c.decodeIfPresent([LoggedExercise].self, forKey: .exercises) ?? []
+        syncState = try c.decodeIfPresent(SyncState.self, forKey: .syncState) ?? .pending
+        activity = try c.decodeIfPresent(CardioActivity.self, forKey: .activity)
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -356,18 +439,39 @@ struct CardioActivity: Codable, Hashable {
 /// Returns nil without a body weight or a duration — an estimate with either
 /// missing would be a made-up number presented as one.
 func estimateCalories(kind: CardioKind, durationSeconds: Int, distanceMetres: Double, elevationGainMetres: Int, bodyWeightKg: Double) -> Int? {
-    guard bodyWeightKg > 0, durationSeconds > 0 else { return nil }
+    guard (20...500).contains(bodyWeightKg), (1...86_400).contains(durationSeconds),
+          distanceMetres.isFinite, (0...1_000_000).contains(distanceMetres),
+          (0...20_000).contains(elevationGainMetres) else { return nil }
     let minutes = Double(durationSeconds) / 60
     guard distanceMetres > 0 else {
         let met: Double = kind == .run ? 9.8 : 3.8
-        return Int((met * bodyWeightKg * minutes / 60).rounded())
+        return boundedInteger(met * bodyWeightKg * minutes / 60, in: 0...50_000)
     }
     let speed = distanceMetres / minutes
     let grade = elevationGainMetres > 0 ? Double(elevationGainMetres) / distanceMetres : 0
     let (linear, vertical): (Double, Double) = kind == .run ? (0.2, 0.9) : (0.1, 1.8)
     let vo2 = linear * speed + vertical * speed * grade + 3.5
     let kcal = vo2 * bodyWeightKg * minutes / 1000 * 5
-    return Int(kcal.rounded())
+    return boundedInteger(kcal, in: 0...50_000)
+}
+
+/// Check before converting a floating-point input to Int; Swift traps for
+/// non-finite or out-of-range values, including large values pasted into a field.
+func boundedInteger(_ value: Double, in range: ClosedRange<Int>) -> Int? {
+    guard value.isFinite, value >= Double(range.lowerBound),
+          value <= Double(range.upperBound) else { return nil }
+    return Int(value.rounded())
+}
+
+enum EntryLimit {
+    static let bodyWeightKg = 20.0...500.0
+    static let setWeightKg = 0.0...1_000.0
+    static let reps = 0.5...1_000.0
+    static let timedSeconds = 1...86_400
+    static let cardioMinutes = 0.1...1_440.0
+    static let distanceMetres = 0.0...1_000_000.0
+    static let elevationMetres = 0...20_000
+    static let calories = 1...50_000
 }
 
 /// Build an activity from what the user typed into the manual logger.
@@ -379,13 +483,20 @@ func estimateCalories(kind: CardioKind, durationSeconds: Int, distanceMetres: Do
 /// keeping. Calories are estimated from the current body weight when there
 /// is one; the logger may override the figure afterwards.
 func manualCardio(kind: CardioKind, minutes: String, distance: String, elevation: String = "", terrain: CardioTerrain? = nil) -> CardioActivity? {
-    guard let mins = decimalEntry(minutes), mins > 0 else { return nil }
+    guard let mins = decimalEntry(minutes), EntryLimit.cardioMinutes.contains(mins),
+          let duration = boundedInteger(mins * 60, in: EntryLimit.timedSeconds) else { return nil }
+    let distanceValue = distance.trimmingCharacters(in: .whitespacesAndNewlines)
+    let elevationValue = elevation.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let metres = distanceValue.isEmpty ? 0 : decimalEntry(distanceValue).map({ $0 * currentDistanceUnit.metres }),
+          EntryLimit.distanceMetres.contains(metres) else { return nil }
+    let ascent = elevationValue.isEmpty ? nil : decimalEntry(elevationValue).flatMap({ boundedInteger($0, in: EntryLimit.elevationMetres) })
+    guard elevationValue.isEmpty || ascent != nil else { return nil }
     var activity = CardioActivity(
         kind: kind,
-        duration: Int((mins * 60).rounded()),
-        distance: max(decimalEntry(distance).map { $0 * currentDistanceUnit.metres } ?? 0, 0),
+        duration: duration,
+        distance: metres,
         route: [],
-        elevationGain: decimalEntry(elevation).map { Int(max($0, 0).rounded()) },
+        elevationGain: ascent,
         terrain: terrain
     )
     activity.calories = estimateCalories(
@@ -402,7 +513,8 @@ func manualCardio(kind: CardioKind, minutes: String, distance: String, elevation
 func decimalEntry(_ text: String) -> Double? {
     let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
         .replacingOccurrences(of: ",", with: ".")
-    guard !normalized.isEmpty,
+    guard !normalized.isEmpty, normalized.count <= 32,
+          normalized.range(of: #"^(\d+(\.\d*)?|\.\d+)$"#, options: .regularExpression) != nil,
           let value = Double(normalized),
           value.isFinite else { return nil }
     return value
@@ -501,12 +613,13 @@ struct PersonalRecord: Identifiable, Codable, Hashable {
 }
 
 struct AppSnapshot: Codable {
+    static let currentSchemaVersion = 3
+    var schemaVersion: Int = currentSchemaVersion
     var sessions: [WorkoutSession] = []
     var personalRecords: [PersonalRecord] = []
     var waterByDay: [String: Int] = [:]
     var draft: WorkoutDraft?
-    // Optional so snapshots written before these fields existed still decode
-    // (a failed decode falls back to an empty snapshot and wipes history).
+    // Optional so snapshots written before these fields existed still decode.
     var unitPreference: WeightUnit?
     var hasOnboarded: Bool?
     var timerPreset: Int?
@@ -516,6 +629,76 @@ struct AppSnapshot: Codable {
     /// Private, independently deletable IronFuel profile. Optional preserves
     /// snapshots written before the Nutrition Passport existed.
     var nutritionPassport: NutritionPassport?
+
+    init(sessions: [WorkoutSession] = [], personalRecords: [PersonalRecord] = [],
+         waterByDay: [String: Int] = [:], draft: WorkoutDraft? = nil,
+         unitPreference: WeightUnit? = nil, hasOnboarded: Bool? = nil,
+         timerPreset: Int? = nil, routines: [SavedRoutine]? = nil,
+         bodyWeight: Double? = nil, nutritionPassport: NutritionPassport? = nil,
+         deletedCloudSessionIDs: Set<String> = [], pendingCloudSessionDeletions: Set<String> = [],
+         deletedRoutineIDs: Set<UUID> = [], pendingRoutineDeletions: Set<UUID> = [],
+         pendingPRSync: Bool = false, pendingWorkoutWipe: Bool = false) {
+        self.sessions = sessions
+        self.personalRecords = personalRecords
+        self.waterByDay = waterByDay
+        self.draft = draft
+        self.unitPreference = unitPreference
+        self.hasOnboarded = hasOnboarded
+        self.timerPreset = timerPreset
+        self.routines = routines
+        self.bodyWeight = bodyWeight
+        self.nutritionPassport = nutritionPassport
+        self.deletedCloudSessionIDs = deletedCloudSessionIDs
+        self.pendingCloudSessionDeletions = pendingCloudSessionDeletions
+        self.deletedRoutineIDs = deletedRoutineIDs
+        self.pendingRoutineDeletions = pendingRoutineDeletions
+        self.pendingPRSync = pendingPRSync
+        self.pendingWorkoutWipe = pendingWorkoutWipe
+    }
+
+    /// Permanent local tombstones prevent a delayed pull or lost DELETE response
+    /// from restoring a record. The pending sets are retried until acknowledged.
+    var deletedCloudSessionIDs: Set<String> = []
+    var pendingCloudSessionDeletions: Set<String> = []
+    var deletedRoutineIDs: Set<UUID> = []
+    var pendingRoutineDeletions: Set<UUID> = []
+    var pendingPRSync = false
+    /// A bulk deletion is written locally before any cloud request. Until the
+    /// cloud confirms it, pulls and uploads must remain blocked for this owner.
+    var pendingWorkoutWipe = false
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion, sessions, personalRecords, waterByDay, draft,
+             unitPreference, hasOnboarded, timerPreset, routines, bodyWeight,
+             nutritionPassport, deletedCloudSessionIDs, pendingCloudSessionDeletions,
+             deletedRoutineIDs, pendingRoutineDeletions, pendingPRSync, pendingWorkoutWipe
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        guard version <= Self.currentSchemaVersion else {
+            throw DecodingError.dataCorruptedError(forKey: .schemaVersion, in: c,
+                debugDescription: "Snapshot was written by a newer IronLog version")
+        }
+        schemaVersion = Self.currentSchemaVersion
+        sessions = try c.decodeIfPresent([WorkoutSession].self, forKey: .sessions) ?? []
+        personalRecords = try c.decodeIfPresent([PersonalRecord].self, forKey: .personalRecords) ?? []
+        waterByDay = try c.decodeIfPresent([String: Int].self, forKey: .waterByDay) ?? [:]
+        draft = try c.decodeIfPresent(WorkoutDraft.self, forKey: .draft)
+        unitPreference = try c.decodeIfPresent(WeightUnit.self, forKey: .unitPreference)
+        hasOnboarded = try c.decodeIfPresent(Bool.self, forKey: .hasOnboarded)
+        timerPreset = try c.decodeIfPresent(Int.self, forKey: .timerPreset)
+        routines = try c.decodeIfPresent([SavedRoutine].self, forKey: .routines)
+        bodyWeight = try c.decodeIfPresent(Double.self, forKey: .bodyWeight)
+        nutritionPassport = try c.decodeIfPresent(NutritionPassport.self, forKey: .nutritionPassport)
+        deletedCloudSessionIDs = try c.decodeIfPresent(Set<String>.self, forKey: .deletedCloudSessionIDs) ?? []
+        pendingCloudSessionDeletions = try c.decodeIfPresent(Set<String>.self, forKey: .pendingCloudSessionDeletions) ?? []
+        deletedRoutineIDs = try c.decodeIfPresent(Set<UUID>.self, forKey: .deletedRoutineIDs) ?? []
+        pendingRoutineDeletions = try c.decodeIfPresent(Set<UUID>.self, forKey: .pendingRoutineDeletions) ?? []
+        pendingPRSync = try c.decodeIfPresent(Bool.self, forKey: .pendingPRSync) ?? false
+        pendingWorkoutWipe = try c.decodeIfPresent(Bool.self, forKey: .pendingWorkoutWipe) ?? false
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -629,12 +812,18 @@ func displayDuration(_ seconds: Int, minutes: Bool) -> Int {
 
 /// Typed input in the display unit, converted back to canonical seconds.
 func displayDurationToSeconds(_ value: Int, minutes: Bool) -> Int {
-    minutes ? value * 60 : value
+    guard value >= 0, (!minutes || value <= Int.max / 60) else { return 0 }
+    return minutes ? value * 60 : value
 }
 
 /// Display string for a stored duration, e.g. "20 min" / "45s".
 func formatLoggedDuration(_ seconds: Int, minutes: Bool) -> String {
-    minutes ? "\(seconds / 60) min" : "\(seconds)s"
+    minutes ? "\(clean(Double(seconds) / 60)) min" : "\(seconds)s"
+}
+
+func durationInputValue(_ seconds: Double, minutes: Bool) -> String {
+    guard let whole = boundedInteger(seconds, in: EntryLimit.timedSeconds) else { return "" }
+    return minutes ? clean(Double(whole) / 60) : String(whole)
 }
 
 /// Rest-timer default durations (seconds) offered in the Log and Settings tabs.

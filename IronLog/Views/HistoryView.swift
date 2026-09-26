@@ -314,7 +314,8 @@ struct HistoryCard: View {
         let details = [set.type?.label, normalizedRemark(set.remark)].compactMap { $0 }
         let tag = details.isEmpty ? "" : details.joined(separator: " · ") + " · "
         if exercise.timed {
-            return tag + formatLoggedDuration(Int(set.reps), minutes: exercise.usesMinutes)
+            guard let seconds = boundedInteger(set.reps, in: EntryLimit.timedSeconds) else { return tag + "--" }
+            return tag + formatLoggedDuration(seconds, minutes: exercise.usesMinutes)
         }
         if let weight = set.weight, weight > 0 {
             return "\(tag)\(formatWeight(weight)) x \(clean(set.reps))"
@@ -354,7 +355,7 @@ struct EditSessionSheet: View {
                         // Stored seconds back into the field's own unit, mirroring
                         // the kg → display-unit conversion on the line above.
                         reps: exercise.timed
-                            ? String(displayDuration(Int(set.reps), minutes: exercise.usesMinutes))
+                            ? durationInputValue(set.reps, minutes: exercise.usesMinutes)
                             : clean(set.reps),
                         done: true,
                         type: set.type,
@@ -415,8 +416,9 @@ struct EditSessionSheet: View {
                     Button {
                         NativeFeedback.success()
                         Task {
-                            await app.updateSession(id: sessionID, exercises: exercises, note: note)
-                            dismiss()
+                            if await app.updateSession(id: sessionID, exercises: exercises, note: note) {
+                                dismiss()
+                            }
                         }
                     } label: {
                         Label("Save Changes", systemImage: "checkmark")
@@ -534,7 +536,7 @@ struct EditSessionSheet: View {
                         }
                         SmallInput(label: index == 0 ? (exercise.wrappedValue.timed ? durationFieldLabel(minutes: exercise.wrappedValue.usesMinutes) : "REPS") : "", value: set.reps, keyboard: exercise.wrappedValue.timed ? .numberPad : .decimalPad, identifier: "edit-reps-input") { value in
                             exercise.wrappedValue.sets[index].reps = exercise.wrappedValue.timed
-                                ? value.filter(\.isNumber)
+                                ? sanitizeDecimalInput(value)
                                 : snapReps(value)
                         }
                         SetTypeMenu(type: exercise.sets[index].type, remark: exercise.sets[index].remark)
