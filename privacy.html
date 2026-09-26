@@ -5,35 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IronLog — Privacy Policy</title>
 <style>
-  body { background:#0a0a0a; color:#efefef; font-family:-apple-system,system-ui,sans-serif; max-width:640px; margin:0 auto; padding:32px 20px; line-height:1.6; }
+  body { background:#0a0a0a; color:#efefef; font-family:-apple-system,system-ui,sans-serif; max-width:680px; margin:0 auto; padding:32px 20px; line-height:1.6; }
   h1 { color:#d4ff4a; }
   h2 { font-size:1.05rem; margin-top:1.6em; }
   a { color:#d4ff4a; }
-  .muted { color:#888; font-size:0.9rem; }
+  .muted { color:#aaa; font-size:0.9rem; }
 </style>
 </head>
 <body>
 <h1>IronLog Privacy Policy</h1>
-<p class="muted">Last updated: July 17, 2026</p>
+<p class="muted">Last updated: September 27, 2026</p>
 
-<p>IronLog is a free workout tracker. It is built to work offline-first: your
-data lives on your device unless you choose to create an account.</p>
+<p>IronLog can be used without an account. In local mode, your workouts, run and walk entries, notes, routines, water log, body weight, and Nutrition Passport stay on your device. We do not receive those local entries. The app uses local storage and device notifications for its workout and rest-timer features.</p>
 
-<h2>What we collect</h2>
-<p>If you create an account: your email address, name (optional), and the
-workout data you log (sessions, sets, weights, personal records). Nothing else —
-no analytics, no advertising identifiers, no third-party SDKs.</p>
+<h2>Accounts and cloud sync</h2>
+<p>If you create or sign in to an account, IronLog uses Supabase for authentication and cloud sync. Supabase receives your email address, optional name, and account ID for your account. The app sends your saved workout sessions, exercise and set details, personal records, routine names and contents, free-text workout notes and set remarks, and saved run or walk details (time, distance, elevation, terrain, any calorie value) to Supabase so they can sync across your devices. Those records are associated with your account ID. IronLog does not collect or upload GPS or location data. A workout started while signed out is uploaded when you later sign in. Cloud requests necessarily include technical connection information handled by Supabase under its own terms.</p>
+<p>If you choose Google sign-in, Google and Supabase handle the sign-in exchange. IronLog uses the resulting account profile; it does not request your Google contacts, calendar, or fitness data. We do not use advertising or cross-app tracking.</p>
 
-<h2>Where it lives</h2>
-<p>Local mode: everything stays on your device. Cloud sync: workout data is
-stored on Supabase (PostgreSQL) protected by row-level security, so only your
-authenticated account can read your rows.</p>
+<h2>Data that stays on your device</h2>
+<p>Your Nutrition Passport, including goals, allergies, dietary restrictions, safety answers, and preferences, is stored in the local snapshot for the current device and account. IronFuel recommendations are generated from an on-device catalog and rules; the Passport and your IronFuel query are not sent to Supabase or an AI service. Your body weight, water log, and unfinished workout draft also stay on the device. Saved cardio calorie values may sync, but the body weight used to estimate them does not. The Live Activity uses device-local state for Lock Screen workout controls.</p>
 
-<h2>Deleting your data</h2>
-<p>Settings → Delete Account &amp; Data removes your workout data from the
-cloud and this device immediately. You can also email us to request deletion.</p>
+<h2>Retention and deletion</h2>
+<p>Local data remains until you delete it in IronLog or remove the app. Signed-in cloud records remain until you delete the relevant records, use Settings → Delete Workout Data, or delete your account. Individual and bulk workout deletions made offline are kept on this device and retried when cloud sync is available; the app shows when cloud deletion is pending. Deleting the account requires a successful connection and shows an error if the cloud request fails. Settings → Delete Account &amp; Data requests deletion of the account and its cloud workout records, then removes its local snapshot. Service backups and operational logs may follow Supabase's retention practices; immediate removal from every backup cannot be guaranteed by the app.</p>
 
 <h2>Contact</h2>
-<p><a href="mailto:neerajchormale39@gmail.com">neerajchormale39@gmail.com</a></p>
+<p>For privacy questions or deletion help, email <a href="mailto:neerajchormale39@gmail.com">neerajchormale39@gmail.com</a>.</p>
 </body>
 </html>
