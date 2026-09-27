@@ -64,6 +64,8 @@ targets:
       - path: IronLog/Live/WorkoutActivityAttributes.swift
       - path: IronLog/Live/LiveWorkoutEngine.swift
       - path: IronLog/Live/WorkoutLiveActivityIntents.swift
+    resources:
+      - path: IronLogWidget/PrivacyInfo.xcprivacy
     settings:
       base:
         BASE_BUNDLE_ID: com.parthjadhav.ironlog

@@ -698,13 +698,16 @@ struct LogExerciseCard: View {
     private func refPlaceholder(_ refSet: LoggedSet?) -> String {
         guard let refSet else { return "0" }
         guard exercise.timed else { return clean(refSet.reps) }
-        return String(displayDuration(Int(refSet.reps), minutes: exercise.usesMinutes))
+        return durationInputValue(refSet.reps, minutes: exercise.usesMinutes)
     }
 
     /// Muted "Last: …" hint mirroring the web client's `.set-ref` line.
     private func referenceLabel(_ refSet: LoggedSet?) -> String? {
         guard let refSet else { return nil }
-        if exercise.timed { return "Last: \(formatLoggedDuration(Int(refSet.reps), minutes: exercise.usesMinutes))" }
+        if exercise.timed {
+            guard let seconds = boundedInteger(refSet.reps, in: EntryLimit.timedSeconds) else { return nil }
+            return "Last: \(formatLoggedDuration(seconds, minutes: exercise.usesMinutes))"
+        }
         // Weight presence decides, not the bodyweight flag — a loaded lunge
         // logs its weight and should show it back.
         guard let weight = refSet.weight, weight > 0 else { return "Last: \(clean(refSet.reps)) reps" }

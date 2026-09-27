@@ -21,6 +21,7 @@ struct IronLogApp: App {
             // Fold in any sets logged from the Lock Screen while backgrounded.
             if phase == .active {
                 appState.reconcileFromLiveActivity()
+                Task { await appState.resumeForegroundSync() }
             }
         }
     }

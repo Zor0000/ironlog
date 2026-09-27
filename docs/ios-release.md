@@ -11,7 +11,29 @@ Native iOS bundle:
 - Version: `1.0`
 - Build: `3`
 
-## Verified Locally
+## September 27 readiness follow-up
+
+The five follow-up blockers are addressed: free-text dietary restrictions fail closed with a Passport prompt; gluten excludes oats; deletion retries continue at a capped 120-second interval and resume on foreground; failed snapshot writes can be retried without discarding the pending snapshot; and cleared session notes encode explicit nulls while rejected edits keep the sheet open.
+
+The Precise Location declaration was removed. Session uploads no longer send route coordinates, including any legacy route data. The widget privacy manifest is included in the release sources and built extension.
+
+The public policy at https://zor0000.github.io/ironlog/privacy.html was deployed on September 27 and compared byte-for-byte with `privacy.html`. Policy-only hosting commit: `d2e938c223ecd8abaa414f6975c93d0101c99b82`. Its `[skip actions]` message suppresses the repository's TestFlight push workflow; only GitHub Pages was deployed.
+
+Local verification: 233 unit tests passed on iOS 26.5 / iPhone 17. Static analysis and an unsigned generic iOS Release build passed. App and widget manifests passed plist validation in the source and built bundles. All 20 UI tests passed; four screenshot-capture tests were intentionally skipped. The UI run still emitted the previously observed nonfatal SwiftUI frame-dimension warnings.
+
+Before submission, create a fresh signed archive, export its privacy report, and complete the physical-device checks below. No app upload or submission was performed. The commands and upload details later in this document describe an earlier build 3 release.
+
+## App Store privacy checklist
+
+- [ ] In App Store Connect, review **Contact Info → Email Address** and optional **Name**, linked to the user, for account authentication.
+- [ ] Review **Identifiers → User ID**, linked to the user, for the Supabase account identifier.
+- [ ] Review **Fitness** for cloud-synced workouts, sets, personal records, and run/walk details, and **Other User Content** for synced free-text notes, remarks, and routines. Their purpose is app functionality; no tracking or advertising is implemented.
+- [ ] Do not declare **Precise Location**: this release does not collect or upload GPS/location data.
+- [ ] Do not label the Nutrition Passport, body weight, water log, IronFuel queries, or draft as collected by the app: the current implementation keeps them on-device. A derived cardio calorie value can sync as part of a saved activity.
+- [ ] Confirm the Google OAuth provider and its consent screen if Google sign-in is enabled. Supabase handles authentication and cloud storage; Google handles the optional sign-in exchange. Check the provider's current data-handling terms before answering any processor or retention questions.
+- [ ] Set the current public `privacy.html` URL in App Store Connect and check it against the shipped behavior. The repository has no evidence that App Store Connect privacy answers were changed.
+- [ ] Export the Xcode privacy report from the final signed archive. Confirm the app and widget manifests and bundled dependency manifests/reasons. Inspect any App Store Connect validation notices before submission.
+- [ ] Check account deletion, individual offline deletion, and bulk workout deletion on two physical devices against the production Supabase project, including sign-out/sign-in, a failed response, and a later sync. Review Supabase backup/log retention settings separately.
 
 The current native app has been verified with:
 

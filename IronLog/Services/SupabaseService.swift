@@ -1,7 +1,7 @@
 import Foundation
 import Supabase
 
-final class SupabaseService {
+class SupabaseService {
     private static let projectURL = URL(string: "https://dvqevdydldxjqjrpkkjc.supabase.co")!
     private static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0"
     private static let authCallbackURL = URL(string: "ironlog://auth/callback")!
@@ -125,15 +125,24 @@ final class SupabaseService {
     func pullSessions() async throws -> [WorkoutSession] {
         guard let user = currentUser else { return [] }
         let select = "*,session_sets(weight_kg,reps,set_index,bodyweight,timed,uses_minutes,set_type,exercises(name))"
-        let rows: [RemoteSession] = try await restGet(
-            path: "/rest/v1/sessions",
-            query: [
-                URLQueryItem(name: "select", value: select),
-                URLQueryItem(name: "user_id", value: "eq.\(user.id)"),
-                URLQueryItem(name: "order", value: "created_at.desc")
-            ]
-        )
-        return rows.map { $0.localSession(userID: user.id) }
+        var rows: [RemoteSession] = []
+        let pageSize = 200
+        while true {
+            let page: [RemoteSession] = try await restGet(
+                path: "/rest/v1/sessions",
+                query: [
+                    URLQueryItem(name: "select", value: select),
+                    URLQueryItem(name: "user_id", value: "eq.\(user.id)"),
+                    URLQueryItem(name: "order", value: "created_at.desc,id.desc"),
+                    URLQueryItem(name: "limit", value: "\(pageSize)"),
+                    URLQueryItem(name: "offset", value: "\(rows.count)")
+                ]
+            )
+            rows.append(contentsOf: page)
+            if page.count < pageSize { break }
+        }
+        return Array(Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }).values)
+            .map { $0.localSession(userID: user.id) }
     }
 
     func pullPRs() async throws -> [PersonalRecord] {
@@ -153,14 +162,22 @@ final class SupabaseService {
 
     func pullRoutines() async throws -> [SavedRoutine] {
         guard let user = currentUser else { return [] }
-        let rows: [RemoteRoutine] = try await restGet(
-            path: "/rest/v1/routines",
-            query: [
-                URLQueryItem(name: "select", value: "id,name,exercises,created_at"),
-                URLQueryItem(name: "user_id", value: "eq.\(user.id)"),
-                URLQueryItem(name: "order", value: "created_at.asc")
-            ]
-        )
+        var rows: [RemoteRoutine] = []
+        let pageSize = 200
+        while true {
+            let page: [RemoteRoutine] = try await restGet(
+                path: "/rest/v1/routines",
+                query: [
+                    URLQueryItem(name: "select", value: "id,name,exercises,created_at"),
+                    URLQueryItem(name: "user_id", value: "eq.\(user.id)"),
+                    URLQueryItem(name: "order", value: "created_at.asc,id.asc"),
+                    URLQueryItem(name: "limit", value: "\(pageSize)"),
+                    URLQueryItem(name: "offset", value: "\(rows.count)")
+                ]
+            )
+            rows.append(contentsOf: page)
+            if page.count < pageSize { break }
+        }
         return rows.compactMap { $0.localRoutine() }
     }
 
@@ -195,15 +212,17 @@ final class SupabaseService {
 
     func backup(session local: WorkoutSession, records: [PersonalRecord]) async throws -> String {
         guard let user = currentUser else { throw SupabaseError.notAuthenticated }
-        if let cloudID = local.cloudID { return cloudID }
 
         // Resolve the shared exercise catalogue first. This can fail for an
         // invalid name or a permission problem; doing it before inserting the
         // session means such a failure cannot leave an empty session header in
         // the user's cloud history.
-        let exerciseIDs = try await ensureExercises(local.exercises.map(\.name))
+        let exerciseIDs = try await ensureExercises(local.exercises.map(\.name) + records.map(\.exerciseName))
         let remoteSession = try await insertSession(local, userID: user.id)
         do {
+            // A lost HTTP response must be safe to retry. The row has a stable
+            // local UUID and its sets are replaced before being posted again.
+            try await restDelete(path: "/rest/v1/session_sets", query: [URLQueryItem(name: "session_id", value: "eq.\(remoteSession.id)")])
             // `setIndex` is the position in this flat list, so it records both
             // exercise order and set order in one column — a pull sorts by it and
             // groups by first appearance to rebuild the session as it was logged.
@@ -232,16 +251,8 @@ final class SupabaseService {
             try await backup(records: records, exerciseIDs: exerciseIDs, userID: user.id)
             return remoteSession.id
         } catch {
-            let backupError = error
-            do {
-                try await deleteCloudSession(remoteSession.id)
-            } catch {
-                throw SupabaseError.partialBackup(
-                    backup: backupError.localizedDescription,
-                    cleanup: error.localizedDescription
-                )
-            }
-            throw backupError
+            // Keep the stable row ID so a retry can complete the same upload.
+            throw error
         }
     }
 
@@ -250,20 +261,23 @@ final class SupabaseService {
         try await restDelete(path: "/rest/v1/sessions", query: [URLQueryItem(name: "id", value: "eq.\(cloudID)")])
     }
 
+    /// PRs are a derived index of sessions. Rebuild it after a successful
+    /// pull and pending deletions so removing or editing a best set cannot
+    /// leave an old cloud PR that reappears on another device.
+    func replacePersonalRecords(_ records: [PersonalRecord]) async throws {
+        guard let user = currentUser else { throw SupabaseError.notAuthenticated }
+        try await restDelete(path: "/rest/v1/personal_records", query: [URLQueryItem(name: "user_id", value: "eq.\(user.id)")])
+        let exerciseIDs = try await ensureExercises(records.map(\.exerciseName))
+        try await backup(records: records, exerciseIDs: exerciseIDs, userID: user.id)
+    }
+
     /// Deletes every workout row the user owns while keeping the Auth identity.
-    /// `session_sets` has no user_id column, so those go first via the
-    /// session ids; RLS scopes everything to the signed-in user anyway.
+    /// The session_sets foreign key cascades deletes from sessions. Deleting
+    /// by user_id avoids a capped SELECT response and oversized ID filters for
+    /// accounts with a long history.
     func deleteWorkoutData() async throws {
         guard let user = currentUser else { throw SupabaseError.notAuthenticated }
         let userFilter = URLQueryItem(name: "user_id", value: "eq.\(user.id)")
-        let sessions: [RemoteSessionInsertResult] = try await restGet(
-            path: "/rest/v1/sessions",
-            query: [URLQueryItem(name: "select", value: "id"), userFilter]
-        )
-        if !sessions.isEmpty {
-            let ids = sessions.map(\.id).joined(separator: ",")
-            try await restDelete(path: "/rest/v1/session_sets", query: [URLQueryItem(name: "session_id", value: "in.(\(ids))")])
-        }
         try await restDelete(path: "/rest/v1/sessions", query: [userFilter])
         try await restDelete(path: "/rest/v1/personal_records", query: [userFilter])
         try await restDelete(path: "/rest/v1/routines", query: [userFilter])
@@ -284,6 +298,8 @@ final class SupabaseService {
 
     private func insertSession(_ session: WorkoutSession, userID: String) async throws -> RemoteSessionInsertResult {
         let body = RemoteSessionInsert(
+            id: session.cloudID ?? session.id.uuidString.lowercased(),
+            createdAt: Self.iso8601.string(from: session.createdAt),
             userID: userID,
             muscleGroup: session.muscle,
             splitType: session.split,
@@ -291,12 +307,12 @@ final class SupabaseService {
             activityType: session.activity?.kind.rawValue,
             distanceM: session.activity?.distance,
             durationS: session.activity?.duration,
-            route: session.activity?.route,
+            route: nil, // This release does not collect or upload location.
             elevationGainM: session.activity?.elevationGain,
             terrain: session.activity?.terrain?.rawValue,
             calories: session.activity?.calories
         )
-        let rows: [RemoteSessionInsertResult] = try await restPost(path: "/rest/v1/sessions", query: [], body: body, prefer: "return=representation")
+        let rows: [RemoteSessionInsertResult] = try await restPost(path: "/rest/v1/sessions", query: [URLQueryItem(name: "on_conflict", value: "id")], body: body, prefer: "resolution=merge-duplicates,return=representation")
         guard let row = rows.first else { throw SupabaseError.emptyResponse }
         return row
     }
@@ -602,6 +618,8 @@ func postgrestInValues(_ values: [String]) -> String {
 }
 
 struct RemoteSessionInsert: Encodable {
+    var id: String? = nil
+    var createdAt: String? = nil
     var userID: String
     var muscleGroup: String?
     var splitType: String?
@@ -617,6 +635,30 @@ struct RemoteSessionInsert: Encodable {
     var terrain: String?
     /// Kilocalories, estimated or overridden. Nil without a body weight.
     var calories: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, createdAt, userID, muscleGroup, splitType, note, activityType
+        case distanceM, durationS, route, elevationGainM, terrain, calories
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(id, forKey: .id)
+        try container.encodeIfPresent(createdAt, forKey: .createdAt)
+        try container.encode(userID, forKey: .userID)
+        try container.encode(muscleGroup, forKey: .muscleGroup)
+        try container.encode(splitType, forKey: .splitType)
+        // Explicit null clears previously stored optional values on upsert.
+        try container.encode(note, forKey: .note)
+        try container.encode(activityType, forKey: .activityType)
+        try container.encode(distanceM, forKey: .distanceM)
+        try container.encode(durationS, forKey: .durationS)
+        try container.encode(route, forKey: .route)
+        try container.encode(elevationGainM, forKey: .elevationGainM)
+        try container.encode(terrain, forKey: .terrain)
+        try container.encode(calories, forKey: .calories)
+    }
+
 }
 
 struct RemoteSessionInsertResult: Codable {
@@ -710,6 +752,7 @@ struct RemoteSession: Codable {
 
     func localSession(userID: String) -> WorkoutSession {
         WorkoutSession(
+            id: UUID(uuidString: id) ?? UUID(),
             cloudID: id,
             userID: userID,
             createdAt: createdAt ?? Date(),

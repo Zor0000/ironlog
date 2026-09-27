@@ -6,7 +6,28 @@ struct RootView: View {
     var body: some View {
         ZStack {
             NativeBackground()
-            if app.showingOnboarding {
+            if let storageError = app.storageError {
+                VStack(spacing: 16) {
+                    Image(systemName: "externaldrive.badge.exclamationmark")
+                        .font(.system(size: 42))
+                        .foregroundStyle(Theme.accent)
+                    Text("Saved data needs attention")
+                        .font(.system(size: 24, weight: .bold))
+                    Text(storageError)
+                        .multilineTextAlignment(.center)
+                    Text("Free up storage if needed, then retry. If the saved data requires a newer app version, update IronLog first.")
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Theme.muted2)
+                    Button("Retry") { Task { await app.retryStorage() } }
+                        .disabled(app.isRetryingStorage)
+                        .accessibilityIdentifier("retry-storage-button")
+                    Link("Contact support", destination: URL(string: "mailto:neerajchormale39@gmail.com")!)
+                }
+                .padding(28)
+            } else if app.isBooting {
+                SwiftUI.ProgressView("Opening IronLog…")
+                    .tint(Theme.accent)
+            } else if app.showingOnboarding {
                 OnboardingView()
                     .transition(.opacity.combined(with: .scale(scale: 0.985)))
             } else if app.showingAuth {

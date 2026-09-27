@@ -270,6 +270,10 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Edit Session"].waitForExistence(timeout: 3))
         let editReps = app.textFields["edit-reps-input"].firstMatch
         editReps.doubleTap() // select-all, so typing replaces "12"
+        editReps.typeText("0")
+        app.buttons["save-session-edits-button"].tap()
+        XCTAssertTrue(app.staticTexts["Edit Session"].exists, "Rejected edits must keep the sheet open")
+        editReps.doubleTap()
         editReps.typeText("15")
         app.buttons["save-session-edits-button"].tap()
 
@@ -322,6 +326,14 @@ final class IronLogUITests: XCTestCase {
         let subtitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "3.00 km")).firstMatch
         XCTAssertTrue(subtitle.waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["history-card-toggle"].firstMatch.label.contains("Run"))
+    }
+
+    func testLargeRunInputIsRejectedWithAnExplanation() {
+        openRunTab()
+        typeInto("run-minutes-field", "999999999999999999")
+        app.buttons["Done"].tap()
+        XCTAssertFalse(app.buttons["save-manual-cardio-button"].isEnabled)
+        XCTAssertTrue(app.staticTexts["Enter 0.1–1,440 minutes."].waitForExistence(timeout: 3))
     }
 
     func testTerrainChipsSelectAndClear() {

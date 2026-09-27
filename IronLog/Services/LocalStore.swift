@@ -3,10 +3,22 @@ import CryptoKit
 import Security
 
 actor LocalStore {
+    enum StoreError: LocalizedError {
+        case unreadable
+        case futureVersion
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadable: "Saved data could not be read. IronLog has stopped saving to protect it."
+            case .futureVersion: "Saved data is from a newer IronLog version. Update the app before editing it."
+            }
+        }
+    }
     private let directory: URL
     private let legacyURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private(set) var didRecoverFromBackup = false
 
     init(directory: URL? = nil) {
         let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -22,27 +34,80 @@ actor LocalStore {
     /// authenticated account. This runs only when that account has no scoped
     /// store yet, so a guest snapshot created by a newer release is never
     /// mistaken for cloud-account data.
-    func migrateLegacyStoreIfNeeded(to ownerID: String) {
+    func migrateLegacyStoreIfNeeded(to ownerID: String) throws {
         let destination = url(ownerID: ownerID)
         guard FileManager.default.fileExists(atPath: legacyURL.path),
-              !FileManager.default.fileExists(atPath: destination.path) else { return }
-        try? FileManager.default.moveItem(at: legacyURL, to: destination)
+              !FileManager.default.fileExists(atPath: destination.path),
+              !FileManager.default.fileExists(atPath: backupURL(for: destination).path) else { return }
+        _ = try load(ownerID: nil)
+        try FileManager.default.moveItem(at: legacyURL, to: destination)
+        let legacyBackup = backupURL(for: legacyURL)
+        if FileManager.default.fileExists(atPath: legacyBackup.path) {
+            try FileManager.default.moveItem(at: legacyBackup, to: backupURL(for: destination))
+        }
     }
 
-    func load(ownerID: String? = nil) -> AppSnapshot {
+    func load(ownerID: String? = nil) throws -> AppSnapshot {
         let url = url(ownerID: ownerID)
-        guard let data = try? Data(contentsOf: url) else { return AppSnapshot() }
-        return (try? decoder.decode(AppSnapshot.self, from: data)) ?? AppSnapshot()
+        let backup = backupURL(for: url)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            guard FileManager.default.fileExists(atPath: backup.path) else { return AppSnapshot() }
+            let data = try Data(contentsOf: backup)
+            let snapshot = try decode(data)
+            try data.write(to: url, options: .atomic)
+            didRecoverFromBackup = true
+            return snapshot
+        }
+        let data = try Data(contentsOf: url)
+        do {
+            return try decode(data)
+        } catch StoreError.futureVersion {
+            throw StoreError.futureVersion
+        } catch {
+            guard let backupData = try? Data(contentsOf: backup),
+                  let snapshot = try? decode(backupData) else { throw StoreError.unreadable }
+            let damaged = url.deletingPathExtension().appendingPathExtension("damaged-\(UUID().uuidString).json")
+            try FileManager.default.moveItem(at: url, to: damaged)
+            try backupData.write(to: url, options: .atomic)
+            didRecoverFromBackup = true
+            return snapshot
+        }
     }
 
-    func save(_ snapshot: AppSnapshot, ownerID: String? = nil) {
-        guard let data = try? encoder.encode(snapshot) else { return }
-        try? data.write(to: url(ownerID: ownerID), options: [.atomic])
+    func save(_ snapshot: AppSnapshot, ownerID: String? = nil, replacingBackup: Bool = false) throws {
+        let destination = url(ownerID: ownerID)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            let previous = try Data(contentsOf: destination)
+            _ = try decode(previous)
+            if !replacingBackup {
+                try previous.write(to: backupURL(for: destination), options: .atomic)
+            }
+        }
+        let data = try encoder.encode(snapshot)
+        // A confirmed deletion must also replace the recovery copy. Writing
+        // it first means a failed backup write leaves the existing primary
+        // untouched and prevents the deletion from being acknowledged.
+        if replacingBackup {
+            try data.write(to: backupURL(for: destination), options: .atomic)
+        }
+        try data.write(to: destination, options: .atomic)
     }
 
-    func clear(ownerID: String? = nil) {
-        try? FileManager.default.removeItem(at: url(ownerID: ownerID))
+    func clear(ownerID: String? = nil) throws {
+        let destination = url(ownerID: ownerID)
+        let backup = backupURL(for: destination)
+        if FileManager.default.fileExists(atPath: backup.path) { try FileManager.default.removeItem(at: backup) }
+        if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
     }
+
+    private func decode(_ data: Data) throws -> AppSnapshot {
+        if let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let version = root["schemaVersion"] as? Int,
+           version > AppSnapshot.currentSchemaVersion { throw StoreError.futureVersion }
+        return try decoder.decode(AppSnapshot.self, from: data)
+    }
+
+    private func backupURL(for url: URL) -> URL { url.appendingPathExtension("bak") }
 
     private func url(ownerID: String?) -> URL {
         guard let ownerID else { return legacyURL }

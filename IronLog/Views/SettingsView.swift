@@ -185,10 +185,20 @@ struct SettingsView: View {
             Text("Used to estimate calories for runs and walks.")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted2)
+            if !bodyWeightText.isEmpty,
+               !EntryLimit.bodyWeightKg.contains(displayWeightToKg(decimalEntry(bodyWeightText) ?? -1)) {
+                Text("Enter a body weight between 20 and 500 kg (44 and 1,102 lb).")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.danger)
+            }
         }
         .cardStyle()
         .onAppear { bodyWeightText = app.bodyWeight.map(formatWeightValue) ?? "" }
         .onChange(of: bodyWeightText) { _, text in
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                app.setBodyWeight(nil)
+                return
+            }
             guard let value = decimalEntry(text), value > 0 else { return }
             app.setBodyWeight(displayWeightToKg(value))
         }

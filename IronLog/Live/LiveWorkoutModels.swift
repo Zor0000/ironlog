@@ -152,7 +152,7 @@ enum LiveWorkoutReducer {
         let exercise = state.exercises[ei.exercise]
         guard !exercise.timed else { return state }
         let current = parseDouble(state.exercises[ei.exercise].sets[ei.set].weight)
-        let next = max(0, current + Double(direction) * state.weightStep)
+        let next = min(2_205, max(0, current + Double(direction) * state.weightStep))
         state.exercises[ei.exercise].sets[ei.set].weight = formatNumber(next)
         return state
     }
@@ -166,7 +166,9 @@ enum LiveWorkoutReducer {
         var state = state
         guard let ei = currentEditableIndices(state) else { return state }
         let current = parseDouble(state.exercises[ei.exercise].sets[ei.set].reps)
-        let next = max(0, current + Double(direction))
+        let maximum: Double = state.exercises[ei.exercise].timed
+            ? (state.exercises[ei.exercise].usesMinutes ? 1_440 : 86_400) : 1_000
+        let next = min(maximum, max(0, current + Double(direction)))
         state.exercises[ei.exercise].sets[ei.set].reps = formatNumber(next)
         return state
     }
@@ -250,8 +252,12 @@ enum LiveWorkoutReducer {
 
     static func isValid(_ set: LiveSet, in exercise: LiveExercise) -> Bool {
         guard let reps = parseDoubleOptional(set.reps), reps > 0 else { return false }
+        if exercise.timed {
+            return exercise.usesMinutes ? reps <= 1_440 : reps <= 86_400 && reps.rounded() == reps
+        }
+        guard reps <= 1_000 else { return false }
         if exercise.bodyweight || exercise.timed { return true }
-        guard let weight = parseDoubleOptional(set.weight), weight >= 0 else { return false }
+        guard let weight = parseDoubleOptional(set.weight), (0...2_205).contains(weight) else { return false }
         return true
     }
 }
@@ -264,7 +270,11 @@ extension LiveWorkoutReducer {
     }
 
     static func parseDoubleOptional(_ value: String) -> Double? {
-        Double(value.replacingOccurrences(of: ",", with: "."))
+        let normalized = value.replacingOccurrences(of: ",", with: ".")
+        guard normalized.count <= 32,
+              normalized.range(of: #"^(\d+(\.\d*)?|\.\d+)$"#, options: .regularExpression) != nil,
+              let number = Double(normalized), number.isFinite else { return nil }
+        return number
     }
 
     /// Renders a stepper value without a trailing ".0" — "60" not "60.0" — while
