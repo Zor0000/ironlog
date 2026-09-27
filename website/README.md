@@ -8,7 +8,7 @@ Tailwind v4. Dark + lime aesthetic that mirrors the app (`IronLog/Theme.swift`).
 ```bash
 cd website
 npm install
-npm run dev      # http://localhost:3001  (see ../.claude/launch.json)
+npm run dev      # http://localhost:3001
 npm run build    # production build
 ```
 

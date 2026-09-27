@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 #
-# capture_evidence.sh — deterministic screenshots of IronLog for PR evidence.
+# capture_evidence.sh — deterministic screenshots of IronLog for local evidence.
 #
 # Runs the scenarios in IronLogUITests/EvidenceCaptureTests.swift across a
 # device × Dynamic Type matrix on the iOS Simulator, exports every screenshot
-# with a stable name, and (optionally) publishes them to the `pr-evidence`
-# orphan branch and prints a Markdown table you can paste into a PR.
+# with a stable name in the local, git-ignored evidence directory.
 #
 #     scripts/capture_evidence.sh AddExercise                 # one scenario
 #     scripts/capture_evidence.sh AddExercise ExerciseFinder  # several
@@ -18,8 +17,6 @@
 #     --seed N                           seed for randomised features (default 7)
 #     --out DIR                          output directory (default evidence/<UTC stamp>)
 #     --clean                            empty an existing --out DIR first
-#     --publish LABEL                    push to pr-evidence/<LABEL>/ and print Markdown
-#     --allow-dirty                      publish even with uncommitted changes
 #     --skip-build                       reuse the last build-for-testing products
 #
 # Output files: DIR/<device>-<size>[-reduce-motion]-<scenario>-<nn>-<step>.png
@@ -38,8 +35,6 @@ REDUCE_MOTION=0
 SEED=7
 OUT=""
 CLEAN=0
-PUBLISH=""
-ALLOW_DIRTY=0
 SKIP_BUILD=0
 ALL=0
 SCENARIOS=()
@@ -52,24 +47,20 @@ while [[ $# -gt 0 ]]; do
     --seed) SEED="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
     --clean) CLEAN=1; shift ;;
-    --publish) PUBLISH="$2"; shift 2 ;;
-    --allow-dirty) ALLOW_DIRTY=1; shift ;;
+    --publish)
+      echo "GitHub evidence publishing is disabled. Use --out evidence/<label> to keep captures local." >&2
+      exit 2
+      ;;
+    --allow-dirty)
+      echo "--allow-dirty is obsolete because captures stay local." >&2
+      exit 2
+      ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --all) ALL=1; shift ;;
     -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) SCENARIOS+=("$1"); shift ;;
   esac
 done
-
-# `--publish` names one directory on the pr-evidence branch.  Keep it a
-# single, ordinary path component: the publish cleanup runs from a clone, but
-# an absolute path or traversal component would make it operate outside it.
-if [[ -n "$PUBLISH" ]]; then
-  if [[ ! "$PUBLISH" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-    echo "invalid --publish label '$PUBLISH': use a single label containing only letters, digits, dots, underscores, or hyphens" >&2
-    exit 2
-  fi
-fi
 
 if [[ $ALL -eq 1 ]]; then
   SCENARIOS=()
@@ -103,10 +94,6 @@ DIRTY=0
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   DIRTY=1
   echo "▸ warning: worktree has uncommitted changes; evidence will be stamped $COMMIT+dirty"
-fi
-if [[ -n "$PUBLISH" && $DIRTY -eq 1 && $ALLOW_DIRTY -eq 0 ]]; then
-  echo "refusing to publish from a dirty worktree (commit first, or pass --allow-dirty)" >&2
-  exit 2
 fi
 STAMP="$COMMIT"; [[ $DIRTY -eq 1 ]] && STAMP="$COMMIT+dirty"
 
@@ -301,71 +288,6 @@ done
 
 echo "▸ done: $(/bin/ls "$OUT"/*.png 2>/dev/null | wc -l | tr -d ' ') screenshots in $OUT"
 if [[ ${#FAILED_LABELS[@]} -gt 0 ]]; then
-  echo "▸ FAILED: ${FAILED_LABELS[*]} — not publishing incomplete evidence (logs in $OUT/.logs)" >&2
+  echo "▸ FAILED: ${FAILED_LABELS[*]} — capture is incomplete (logs in $OUT/.logs)" >&2
   exit 1
-fi
-
-# ── Publish ──────────────────────────────────────────────────────────────────
-# Images go to an orphan branch so nothing binary ever lands in main. The
-# Markdown printed at the end links to raw.githubusercontent.com.
-if [[ -n "$PUBLISH" ]]; then
-  remote_url="$(git config --get remote.origin.url)"
-  slug="$(echo "$remote_url" | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
-  work="$(mktemp -d)"
-  trap 'rm -r -f "$work"' EXIT
-  git clone -q --no-checkout "$remote_url" "$work"
-  (
-    cd "$work"
-    if git fetch -q origin pr-evidence 2>/dev/null; then
-      git checkout -q pr-evidence
-    else
-      git checkout -q --orphan pr-evidence
-      git read-tree --empty
-      printf '# PR evidence\n\nScreenshots referenced from pull requests. Not merged into main.\n' > README.md
-    fi
-    rm -r -f "$PUBLISH"; mkdir -p "$PUBLISH"
-    for f in "$OUT"/*.png; do
-      # Downscale for the PR page; the full-resolution originals stay in $OUT.
-      sips -Z 1200 "$f" --out "$PUBLISH/$(basename "$f")" >/dev/null
-    done
-    cp "$OUT/MANIFEST.txt" "$PUBLISH/"
-    git add -A
-    if git diff --cached --quiet; then
-      echo "▸ pr-evidence/$PUBLISH already up to date"
-    else
-      git commit -qm "Evidence: $PUBLISH ($STAMP)"
-      git push -q origin pr-evidence
-    fi
-  )
-  echo
-  echo "## Evidence"
-  echo
-  echo "Captured with \`scripts/capture_evidence.sh ${SCENARIOS[*]} --seed $SEED --publish $PUBLISH\` at $STAMP (see \`$PUBLISH/MANIFEST.txt\` on the \`pr-evidence\` branch)."
-  echo
-  for s in "${SCENARIOS[@]}"; do
-    scen="$(echo "$s" | tr '[:upper:]' '[:lower:]')"
-    echo "### $s"
-    echo
-    for i in "${!UDIDS[@]}"; do
-      labels=()
-      for size in "${SIZE_KEYS[@]}"; do labels+=("${DEVICE_CLASSES[$i]}-$size"); done
-      [[ $REDUCE_MOTION -eq 1 ]] && labels+=("${DEVICE_CLASSES[$i]}-default-reduce-motion")
-      for label in "${labels[@]}"; do
-        files=("$OUT"/"$label"-"$scen"-*.png)
-        [[ -e "${files[0]}" ]] || continue
-        echo "**${NAMES[$i]} · ${label#${DEVICE_CLASSES[$i]}-}**"
-        echo
-        header=""; sep=""; row=""
-        # Step numbers are zero-padded, but sort numerically anyway so an
-        # older, unpadded capture still comes out in order.
-        while IFS= read -r f; do
-          b="$(basename "$f" .png)"
-          rest="${b##*-$scen-}"   # "<nn>-<step>"
-          step="${rest#*-}"
-          header+="| $step "; sep+="|---"; row+="| ![]($(printf 'https://raw.githubusercontent.com/%s/pr-evidence/%s/%s.png' "$slug" "$PUBLISH" "$b")) "
-        done < <(printf '%s\n' "${files[@]}" | awk -v scen="$scen" '{ n=$0; sub(".*-" scen "-", "", n); sub("-.*", "", n); print n+0 "\t" $0 }' | sort -n | cut -f2-)
-        echo "$header|"; echo "$sep|"; echo "$row|"; echo
-      done
-    done
-  done
 fi

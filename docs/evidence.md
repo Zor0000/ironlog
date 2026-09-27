@@ -1,13 +1,14 @@
-# PR evidence: deterministic screenshots
+# Local evidence: deterministic screenshots
 
 Every UI change should ship with screenshots that anyone can regenerate.
 `scripts/capture_evidence.sh` drives the app through fixed **scenarios** on a
-fixed **device × Dynamic Type** matrix and writes stably-named PNGs.
+fixed **device × Dynamic Type** matrix and writes stably-named PNGs to the
+local, git-ignored `evidence/` directory.
 
 ```bash
 scripts/capture_evidence.sh AddExercise                      # one scenario, all devices/sizes
 scripts/capture_evidence.sh --all --reduce-motion            # everything, plus Reduce Motion
-scripts/capture_evidence.sh ExerciseFinder --publish issue-39 # push + print a Markdown table
+scripts/capture_evidence.sh ExerciseFinder --out evidence/issue-39
 ```
 
 Output lands in `evidence/<UTC stamp>/` (git-ignored):
@@ -20,12 +21,9 @@ MANIFEST.txt   # commit (+dirty if uncommitted changes), seed, simulators + runt
 ```
 
 A reused `--out` must be empty or passed with `--clean`. A failing scenario
-fails the run (exit 1) and nothing is published. Publishing from a dirty
-worktree is refused unless `--allow-dirty`, and the stamp says `+dirty`.
-
-`--publish <label>` copies the set to the `pr-evidence` orphan branch under
-`<label>/` and prints Markdown you can paste straight into the PR body. Nothing
-binary lands in `main`.
+fails the run (exit 1); its local output and logs remain in the selected output
+directory for inspection. Captures stay on the local machine and are not
+pushed to GitHub.
 
 ## Matrix
 
@@ -98,5 +96,5 @@ transitions disabled, `prefers-reduced-motion` on, fonts awaited and the
 page pre-scrolled so lazy images have loaded. Capture the production build
 (`next start`), not `next dev`, so the dev overlay never appears. Playwright's
 Chromium is used when installed; otherwise it falls back to Google Chrome
-(`--channel chrome` forces it). Publish the PNGs to `pr-evidence/<label>/`
-the same way as the iOS captures.
+(`--channel chrome` forces it). The screenshots remain in the local ignored
+`evidence/` directory.

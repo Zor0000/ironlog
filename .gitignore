@@ -39,6 +39,25 @@ next-env.d.ts
 skills-lock.json
 bun.lock
 
+# Local-only app tooling and launch settings
+.asc/project.json
+.claude/launch.json
+
+# Local UI captures and retired source screenshots
+.codex/screenshots/
+/images/history.png
+/images/stats.png
+/screenshot-studio/public/screenshots/03-history.png
+/screenshot-studio/public/screenshots/04-stats.png
+/website/public/file.svg
+/website/public/globe.svg
+/website/public/next.svg
+/website/public/vercel.svg
+/website/public/window.svg
+
+# Evidence directories retained locally after removing GitHub copies
+/issue-*/
+
 # Environment / secrets
 .env
 .env.local
@@ -65,5 +84,5 @@ artifacts/
 # Logs
 *.log
 
-# Evidence captures (scripts/capture_evidence.sh); published to the pr-evidence branch instead
+# Evidence captures (scripts/capture_evidence.sh), kept local
 evidence/
