@@ -122,7 +122,7 @@ tags from an allowlist the client supplies, never safety constraints).
 Presentation has `FuelBuddyPresentationRequest` / `FuelBuddyPresentationResponse`.
 Both share `schemaVersion` and
 `policyVersion`. Full schema: `docs/ironfuel/fuel-buddy-llm-contract.md` (#35),
-mirrored in `IronLog/IronFuel/FuelBuddyLLMContract.swift`.
+mirrored in `Setzo/IronFuel/FuelBuddyLLMContract.swift`.
 
 ## Data flow rules
 
@@ -221,7 +221,7 @@ good answer.
 At the time of writing there is no IronFuel code in this repository —
 `FoodRuleEngine`, `EnergyFirewall`, `FoodFactsProvider` and the local Fuel
 Buddy are referenced by the issues but not yet committed. The follow-up PRs
-therefore add an isolated `IronLog/IronFuel/` module built against small
+therefore add an isolated `Setzo/IronFuel/` module built against small
 protocol seams (`ApprovedFood`, `FuelBuddyCandidate`, `passesCurrentRules`,
 `FuelBuddyLLMProvider`) so that the real engines can be dropped in without
 changing the guardrails.

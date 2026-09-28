@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="${APP_NAME:-IronLog}"
+APP_NAME="${APP_NAME:-Setzo}"
 BUNDLE_ID="${BUNDLE_ID:-com.parthjadhav.ironlog}"
-SKU="${SKU:-ironlog-ios}"
+SKU="${SKU:-setzo-ios}"
 PRIMARY_LOCALE="${PRIMARY_LOCALE:-en-US}"
 VERSION="${VERSION:-1.0}"
 

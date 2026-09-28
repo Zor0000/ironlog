@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Keep the existing Apple app's editable metadata consistent with Setzo."""
+
+import json
+import os
+import re
+import subprocess
+
+
+APP_ID = os.environ["ASC_APP_ID"]
+PRIVACY_URL = "https://zor0000.github.io/setzo/privacy.html"
+
+
+def asc(*args):
+    result = subprocess.run(
+        ["asc", *args, "--output", "json"],
+        check=True, capture_output=True, text=True,
+    )
+    return json.loads(result.stdout)
+
+
+def resources(payload, resource_type):
+    found = {}
+
+    def visit(value):
+        if isinstance(value, dict):
+            if value.get("type") == resource_type and "attributes" in value:
+                found[value["id"]] = value
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(payload)
+    return list(found.values())
+
+
+def renamed(value):
+    def replace(match):
+        old = match.group()
+        return "setzo" if old.islower() else "SETZO" if old.isupper() else "Setzo"
+
+    return re.sub("ironlog", replace, value, flags=re.IGNORECASE)
+
+
+def changed_fields(attributes, fields):
+    flags = []
+    for field, flag in fields.items():
+        old = attributes.get(field)
+        if isinstance(old, str) and renamed(old) != old:
+            flags.extend([flag, renamed(old)])
+    return flags
+
+
+def main():
+    app = resources(asc("apps", "view", "--id", APP_ID), "apps")[0]
+    primary_locale = app["attributes"]["primaryLocale"]
+    asc("apps", "rename", "--app", APP_ID, "--locale", primary_locale, "--name", "Setzo")
+
+    infos = resources(asc("localizations", "list", "--app", APP_ID,
+                          "--type", "app-info", "--paginate"), "appInfoLocalizations")
+    if not infos:
+        raise RuntimeError("No app info localizations returned after renaming")
+    for info in infos:
+        flags = changed_fields(info["attributes"], {
+            "subtitle": "--subtitle", "privacyPolicyText": "--privacy-policy-text",
+            "privacyChoicesUrl": "--privacy-choices-url",
+        })
+        asc("localizations", "update", "--type", "app-info", "--id", info["id"],
+            "--name", "Setzo", "--privacy-policy-url", PRIVACY_URL, *flags)
+
+    versions = resources(asc("localizations", "list", "--app", APP_ID,
+                             "--platform", "IOS", "--paginate"), "appStoreVersionLocalizations")
+    for version in versions:
+        flags = changed_fields(version["attributes"], {
+            "description": "--description", "keywords": "--keywords",
+            "promotionalText": "--promotional-text", "whatsNew": "--whats-new",
+            "marketingUrl": "--marketing-url", "supportUrl": "--support-url",
+        })
+        if flags:
+            asc("localizations", "update", "--id", version["id"], *flags)
+
+    betas = resources(asc("testflight", "app-localizations", "list", "--app", APP_ID,
+                          "--paginate"), "betaAppLocalizations")
+    for beta in betas:
+        flags = changed_fields(beta["attributes"], {
+            "description": "--description", "marketingUrl": "--marketing-url",
+            "tvOsPrivacyPolicy": "--tv-os-privacy-policy",
+        })
+        asc("testflight", "app-localizations", "update", "--id", beta["id"],
+            "--privacy-policy-url", PRIVACY_URL, *flags)
+
+    groups = resources(asc("testflight", "groups", "list", "--app", APP_ID,
+                           "--paginate"), "betaGroups")
+    for group in groups:
+        old = group["attributes"]["name"]
+        if renamed(old) != old:
+            asc("testflight", "groups", "edit", "--id", group["id"], "--name", renamed(old))
+
+    # Apple identifiers remain stable; their editable display names can change.
+    for identifier, name in [
+        ("com.parthjadhav.ironlog", "Setzo"),
+        ("com.parthjadhav.ironlog.IronLogWidget", "Setzo Widget"),
+    ]:
+        bundles = resources(asc("bundle-ids", "list", "--identifier", identifier), "bundleIds")
+        for bundle in bundles:
+            if bundle["attributes"]["name"] != name:
+                asc("bundle-ids", "update", "--id", bundle["id"], "--name", name)
+
+    verified = resources(asc("localizations", "list", "--app", APP_ID,
+                             "--type", "app-info", "--paginate"), "appInfoLocalizations")
+    assert verified and all(v["attributes"]["name"] == "Setzo" for v in verified)
+    assert all(v["attributes"]["privacyPolicyUrl"] == PRIVACY_URL for v in verified)
+    print(json.dumps({"appId": APP_ID, "name": "Setzo", "privacyPolicyUrl": PRIVACY_URL,
+                      "locales": [v["attributes"]["locale"] for v in verified]}))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except subprocess.CalledProcessError as error:
+        # asc diagnostics contain the Apple API error; credentials stay in its auth store.
+        raise SystemExit(error.stderr.strip() or str(error)) from error

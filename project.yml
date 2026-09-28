@@ -1,4 +1,4 @@
-name: IronLog
+name: Setzo
 options:
   bundleIdPrefix: com.parthjadhav
   deploymentTarget:
@@ -15,25 +15,25 @@ settings:
     MARKETING_VERSION: 1.0
     CURRENT_PROJECT_VERSION: 3
     DEVELOPMENT_TEAM: 75LRT8TRQY
-# NOTE: IronLog.xcodeproj is committed and authoritative (XcodeGen is not run at
+# NOTE: Setzo.xcodeproj is committed and authoritative (XcodeGen is not run at
 # checkout). Keep this file in sync when adding targets, but the .xcodeproj wins.
 targets:
-  IronLog:
+  Setzo:
     type: application
     platform: iOS
     sources:
-      - path: IronLog
+      - path: Setzo
     resources:
-      - path: IronLog/Resources
+      - path: Setzo/Resources
     dependencies:
-      - target: IronLogWidgetExtension
+      - target: SetzoWidgetExtension
       - package: Liveline
       - package: Supabase
     settings:
       base:
         BASE_BUNDLE_ID: com.parthjadhav.ironlog
         PRODUCT_BUNDLE_IDENTIFIER: $(BASE_BUNDLE_ID)
-        INFOPLIST_FILE: IronLog/Info.plist
+        INFOPLIST_FILE: Setzo/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: 1
         SUPPORTS_MACCATALYST: NO
@@ -47,30 +47,30 @@ targets:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: Apple Distribution
-          PROVISIONING_PROFILE_SPECIFIER: IronLog App Store
+          PROVISIONING_PROFILE_SPECIFIER: Setzo App Store
     scheme:
       testTargets:
-        - IronLogTests
-        - IronLogUITests
+        - SetzoTests
+        - SetzoUITests
   # Lock-screen / Dynamic Island Live Activity for logging sets without unlocking.
   # The four shared Live/* files are compiled into both the app and this extension;
   # AppState+LiveActivity.swift stays app-only (it references AppState).
-  IronLogWidgetExtension:
+  SetzoWidgetExtension:
     type: app-extension
     platform: iOS
     sources:
-      - path: IronLogWidget
-      - path: IronLog/Live/LiveWorkoutModels.swift
-      - path: IronLog/Live/WorkoutActivityAttributes.swift
-      - path: IronLog/Live/LiveWorkoutEngine.swift
-      - path: IronLog/Live/WorkoutLiveActivityIntents.swift
+      - path: SetzoWidget
+      - path: Setzo/Live/LiveWorkoutModels.swift
+      - path: Setzo/Live/WorkoutActivityAttributes.swift
+      - path: Setzo/Live/LiveWorkoutEngine.swift
+      - path: Setzo/Live/WorkoutLiveActivityIntents.swift
     resources:
-      - path: IronLogWidget/PrivacyInfo.xcprivacy
+      - path: SetzoWidget/PrivacyInfo.xcprivacy
     settings:
       base:
         BASE_BUNDLE_ID: com.parthjadhav.ironlog
         PRODUCT_BUNDLE_IDENTIFIER: $(BASE_BUNDLE_ID).IronLogWidget
-        INFOPLIST_FILE: IronLogWidget/Info.plist
+        INFOPLIST_FILE: SetzoWidget/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: 1
         SWIFT_VERSION: 5.0
@@ -79,26 +79,26 @@ targets:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: Apple Distribution
-          PROVISIONING_PROFILE_SPECIFIER: IronLog Widget App Store
-  IronLogTests:
+          PROVISIONING_PROFILE_SPECIFIER: Setzo Widget App Store
+  SetzoTests:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: IronLogTests
+      - path: SetzoTests
     dependencies:
-      - target: IronLog
+      - target: Setzo
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.ironlog.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.setzo.tests
         GENERATE_INFOPLIST_FILE: YES
-  IronLogUITests:
+  SetzoUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
-      - path: IronLogUITests
+      - path: SetzoUITests
     dependencies:
-      - target: IronLog
+      - target: Setzo
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.ironlog.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.parthjadhav.setzo.uitests
         GENERATE_INFOPLIST_FILE: YES

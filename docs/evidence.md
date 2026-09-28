@@ -59,7 +59,7 @@ Same commit + same simulator runtime + same inputs ⇒ the same pixels.
 
 ## Adding a scenario
 
-Scenarios are test methods in `IronLogUITests/EvidenceCaptureTests.swift`:
+Scenarios are test methods in `SetzoUITests/EvidenceCaptureTests.swift`:
 
 ```swift
 func testScenarioMyScreen() {

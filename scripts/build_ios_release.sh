@@ -40,8 +40,8 @@ cd "$ROOT_DIR"
 
 simulator_build=(
   xcodebuild
-  -project IronLog.xcodeproj
-  -scheme IronLog
+  -project Setzo.xcodeproj
+  -scheme Setzo
   -destination 'generic/platform=iOS Simulator'
 )
 if (( ${#build_settings[@]} > 0 )); then
@@ -50,7 +50,7 @@ fi
 simulator_build+=(build)
 "${simulator_build[@]}"
 
-rm -rf build/IronLog.xcarchive build/export
+rm -rf build/Setzo.xcarchive build/export
 
 # No -allowProvisioningUpdates on either step below, deliberately. That flag is
 # what let a fresh runner ask Apple for a new signing certificate on every build
@@ -60,10 +60,10 @@ rm -rf build/IronLog.xcarchive build/export
 # the machine first. If something is missing, this fails — which is the point.
 archive_build=(
   xcodebuild
-  -project IronLog.xcodeproj
-  -scheme IronLog
+  -project Setzo.xcodeproj
+  -scheme Setzo
   -destination 'generic/platform=iOS'
-  -archivePath build/IronLog.xcarchive
+  -archivePath build/Setzo.xcarchive
 )
 if (( ${#authentication_args[@]} > 0 )); then
   archive_build+=("${authentication_args[@]}")
@@ -77,7 +77,7 @@ archive_build+=(archive)
 export_build=(
   xcodebuild
   -exportArchive
-  -archivePath build/IronLog.xcarchive
+  -archivePath build/Setzo.xcarchive
   -exportPath build/export
   -exportOptionsPlist ExportOptions.plist
 )
@@ -86,4 +86,4 @@ if (( ${#authentication_args[@]} > 0 )); then
 fi
 "${export_build[@]}"
 
-echo "Exported build/export/IronLog.ipa"
+echo "Exported build/export/Setzo.ipa"

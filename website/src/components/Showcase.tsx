@@ -13,7 +13,7 @@ export function Showcase() {
           </h2>
           <p className="mt-5 text-lg text-muted">
             Real screenshots — no mockup fluff. This is exactly what training with
-            IronLog looks like.
+            Setzo looks like.
           </p>
         </Reveal>
 

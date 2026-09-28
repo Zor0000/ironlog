@@ -2,15 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IPA_PATH="${IPA_PATH:-$ROOT_DIR/build/export/IronLog.ipa}"
+IPA_PATH="${IPA_PATH:-$ROOT_DIR/build/export/Setzo.ipa}"
 APP_ID="${ASC_APP_ID:-}"
 TESTFLIGHT_GROUP_ID="${TESTFLIGHT_GROUP_ID:-}"
 
 if [[ ! -f "$IPA_PATH" ]]; then
   echo "Missing IPA at $IPA_PATH"
   echo "Run from repo root:"
-  echo "  xcodebuild -project IronLog.xcodeproj -scheme IronLog -destination 'generic/platform=iOS' -archivePath build/IronLog.xcarchive archive"
-  echo "  xcodebuild -exportArchive -archivePath build/IronLog.xcarchive -exportPath build/export -exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates"
+  echo "  xcodebuild -project Setzo.xcodeproj -scheme Setzo -destination 'generic/platform=iOS' -archivePath build/Setzo.xcarchive archive"
+  echo "  xcodebuild -exportArchive -archivePath build/Setzo.xcarchive -exportPath build/export -exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates"
   exit 1
 fi
 
@@ -34,7 +34,7 @@ bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_info_p
 if command -v asc >/dev/null 2>&1 && [[ -n "$APP_ID" ]]; then
   if [[ -n "${ASC_API_KEY_ID:-}" && -n "${ASC_API_ISSUER_ID:-}" && -n "${ASC_API_PRIVATE_KEY_PATH:-}" ]]; then
     asc auth login \
-      --name ironlog \
+      --name setzo \
       --key-id "$ASC_API_KEY_ID" \
       --issuer-id "$ASC_API_ISSUER_ID" \
       --private-key "$ASC_API_PRIVATE_KEY_PATH"
@@ -70,7 +70,7 @@ else
 Missing App Store Connect upload credentials.
 
 Preferred asc CLI upload:
-  asc auth login --name ironlog --key-id <KEY_ID> --issuer-id <ISSUER_ID> --private-key-path /path/to/AuthKey_<KEY_ID>.p8
+  asc auth login --name setzo --key-id <KEY_ID> --issuer-id <ISSUER_ID> --private-key-path /path/to/AuthKey_<KEY_ID>.p8
   ASC_APP_ID=<app-store-connect-app-id> scripts/upload_testflight.sh
 
 One-shot asc CLI auth + upload:

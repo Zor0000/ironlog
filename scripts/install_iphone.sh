@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# install_iphone.sh — build IronLog and install it on a connected iPhone using
+# install_iphone.sh — build Setzo and install it on a connected iPhone using
 # your OWN free Apple ID (a personal team), no TestFlight and no paid account.
 #
 # Day-to-day use, after the one-time setup below:
@@ -9,13 +9,13 @@
 #
 # It signs with command-line overrides only, so it does NOT disturb the App
 # Store / TestFlight release config (which still targets the original team).
-# It installs under a separate bundle id (…ironlog.dev) so this dev build sits
+# It installs under a separate bundle id (…setzo.dev) so this dev build sits
 # next to the TestFlight build as its own icon instead of replacing it.
 #
 # ───────────────────────── ONE-TIME SETUP (you do this once) ─────────────────
 #  1. Connect your iPhone with a cable. On the phone tap "Trust This Computer"
 #     and enter your passcode.
-#  2. Open IronLog.xcodeproj in Xcode → click the "IronLog" target → Signing &
+#  2. Open Setzo.xcodeproj in Xcode → click the "Setzo" target → Signing &
 #     Capabilities → check "Automatically manage signing" → under Team, "Add an
 #     Account…" and sign in with your normal (free) Apple ID. Pick the team that
 #     looks like "Your Name (Personal Team)".
@@ -26,7 +26,7 @@
 #     developer Apple ID → Trust.
 #  5. Find your Team ID: Xcode → Settings (⌘,) → Accounts → select your Apple ID
 #     → it's the 10-character string next to your Personal Team. Put it below or
-#     export it: `export IRONLOG_TEAM_ID=XXXXXXXXXX`
+#     export it: `export SETZO_TEAM_ID=XXXXXXXXXX`
 #
 #  After that, every future install is just running this script. NOTE: free
 #  Apple ID builds STOP LAUNCHING AFTER 7 DAYS — just re-run this script to
@@ -37,16 +37,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # --- config (override via env) ----------------------------------------------
-TEAM_ID="${IRONLOG_TEAM_ID:-}"                 # your Personal Team ID (required)
-DEV_BUNDLE_ID="${IRONLOG_DEV_BUNDLE_ID:-com.neerajchormale.ironlog.dev}"
-SCHEME="IronLog"
-PROJECT="IronLog.xcodeproj"
+TEAM_ID="${SETZO_TEAM_ID:-${IRONLOG_TEAM_ID:-}}" # supports existing local setup
+DEV_BUNDLE_ID="${SETZO_DEV_BUNDLE_ID:-com.neerajchormale.setzo.dev}"
+SCHEME="Setzo"
+PROJECT="Setzo.xcodeproj"
 DERIVED="build/dd-device"
 
 if [[ -z "$TEAM_ID" ]]; then
   cat >&2 <<'EOF'
 ✗ No Team ID set.
-  Set it once with:  export IRONLOG_TEAM_ID=XXXXXXXXXX
+  Set it once with:  export SETZO_TEAM_ID=XXXXXXXXXX
   (Xcode → Settings → Accounts → your Apple ID → 10-char Team ID next to
    "Your Name (Personal Team)"), then re-run this script.
 EOF
@@ -90,7 +90,7 @@ echo "  found device: $DEVICE_ID"
 
 # --- build (signed with your personal team, dev bundle id) -------------------
 # BASE_BUNDLE_ID drives BOTH targets: the app becomes $DEV_BUNDLE_ID and the
-# Live Activity widget becomes $DEV_BUNDLE_ID.IronLogWidget, so they stay a
+# Live Activity widget becomes $DEV_BUNDLE_ID.SetzoWidget, so they stay a
 # matching app/extension pair without colliding.
 echo "▸ Building $SCHEME for device (team $TEAM_ID, bundle $DEV_BUNDLE_ID)…"
 xcodebuild \
@@ -118,4 +118,4 @@ xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"
 echo "▸ Launching…"
 xcrun devicectl device process launch --device "$DEVICE_ID" "$DEV_BUNDLE_ID" >/dev/null 2>&1 || true
 
-echo "✓ Done. IronLog (dev) is on your iPhone. Re-run within 7 days to keep it alive."
+echo "✓ Done. Setzo (dev) is on your iPhone. Re-run within 7 days to keep it alive."

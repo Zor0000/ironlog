@@ -1,15 +1,23 @@
-# IronLog iOS Release
+# Setzo iOS Release
 
 Native iOS bundle:
 
-- Project: `IronLog.xcodeproj`
-- Scheme: `IronLog`
+- Project: `Setzo.xcodeproj`
+- Scheme: `Setzo`
 - Bundle ID: `com.parthjadhav.ironlog`
-- App Store Connect app name: `IronLog Strength Journal`
+- App Store Connect app name: `Setzo`
 - App Store Connect app ID: `6771258872`
 - Team ID: `75LRT8TRQY`
 - Version: `1.0`
-- Build: `3`
+- Build: GitHub Actions run ID for CI releases
+
+## Setzo rename
+
+September 29 verification: 252 unit tests passed on iOS 26.5 / iPhone 17, and the website production build passed. The TestFlight workflow synchronizes the app name, listing and beta metadata, privacy URLs, and bundle display names before uploading a new build.
+
+The source project, schemes, targets, release artifacts, website, and GitHub repository use Setzo. Apple keeps the existing app ID `6771258872`, bundle ID `com.parthjadhav.ironlog`, and widget bundle ID `com.parthjadhav.ironlog.IronLogWidget`. These identifiers are intentionally stable for updates and signing.
+
+The existing local data directory, authentication storage keys, Live Activity storage keys, and `ironlog:v1:` set metadata remain stable to preserve saved workouts and sessions. New authentication links use `setzo://`; legacy links are still accepted. Existing build history and historical evidence retain the branding used when they were produced.
 
 ## September 27 readiness follow-up
 
@@ -17,7 +25,7 @@ The five follow-up blockers are addressed: free-text dietary restrictions fail c
 
 The Precise Location declaration was removed. Session uploads no longer send route coordinates, including any legacy route data. The widget privacy manifest is included in the release sources and built extension.
 
-The public policy at https://zor0000.github.io/ironlog/privacy.html was deployed on September 27 and compared byte-for-byte with `privacy.html`. Policy-only hosting commit: `d2e938c223ecd8abaa414f6975c93d0101c99b82`. Its `[skip actions]` message suppresses the repository's TestFlight push workflow; only GitHub Pages was deployed.
+The public policy was deployed on September 27 and compared byte-for-byte with `privacy.html`; its current location after the rename is https://zor0000.github.io/setzo/privacy.html. Policy-only hosting commit: `d2e938c223ecd8abaa414f6975c93d0101c99b82`. Its `[skip actions]` message suppresses the repository's TestFlight push workflow; only GitHub Pages was deployed.
 
 Local verification: 233 unit tests passed on iOS 26.5 / iPhone 17. Static analysis and an unsigned generic iOS Release build passed. App and widget manifests passed plist validation in the source and built bundles. All 20 UI tests passed; four screenshot-capture tests were intentionally skipped. The UI run still emitted the previously observed nonfatal SwiftUI frame-dimension warnings.
 
@@ -39,13 +47,13 @@ Before submission, create a fresh signed archive, export its privacy report, and
 The current native app has been verified with:
 
 ```bash
-xcodebuild test -project IronLog.xcodeproj -scheme IronLog -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
-xcodebuild -project IronLog.xcodeproj -scheme IronLog -destination 'generic/platform=iOS Simulator' build
-xcodebuild -project IronLog.xcodeproj -scheme IronLog -destination 'generic/platform=iOS' -archivePath build/IronLog.xcarchive archive
-xcodebuild -exportArchive -archivePath build/IronLog.xcarchive -exportPath build/export -exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates
+xcodebuild test -project Setzo.xcodeproj -scheme Setzo -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+xcodebuild -project Setzo.xcodeproj -scheme Setzo -destination 'generic/platform=iOS Simulator' build
+xcodebuild -project Setzo.xcodeproj -scheme Setzo -destination 'generic/platform=iOS' -archivePath build/Setzo.xcarchive archive
+xcodebuild -exportArchive -archivePath build/Setzo.xcarchive -exportPath build/export -exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates
 ```
 
-The exported IPA is `build/export/IronLog.ipa`.
+The exported IPA is `build/export/Setzo.ipa`.
 
 The IPA contains:
 
@@ -62,13 +70,13 @@ The export summary shows an App Store distribution profile and `beta-reports-act
 
 The App Store Connect record has been created:
 
-- App name: `IronLog Strength Journal`
+- App name: `Setzo`
 - App ID: `6771258872`
 - Bundle ID: `com.parthjadhav.ironlog`
-- SKU: `ironlog-ios`
+- SKU: `ironlog-ios` (immutable existing Apple record)
 - Primary language: `English (U.S.)`
 
-The exact `IronLog` App Store name was unavailable, so the App Store Connect listing uses `IronLog Strength Journal`; the native bundle and in-app identity remain `IronLog`.
+The product is renamed to `Setzo`. The existing Apple app record, bundle IDs, and SKU are retained so TestFlight users receive an update to the same app.
 
 If this app record ever needs to be recreated, the public App Store Connect API cannot create new app records. This repo includes an `asc iris` helper for the private web-session flow:
 
@@ -110,7 +118,7 @@ Persistent `asc` API key auth:
 
 ```bash
 asc auth login \
-  --name ironlog \
+  --name setzo \
   --key-id <KEY_ID> \
   --issuer-id <ISSUER_ID> \
   --private-key-path /path/to/AuthKey_<KEY_ID>.p8

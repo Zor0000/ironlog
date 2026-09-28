@@ -35,7 +35,7 @@ export function Footer() {
         </nav>
       </div>
       <div className="border-t border-line/60 py-5 text-center text-xs text-muted-2">
-        © {new Date().getFullYear()} IronLog · A personal gym tracker · Not
+        © {new Date().getFullYear()} Setzo · A personal gym tracker · Not
         affiliated with Apple Inc.
       </div>
     </footer>

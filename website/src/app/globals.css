@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* IronLog palette (mirrors IronLog/Theme.swift) */
+  /* Setzo palette (mirrors Setzo/Theme.swift) */
   --color-ink: #0a0a0a;
   --color-surface: #121214;
   --color-surface-2: #1a1a1d;

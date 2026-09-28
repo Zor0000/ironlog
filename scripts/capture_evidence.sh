@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# capture_evidence.sh — deterministic screenshots of IronLog for local evidence.
+# capture_evidence.sh — deterministic screenshots of Setzo for local evidence.
 #
-# Runs the scenarios in IronLogUITests/EvidenceCaptureTests.swift across a
+# Runs the scenarios in SetzoUITests/EvidenceCaptureTests.swift across a
 # device × Dynamic Type matrix on the iOS Simulator, exports every screenshot
 # with a stable name in the local, git-ignored evidence directory.
 #
@@ -66,7 +66,7 @@ if [[ $ALL -eq 1 ]]; then
   SCENARIOS=()
   while IFS= read -r line; do
     SCENARIOS+=("$line")
-  done < <(grep -oE 'func testScenario[A-Za-z0-9]+\(' IronLogUITests/EvidenceCaptureTests.swift | sed -E 's/func testScenario([A-Za-z0-9]+)\(/\1/')
+  done < <(grep -oE 'func testScenario[A-Za-z0-9]+\(' SetzoUITests/EvidenceCaptureTests.swift | sed -E 's/func testScenario([A-Za-z0-9]+)\(/\1/')
 fi
 if [[ ${#SCENARIOS[@]} -eq 0 ]]; then
   echo "usage: $0 [options] <Scenario>... | --all   (see --help)" >&2
@@ -160,7 +160,7 @@ BUILD_DEST="id=${UDIDS[0]}"
 if [[ $SKIP_BUILD -eq 0 ]]; then
   echo "▸ build-for-testing"
   xcodebuild build-for-testing \
-    -project IronLog.xcodeproj -scheme IronLog \
+    -project Setzo.xcodeproj -scheme Setzo \
     -destination "$BUILD_DEST" \
     CODE_SIGNING_ALLOWED=NO -quiet
 fi
@@ -168,7 +168,7 @@ fi
 # ── Run the matrix ───────────────────────────────────────────────────────────
 ONLY_TESTING=()
 for s in "${SCENARIOS[@]}"; do
-  ONLY_TESTING+=("-only-testing:IronLogUITests/EvidenceCaptureTests/testScenario${s}")
+  ONLY_TESTING+=("-only-testing:SetzoUITests/EvidenceCaptureTests/testScenario${s}")
 done
 
 read_reduce_motion() {
@@ -243,7 +243,7 @@ run_one() {
     TEST_RUNNER_EVIDENCE_CONTENT_SIZE="$category" \
     TEST_RUNNER_EVIDENCE_SEED="$SEED" \
     xcodebuild test-without-building \
-      -project IronLog.xcodeproj -scheme IronLog \
+      -project Setzo.xcodeproj -scheme Setzo \
       -destination "id=$udid" \
       "${ONLY_TESTING[@]}" \
       -resultBundlePath "$bundle" \

@@ -18,9 +18,9 @@
   <key>provisioningProfiles</key>
   <dict>
     <key>com.parthjadhav.ironlog</key>
-    <string>IronLog App Store</string>
+    <string>Setzo App Store</string>
     <key>com.parthjadhav.ironlog.IronLogWidget</key>
-    <string>IronLog Widget App Store</string>
+    <string>Setzo Widget App Store</string>
   </dict>
   <key>stripSwiftSymbols</key>
   <true/>

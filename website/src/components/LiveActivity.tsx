@@ -23,7 +23,7 @@ export function LiveActivity() {
             <span className="text-lime">unlocking your phone.</span>
           </h2>
           <p className="mt-5 max-w-md text-lg leading-relaxed text-muted">
-            IronLog puts a live workout card on your Lock Screen and in the
+            Setzo puts a live workout card on your Lock Screen and in the
             Dynamic Island. Dial in the weight and reps, tap{" "}
             <span className="font-semibold text-fg">Log set</span>, and the rest
             timer restarts — all between sets, without ever breaking your flow.
@@ -81,7 +81,7 @@ function LockScreen() {
   );
 }
 
-/** Faithful recreation of IronLogWidget/WorkoutLiveActivity.swift LockScreenView. */
+/** Faithful recreation of SetzoWidget/WorkoutLiveActivity.swift LockScreenView. */
 function LiveActivityCard() {
   return (
     <div className="rounded-2xl bg-[#121214] p-4 shadow-2xl ring-1 ring-white/[0.06]">

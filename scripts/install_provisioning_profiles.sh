@@ -15,8 +15,8 @@ APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.parthjadhav.ironlog}"
 WIDGET_BUNDLE_ID="${WIDGET_BUNDLE_ID:-com.parthjadhav.ironlog.IronLogWidget}"
 # These names are also in the Xcode project and ExportOptions.plist; changing one
 # means changing all three.
-APP_PROFILE_NAME="${APP_PROFILE_NAME:-IronLog App Store}"
-WIDGET_PROFILE_NAME="${WIDGET_PROFILE_NAME:-IronLog Widget App Store}"
+APP_PROFILE_NAME="${APP_PROFILE_NAME:-Setzo App Store}"
+WIDGET_PROFILE_NAME="${WIDGET_PROFILE_NAME:-Setzo Widget App Store}"
 
 for required in ASC_API_KEY_ID ASC_API_ISSUER_ID ASC_API_PRIVATE_KEY_PATH; do
   if [[ -z "${!required:-}" ]]; then
@@ -29,7 +29,7 @@ work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
 
 asc auth login \
-  --name ironlog \
+  --name setzo \
   --key-id "$ASC_API_KEY_ID" \
   --issuer-id "$ASC_API_ISSUER_ID" \
   --private-key "$ASC_API_PRIVATE_KEY_PATH" > /dev/null

@@ -17,12 +17,12 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "IronLog — Track your gains. Own your progress.",
+  title: "Setzo — Track your gains. Own your progress.",
   description:
     "A fast, free, no-nonsense gym tracker. Log every set, run any split, watch your PRs and streaks grow — with a lock-screen Live Activity so you never break your flow.",
   icons: { icon: "/favicon.svg" },
   openGraph: {
-    title: "IronLog — Track your gains. Own your progress.",
+    title: "Setzo — Track your gains. Own your progress.",
     description:
       "A fast, free, no-nonsense gym tracker with a lock-screen Live Activity.",
     type: "website",

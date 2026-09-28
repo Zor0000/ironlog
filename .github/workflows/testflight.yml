@@ -52,6 +52,14 @@ jobs:
           chmod 600 "$RUNNER_TEMP/AuthKey.p8"
           echo "ASC_API_PRIVATE_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
 
+      - name: Sync Setzo name and Apple metadata
+        run: |
+          asc auth login --name setzo \
+            --key-id "$ASC_API_KEY_ID" \
+            --issuer-id "$ASC_API_ISSUER_ID" \
+            --private-key "$ASC_API_PRIVATE_KEY_PATH" > /dev/null
+          python3 scripts/sync_apple_branding.py
+
       - name: Select an installed iPhone simulator
         run: |
           set -euo pipefail
@@ -63,10 +71,10 @@ jobs:
       - name: Run unit tests
         run: |
           xcodebuild test \
-            -project IronLog.xcodeproj \
-            -scheme IronLog \
+            -project Setzo.xcodeproj \
+            -scheme Setzo \
             -destination "id=$SIMULATOR_ID" \
-            -only-testing:IronLogTests \
+            -only-testing:SetzoTests \
             CODE_SIGNING_ALLOWED=NO
 
       # Without a distribution certificate already on the runner, xcodebuild's

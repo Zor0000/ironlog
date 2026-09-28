@@ -39,7 +39,7 @@ if [[ $# -eq 0 ]]; then
   /usr/bin/openssl req -new -newkey rsa:2048 -nodes \
     -keyout "$KEY_PATH" \
     -out "$CSR_PATH" \
-    -subj "/CN=IronLog CI/O=IronLog/C=US" \
+    -subj "/CN=Setzo CI/O=Setzo/C=US" \
     2> /dev/null
   chmod 600 "$KEY_PATH"
 
@@ -93,7 +93,7 @@ password="$(uuidgen)"
 /usr/bin/openssl pkcs12 -export \
   -inkey "$KEY_PATH" \
   -in "$SIGNING_DIR/distribution.pem" \
-  -name "IronLog CI distribution" \
+  -name "Setzo CI distribution" \
   -out "$P12_PATH" \
   -passout pass:"$password"
 chmod 600 "$P12_PATH"

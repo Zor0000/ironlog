@@ -1,7 +1,7 @@
-# IronLog — Demo Website
+# Setzo — Demo Website
 
-A single-page marketing site for **IronLog**, built with Next.js 16, React 19 and
-Tailwind v4. Dark + lime aesthetic that mirrors the app (`IronLog/Theme.swift`).
+A single-page marketing site for **Setzo**, built with Next.js 16, React 19 and
+Tailwind v4. Dark + lime aesthetic that mirrors the app (`Setzo/Theme.swift`).
 
 ## Run it
 
@@ -22,7 +22,7 @@ npm run build    # production build
 - `public/screenshots/` — real iOS screenshots captured from the app on the
   iPhone 17 Pro simulator (seeded demo data). The `Showcase` section renders them
   in device frames as App Store–style slides; the `LiveActivity` section is a
-  faithful CSS recreation of `IronLogWidget/WorkoutLiveActivity.swift`.
+  faithful CSS recreation of `SetzoWidget/WorkoutLiveActivity.swift`.
 
 ## Where the screenshots come from
 
@@ -37,7 +37,7 @@ xcrun simctl io booted screenshot 02-log.png
 App Store / Google Play framed exports can be produced from the sibling
 `../screenshot-studio` project (scaffolded with the
 [`app-store-screenshots`](https://github.com/ParthJadhav/app-store-screenshots)
-skill and pre-filled with IronLog content): run `npm run dev` there and click
+skill and pre-filled with Setzo content): run `npm run dev` there and click
 **Export bundle** in a desktop browser.
 
 ## Deploy

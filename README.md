@@ -1,8 +1,8 @@
-# IronLog
+# Setzo
 
 > **Launching soon** — a focused, free gym and running tracker for iPhone.
 
-IronLog makes it easy to plan a workout, log every set, record a run, see the progress you have earned, and get food ideas that respect your rules. It is a native SwiftUI app backed by Supabase—no ads and no unnecessary noise.
+Setzo makes it easy to plan a workout, log every set, record a run, see the progress you have earned, and get food ideas that respect your rules. It is a native SwiftUI app backed by Supabase—no ads and no unnecessary noise.
 
 ## Built to keep momentum
 
@@ -12,7 +12,7 @@ IronLog makes it easy to plan a workout, log every set, record a run, see the pr
 - **See your progress** — follow sessions, streaks, total sets, training volume, and exercise-specific trends.
 - **Food ideas with your rules** — create a private Nutrition Passport and screen catalog meal options against your restrictions; check actual labels and cross-contact for allergies.
 
-## Inside IronLog
+## Inside Setzo
 
 <table>
   <tr>
@@ -39,7 +39,7 @@ IronLog makes it easy to plan a workout, log every set, record a run, see the pr
 
 ## Privacy at a glance
 
-Without an account, workout and run entries stay on this iPhone. With an account, saved workouts, runs/walks, records, routines, and their notes sync through Supabase; a guest workout is uploaded after sign-in. IronLog does not collect or upload GPS or location data. The full Nutrition Passport, body weight, water log, and unfinished workout draft stay on-device. When you use Fuel Buddy, your meal request and relevant food preferences go through Supabase to Groq to generate dish names; guests use a separate anonymous Supabase session. The app links the Supabase Swift SDK and Liveline; it has no advertising or analytics SDK. See the [privacy policy](privacy.html) and [App Store privacy checklist](docs/ios-release.md#app-store-privacy-checklist) before setting the App Store Connect privacy answers.
+Without an account, workout and run entries stay on this iPhone. With an account, saved workouts, runs/walks, records, routines, and their notes sync through Supabase; a guest workout is uploaded after sign-in. Setzo does not collect or upload GPS or location data. The full Nutrition Passport, body weight, water log, and unfinished workout draft stay on-device. When you use Fuel Buddy, your meal request and relevant food preferences go through Supabase to Groq to generate dish names; guests use a separate anonymous Supabase session. The app links the Supabase Swift SDK and Liveline; it has no advertising or analytics SDK. See the [privacy policy](privacy.html) and [App Store privacy checklist](docs/ios-release.md#app-store-privacy-checklist) before setting the App Store Connect privacy answers.
 
 ## Tech Stack
 
@@ -64,13 +64,13 @@ Without an account, workout and run entries stay on this iPhone. With an account
 
    Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the function. Keep the service-role key server-side; never add it to the iOS app.
 
-4. To enable Google sign-in, add the Google OAuth client in **Authentication → Providers**. In Google Cloud, set the consent-screen app name to **IronLog** and register this Supabase callback exactly:
+4. To enable Google sign-in, add the Google OAuth client in **Authentication → Providers**. In Google Cloud, set the consent-screen app name to **Setzo** and register this Supabase callback exactly:
 
    ```text
    https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
    ```
 
-   The iOS deep link (`ironlog://auth/callback`) belongs in Supabase Auth's Redirect URLs, not in Google Cloud.
+   The iOS deep link (`setzo://auth/callback`) belongs in Supabase Auth's Redirect URLs, not in Google Cloud.
 
 ### Supabase source of truth
 
@@ -84,7 +84,7 @@ The scheduled keep-alive workflow queries the database with the server-side `ser
 
 ## 2. Configure Your Keys
 
-Point the app at your own Supabase project in [`IronLog/Services/SupabaseService.swift`](IronLog/Services/SupabaseService.swift): set `projectURL` and `anonKey`.
+Point the app at your own Supabase project in [`Setzo/Services/SupabaseService.swift`](Setzo/Services/SupabaseService.swift): set `projectURL` and `anonKey`.
 
 > The anon key is safe to commit — it's public by design, and RLS is what protects your data.
 
@@ -94,20 +94,20 @@ Point the app at your own Supabase project in [`IronLog/Services/SupabaseService
 
 **Requirements:** macOS with Xcode 15+.
 
-1. Open `IronLog.xcodeproj` in Xcode.
+1. Open `Setzo.xcodeproj` in Xcode.
 2. Pick a simulator or your iPhone and press **⌘R**.
 
 The project is defined in [`project.yml`](project.yml); if you change its structure, regenerate with `xcodegen generate` (`brew install xcodegen`).
 
 ### Install to your iPhone for free (no TestFlight)
 
-You can put IronLog on your own iPhone with a free Apple ID — no paid developer account. Run:
+You can put Setzo on your own iPhone with a free Apple ID — no paid developer account. Run:
 
 ```bash
 ./scripts/install_iphone.sh
 ```
 
-The [script header](scripts/install_iphone.sh) lists the one-time setup (sign in with your Apple ID, enable Developer Mode, set `IRONLOG_TEAM_ID`). After that, `git pull && ./scripts/install_iphone.sh` reinstalls the latest build.
+The [script header](scripts/install_iphone.sh) lists the one-time setup (sign in with your Apple ID, enable Developer Mode, set `SETZO_TEAM_ID`). After that, `git pull && ./scripts/install_iphone.sh` reinstalls the latest build.
 
 > Free-signed builds stop launching after **7 days** — just re-run the script to refresh.
 
@@ -116,9 +116,9 @@ The [script header](scripts/install_iphone.sh) lists the one-time setup (sign in
 ## Repo Layout
 
 ```
-IronLog/            SwiftUI app (Views/, Services/, Live/ = Live Activity)
-IronLogWidget/      Lock-screen Live Activity widget extension
-IronLogTests/       Unit tests
+Setzo/            SwiftUI app (Views/, Services/, Live/ = Live Activity)
+SetzoWidget/      Lock-screen Live Activity widget extension
+SetzoTests/       Unit tests
 images/             README product screenshots
 supabase/           Database migrations, RLS tests, and account-deletion Edge Function
 scripts/            build_ios_release.sh, upload_testflight.sh, install_iphone.sh

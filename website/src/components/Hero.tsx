@@ -43,7 +43,7 @@ export function Hero() {
               href="#get"
               className="w-full rounded-xl bg-lime px-6 py-3.5 text-center text-base font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-[0.98] sm:w-auto"
             >
-              Get IronLog free
+              Get Setzo free
             </a>
             <a
               href={SITE.github}
@@ -80,7 +80,7 @@ export function Hero() {
             <div className="mx-auto max-h-[520px] max-w-[300px] sm:max-h-[600px] sm:max-w-[320px]">
               <PhoneFrame
                 src="/screenshots/02-log.png"
-                alt="IronLog logging a Push workout with a running rest timer"
+                alt="Setzo logging a Push workout with a running rest timer"
                 priority
                 sizes="(max-width: 1024px) 68vw, 320px"
               />

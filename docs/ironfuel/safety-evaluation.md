@@ -1,14 +1,14 @@
 # IronFuel safety & hallucination evaluation
 
-Tracks #38. The suite lives in `IronLogTests/IronFuelSafetyEvaluationTests.swift`
+Tracks #38. The suite lives in `SetzoTests/IronFuelSafetyEvaluationTests.swift`
 and runs as part of the normal unit tests — no model, no network, no
 credentials. It proves that adding a model cannot weaken the safety contract
 described in `llm-variety-layer.md`.
 
 ```bash
-xcodebuild test -project IronLog.xcodeproj -scheme IronLog \
+xcodebuild test -project Setzo.xcodeproj -scheme Setzo \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:IronLogTests/IronFuelSafetyEvaluationTests CODE_SIGNING_ALLOWED=NO
+  -only-testing:SetzoTests/IronFuelSafetyEvaluationTests CODE_SIGNING_ALLOWED=NO
 ```
 
 ## What is evaluated

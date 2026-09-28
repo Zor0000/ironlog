@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "appName": "IronLog",
+  "appName": "Setzo",
   "themeId": "dark-bold",
   "connectedCanvas": false,
   "locales": [
@@ -16,7 +16,7 @@
         "id": "il_hero",
         "layout": "hero",
         "label": {
-          "en": "MEET IRONLOG"
+          "en": "MEET SETZO"
         },
         "headline": {
           "en": "Track your gains.\nOwn your progress."

@@ -17,7 +17,7 @@ export function Logo({ className = "" }: { className?: string }) {
         <LogoMark className="w-5 text-lime" />
       </span>
       <span className="font-display text-2xl tracking-wide text-fg">
-        Iron<span className="text-lime">Log</span>
+        Set<span className="text-lime">zo</span>
       </span>
     </span>
   );

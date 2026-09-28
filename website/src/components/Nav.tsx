@@ -6,7 +6,7 @@ export function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-line/60 bg-ink/70 backdrop-blur-xl">
       <nav className="page flex h-16 items-center justify-between">
-        <a href="#top" aria-label="IronLog home">
+        <a href="#top" aria-label="Setzo home">
           <Logo />
         </a>
 
@@ -28,7 +28,7 @@ export function Nav() {
             target="_blank"
             rel="noreferrer"
             className="hidden size-9 place-items-center rounded-lg text-muted ring-1 ring-line transition-colors hover:text-fg hover:ring-white/20 sm:grid"
-            aria-label="IronLog on GitHub"
+            aria-label="Setzo on GitHub"
           >
             <GithubIcon className="size-4" />
           </a>
@@ -36,7 +36,7 @@ export function Nav() {
             href="#get"
             className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink transition-transform hover:scale-[1.03] active:scale-95"
           >
-            Get IronLog
+            Get Setzo
           </a>
         </div>
       </nav>

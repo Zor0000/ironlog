@@ -2,8 +2,8 @@
 
 Provider-neutral request/response schemas for the optional LLM layer described
 in `llm-variety-layer.md`. Tracks #35. Swift types live in
-`IronLog/IronFuel/FuelBuddyLLMContract.swift` and round-trip these examples in
-`IronLogTests/FuelBuddyLLMContractTests.swift`.
+`Setzo/IronFuel/FuelBuddyLLMContract.swift` and round-trip these examples in
+`SetzoTests/FuelBuddyLLMContractTests.swift`.
 
 Two stages, one version:
 
