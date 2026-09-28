@@ -36,9 +36,22 @@ jobs:
           swift --version
 
       - name: Install asc CLI
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: "1"
-        run: brew install asc
+        run: |
+          set -euo pipefail
+          version=5.7.0
+          tool_dir="$RUNNER_TEMP/asc-cli"
+          mkdir -p "$tool_dir"
+          cd "$tool_dir"
+          base="https://github.com/rorkai/App-Store-Connect-CLI/releases/download/$version"
+          binary="asc_${version}_macOS_arm64"
+          curl --fail --location --silent --show-error "$base/$binary" -o "$binary"
+          curl --fail --location --silent --show-error "$base/asc_${version}_checksums.txt" -o checksums.txt
+          awk -v binary="$binary" '$2 == binary { print }' checksums.txt > selected-checksum.txt
+          test -s selected-checksum.txt
+          shasum -a 256 -c selected-checksum.txt
+          mv "$binary" asc
+          chmod +x asc
+          echo "$tool_dir" >> "$GITHUB_PATH"
 
       - name: Prepare App Store Connect authentication
         env:
