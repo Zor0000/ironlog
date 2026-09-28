@@ -50,7 +50,11 @@ struct NutritionPassport: Codable, Equatable, Identifiable {
     }
 
     var id = UUID()
-    var sexContext: SexContext?
+    var sexContext: SexContext? {
+        didSet {
+            if !supportsPregnancyQuestion { isPregnantOrBreastfeeding = false }
+        }
+    }
     var goals: [Goal] = []
     var energyTarget: Int?
     var targetSource: TargetSource = .none
@@ -76,8 +80,18 @@ struct NutritionPassport: Codable, Equatable, Identifiable {
         sexContext != nil && !goals.isEmpty && safetyReviewedAt != nil
     }
 
+    var supportsPregnancyQuestion: Bool { sexContext == .female }
+
+    /// Also clears legacy values restored from disk or cloud snapshots.
+    var normalized: NutritionPassport {
+        var copy = self
+        if !supportsPregnancyQuestion { copy.isPregnantOrBreastfeeding = false }
+        return copy
+    }
+
     var requiresProfessionalGuidance: Bool {
-        isMinor || isPregnantOrBreastfeeding || hasEatingDisorderHistory || followsPrescribedDiet
+        isMinor || (supportsPregnancyQuestion && isPregnantOrBreastfeeding)
+            || hasEatingDisorderHistory || followsPrescribedDiet
     }
 
     var goalStack: [String] { goals.map(\.rawValue) }
@@ -130,6 +144,11 @@ struct FuelOption: Identifiable, Equatable {
     let ingredients: Set<String>
     let ruleTags: Set<String>
     let approvedFacts: [String]
+    var mealTypes: Set<String> = []
+    var mealTags: Set<String> = []
+    var cookingAbility: NutritionPassport.CookingAbility = .basic
+    var preparation: String = ""
+    var recipeIngredients: [String] = []
 }
 
 enum FuelBuddyOutcome: Equatable {
@@ -139,141 +158,4 @@ enum FuelBuddyOutcome: Equatable {
     case routed(String)
     case offline([FuelOption])
     case error(String)
-}
-
-enum FuelBuddyRecommendationEngine {
-    static let catalog: [FuelOption] = [
-        FuelOption(id: "chana-rice", name: "Chana masala with rice", cuisine: "Indian", prepMinutes: 25, budget: .value,
-                   ingredients: ["chickpea", "tomato", "onion", "rice"], ruleTags: ["vegan", "vegetarian", "halal"],
-                   approvedFacts: ["25 minute preparation", "value-friendly pantry ingredients", "Indian cuisine"]),
-        FuelOption(id: "paneer-roti", name: "Paneer bhurji with roti", cuisine: "Indian", prepMinutes: 20, budget: .flexible,
-                   ingredients: ["milk", "paneer", "wheat", "tomato", "onion"], ruleTags: ["vegetarian", "halal"],
-                   approvedFacts: ["20 minute preparation", "Indian cuisine", "requires basic cooking"]),
-        FuelOption(id: "tofu-bowl", name: "Ginger tofu rice bowl", cuisine: "East Asian", prepMinutes: 20, budget: .flexible,
-                   ingredients: ["soy", "tofu", "rice", "ginger"], ruleTags: ["vegan", "vegetarian", "halal"],
-                   approvedFacts: ["20 minute preparation", "East Asian cuisine", "one-bowl meal"]),
-        FuelOption(id: "chicken-wrap", name: "Chicken hummus wrap", cuisine: "Mediterranean", prepMinutes: 15, budget: .flexible,
-                   ingredients: ["chicken", "chickpea", "sesame", "wheat", "hummus"], ruleTags: ["halal"],
-                   approvedFacts: ["15 minute preparation", "Mediterranean cuisine", "assembly-friendly"]),
-        FuelOption(id: "yogurt-oats", name: "Fruit and yogurt oats", cuisine: "Everyday", prepMinutes: 5, budget: .value,
-                   ingredients: ["milk", "yogurt", "oats", "fruit"], ruleTags: ["vegetarian", "halal"],
-                   approvedFacts: ["5 minute preparation", "no stove required", "value-friendly"]),
-        FuelOption(id: "jain-poha", name: "Jain vegetable poha", cuisine: "Indian", prepMinutes: 20, budget: .value,
-                   ingredients: ["rice flakes", "peas", "peanut"], ruleTags: ["vegan", "vegetarian", "jain", "halal"],
-                   approvedFacts: ["20 minute preparation", "Jain rules supported", "value-friendly"]),
-        FuelOption(id: "salmon-potato", name: "Salmon with potatoes", cuisine: "European", prepMinutes: 30, budget: .flexible,
-                   ingredients: ["fish", "salmon", "potato"], ruleTags: ["kosher"],
-                   approvedFacts: ["30 minute preparation", "European cuisine", "requires confident cooking"])
-    ]
-
-    static func recommend(passport: NutritionPassport?, query: String, isOffline: Bool = false) -> FuelBuddyOutcome {
-        guard let passport, passport.isComplete else {
-            return .blocked("Finish your Nutrition Passport before requesting personalized options.")
-        }
-        guard !passport.requiresProfessionalGuidance else {
-            return .routed("Your Passport calls for professional guidance. Use advice from your clinician or dietitian rather than personalized app suggestions.")
-        }
-
-        switch FuelBuddySafetyPolicy.screen(request: query) {
-        case .blocked(let reason):
-            return .blocked(blockedCopy(reason))
-        case .routed:
-            return .routed("This request needs support from a qualified clinician or dietitian. Fuel Buddy will not improvise a recommendation.")
-        case .allowed:
-            break
-        }
-
-        // Free text is not a reliable source of structured dietary constraints.
-        // Fail closed and ask the user to save them before offering catalog food.
-        let restrictionPattern = #"\b(allerg\w*|intoleran\w*|celiac|coeliac|gluten|dairy|lactose|vegan|vegetarian|jain|halal|kosher|avoid\w*|without|exclude\w*|restrict\w*|sensitiv\w*|react\w*|omit\w*|except|pescatarian|pescetarian|no|not|free|cannot|can.t|don.t|won.t)\b"#
-        if query.range(of: restrictionPattern, options: [.regularExpression, .caseInsensitive]) != nil {
-            return .blocked("Save any allergies or dietary restrictions in your Nutrition Passport first, then request a meal without restriction instructions. Fuel Buddy cannot safely interpret those instructions from free text.")
-        }
-
-        let matches = catalog
-            .filter { passesHardRules($0, passport: passport) }
-            .filter { option in
-                let normalized = query.lowercased()
-                guard !normalized.isEmpty else { return true }
-                let searchable = ([option.name, option.cuisine] + option.approvedFacts).joined(separator: " ").lowercased()
-                let usefulWords = normalized.split(separator: " ").filter { $0.count > 3 }
-                return usefulWords.isEmpty || usefulWords.contains { searchable.contains($0) }
-            }
-            .sorted { lhs, rhs in
-                let lhsCuisine = passport.preferredCuisines.contains { lhs.cuisine.localizedCaseInsensitiveContains($0) }
-                let rhsCuisine = passport.preferredCuisines.contains { rhs.cuisine.localizedCaseInsensitiveContains($0) }
-                if lhsCuisine != rhsCuisine { return lhsCuisine }
-                if lhs.prepMinutes != rhs.prepMinutes { return lhs.prepMinutes < rhs.prepMinutes }
-                return lhs.name < rhs.name
-            }
-
-        guard !matches.isEmpty else { return .noCompatibleResult }
-        let result = Array(matches.prefix(3))
-        return isOffline ? .offline(result) : .suggestions(result)
-    }
-
-    static func passesHardRules(_ option: FuelOption, passport: NutritionPassport) -> Bool {
-        let identityAllowed: Bool = switch passport.dietaryIdentity {
-        case .omnivore: true
-        case .vegetarian: option.ruleTags.contains("vegetarian")
-        case .vegan: option.ruleTags.contains("vegan")
-        case .jain: option.ruleTags.contains("jain")
-        case .halal: option.ruleTags.contains("halal")
-        case .kosher: option.ruleTags.contains("kosher")
-        }
-        guard identityAllowed else { return false }
-
-        let forbidden = (passport.allergies + passport.intolerances + passport.exclusions + passport.neverSuggest)
-            .map(normalize)
-            .filter { !$0.isEmpty }
-        let optionTerms = option.ingredients.map(normalize) + [normalize(option.name)]
-        guard !forbidden.contains(where: { rule in optionTerms.contains(where: { matchesRule(rule, ingredient: $0) }) }) else {
-            return false
-        }
-        guard option.prepMinutes <= passport.maxCookingMinutes else { return false }
-        if passport.budget == .value, option.budget != .value { return false }
-        return !passport.dislikes.map(normalize).contains { dislike in
-            optionTerms.contains { $0.contains(dislike) || dislike.contains($0) }
-        }
-    }
-
-    private static func normalize(_ value: String) -> String {
-        value.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Match common food-family names as well as ingredient spellings. A
-    /// simple substring check misses "dairy" versus milk or "groundnut"
-    /// versus peanut. This remains a catalog filter, not a label or
-    /// cross-contact verification for a prepared food.
-    private static func matchesRule(_ rule: String, ingredient: String) -> Bool {
-        let singular = rule.hasSuffix("s") && rule.count > 3 ? String(rule.dropLast()) : rule
-        if ingredient.contains(rule) || rule.contains(ingredient)
-            || ingredient.contains(singular) || singular.contains(ingredient) { return true }
-        let families: [Set<String>] = [
-            ["dairy", "milk", "lactose", "paneer", "yogurt", "curd", "cheese"],
-            ["gluten", "wheat", "roti", "wrap", "oat"],
-            ["soy", "soya", "tofu"],
-            ["peanut", "groundnut", "nut"],
-            ["chickpea", "garbanzo", "hummus"],
-            ["sesame", "tahini"],
-            ["fish", "seafood", "salmon"]
-        ]
-        return families.contains { family in
-            (family.contains(rule) || family.contains(singular)) && ingredient.split(whereSeparator: { !$0.isLetter }).contains { word in
-                let term = String(word)
-                let singularTerm = term.hasSuffix("s") && term.count > 3 ? String(term.dropLast()) : term
-                return family.contains(term) || family.contains(singularTerm)
-            }
-        }
-    }
-
-    private static func blockedCopy(_ reason: FuelBuddySafetyPolicy.BlockReason) -> String {
-        switch reason {
-        case .supplementsOrSteroids: "Fuel Buddy only suggests catalog foods, not supplements or steroids."
-        case .diagnosisOrTreatment: "Fuel Buddy cannot diagnose or treat a condition. Please ask a qualified clinician."
-        case .crashDietOrCompensation: "Fuel Buddy will not use food as punishment or support unsafe restriction."
-        case .allergyBypass: "Passport allergies are hard rules and cannot be overridden."
-        case .dietaryRuleBypass: "Passport belief and dietary rules are hard rules and cannot be overridden."
-        }
-    }
 }

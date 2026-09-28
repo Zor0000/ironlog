@@ -33,13 +33,13 @@ IronLog makes it easy to plan a workout, log every set, record a run, see the pr
 - **Lock-screen Live Activity** (iOS) — log sets from the Lock Screen / Dynamic Island without unlocking
 - **Draft persistence** — an in-progress workout survives app restarts
 - **Progress** — switch between chronological history and sessions, streaks, volume, trends, and auto-detected PRs
-- **IronFuel** — private Nutrition Passport, safety gates, deterministic hard-rule filtering, and offline catalog fallback
+- **IronFuel** — local Nutrition Passport, safety gates, and AI-generated dish names checked against food preferences
 - **Water tracker** — daily 8-glass counter
 - **Auth + cloud sync** — Supabase Auth (email/password or optional Google sign-in) with Row Level Security
 
 ## Privacy at a glance
 
-Without an account, entries stay on this iPhone. With an account, saved workouts, runs/walks, records, routines, and their notes sync through Supabase; a guest workout is uploaded after sign-in. IronLog does not collect or upload GPS or location data. The Nutrition Passport, IronFuel queries and recommendations, body weight, water log, and unfinished workout draft stay on-device even while signed in. The app links the Supabase Swift SDK and Liveline; it has no advertising or analytics SDK. See the [privacy policy](privacy.html) and [App Store privacy checklist](docs/ios-release.md#app-store-privacy-checklist) before setting the App Store Connect privacy answers.
+Without an account, workout and run entries stay on this iPhone. With an account, saved workouts, runs/walks, records, routines, and their notes sync through Supabase; a guest workout is uploaded after sign-in. IronLog does not collect or upload GPS or location data. The full Nutrition Passport, body weight, water log, and unfinished workout draft stay on-device. When you use Fuel Buddy, your meal request and relevant food preferences go through Supabase to Groq to generate dish names; guests use a separate anonymous Supabase session. The app links the Supabase Swift SDK and Liveline; it has no advertising or analytics SDK. See the [privacy policy](privacy.html) and [App Store privacy checklist](docs/ios-release.md#app-store-privacy-checklist) before setting the App Store Connect privacy answers.
 
 ## Tech Stack
 

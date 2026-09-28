@@ -247,6 +247,111 @@ final class IronLogUITests: XCTestCase {
         XCTAssertTrue(app.buttons["create-nutrition-passport-button"].waitForExistence(timeout: 3))
     }
 
+    func testIronFuelReturnsCompatibleMealFromReadyPassport() {
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_IronFuelPassport", "ready", "UITest_IronFuelState", "generated"]
+        app.launch()
+        app.buttons["IronFuel"].tap()
+
+        let requestField = app.textFields["fuel-buddy-request-field"]
+        XCTAssertTrue(requestField.waitForExistence(timeout: 3))
+        requestField.tap()
+        requestField.typeText("Indian dinner")
+        app.buttons["fuel-buddy-submit-button"].tap()
+
+        XCTAssertTrue(app.staticTexts["Paneer Bhurji"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Vegetable Pulao"].exists)
+        XCTAssertTrue(app.staticTexts["Masoor Dal"].exists)
+        XCTAssertFalse(app.staticTexts["On-device"].exists)
+    }
+
+    func testIronFuelScreenshotRequestsAndStaleResultClearing() {
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_IronFuelPassport", "omnivore", "UITest_IronFuelState", "generated"]
+        app.launch()
+        app.buttons["IronFuel"].tap()
+        let requestField = app.textFields["fuel-buddy-request-field"]
+        XCTAssertTrue(requestField.waitForExistence(timeout: 3))
+        requestField.tap()
+        requestField.typeText("Quick egg rice")
+        app.buttons["fuel-buddy-submit-button"].tap()
+        XCTAssertTrue(app.staticTexts["Egg Fried Rice"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Chana masala with rice"].exists)
+        XCTAssertTrue(app.keyboards.allElementsBoundByIndex.isEmpty)
+        app.swipeUp()
+        let eggShot = XCTAttachment(screenshot: app.screenshot())
+        eggShot.name = "Quick egg rice matches eggs and rice"
+        eggShot.lifetime = .keepAlways
+        add(eggShot)
+        requestField.tap()
+        // Insert text so this assertion does not depend on the cursor location
+        // after scrolling back to a multiline text field.
+        requestField.typeText(" extra")
+        XCTAssertFalse(app.staticTexts["Egg Fried Rice"].exists, "Editing must clear old results")
+        app.terminate()
+        app.launch()
+        app.buttons["IronFuel"].tap()
+        XCTAssertTrue(requestField.waitForExistence(timeout: 3))
+        requestField.tap()
+        requestField.typeText("Heavy breakfast")
+        app.buttons["fuel-buddy-submit-button"].tap()
+        XCTAssertTrue(app.staticTexts["Paneer Bhurji with Toast"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["No compatible result"].exists)
+        app.swipeUp()
+        let breakfastShot = XCTAttachment(screenshot: app.screenshot())
+        breakfastShot.name = "Heavy breakfast has compatible options"
+        breakfastShot.lifetime = .keepAlways
+        add(breakfastShot)
+    }
+
+    func testIronFuelLiveGuestGeneration() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["IRONFUEL_LIVE_TESTS"] == "1", "Opt-in live Groq integration")
+        for query in ["Quick Indian dinner", "Protein rich breakfast", "Quick egg rice", "Heavy breakfast"] {
+            app.terminate()
+            app.launchArguments = ["UITest_ResetStore", "UITest_IronFuelPassport", "omnivore"]
+            app.launch()
+            app.buttons["IronFuel"].tap()
+            let field = app.textFields["fuel-buddy-request-field"]
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            field.tap()
+            field.typeText(query)
+            app.buttons["fuel-buddy-submit-button"].tap()
+            let first = app.staticTexts["fuel-buddy-dish-name-0"]
+            XCTAssertTrue(first.waitForExistence(timeout: 40), "Live AI should generate at least one dish")
+            XCTAssertFalse(app.staticTexts["No compatible result"].exists)
+            let count = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "fuel-buddy-dish-name-")).count
+            XCTAssertTrue((1...5).contains(count))
+            app.swipeUp()
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "Live AI guest - \(query)"
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+    }
+
+    func testPassportPregnancyVisibilityAndClearingWhenSexChanges() {
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_IronFuelPassport", "ready"]
+        app.launch()
+        app.buttons["IronFuel"].tap()
+        app.buttons["edit-nutrition-passport-button"].tap()
+        app.buttons["passport-sex-context-picker"].tap()
+        app.buttons["Female"].tap()
+        for _ in 0..<3 { app.buttons["passport-continue-button"].tap() }
+        let pregnancy = app.switches["passport-pregnancy-toggle"]
+        XCTAssertTrue(pregnancy.waitForExistence(timeout: 2))
+        pregnancy.tap()
+        for _ in 0..<3 { app.buttons["Back"].tap() }
+        app.buttons["passport-sex-context-picker"].tap()
+        app.buttons["Male"].tap()
+        for _ in 0..<3 { app.buttons["passport-continue-button"].tap() }
+        XCTAssertFalse(pregnancy.exists)
+        app.buttons["save-nutrition-passport-button"].tap()
+        XCTAssertTrue(app.buttons["fuel-buddy-submit-button"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["edit-nutrition-passport-button"].exists)
+        XCTAssertFalse(app.staticTexts["Use your care plan"].exists)
+    }
+
     func testHistoryCardOpensEditSheetAndSavesChanges() {
         // Log a quick workout first.
         app.buttons["Today"].tap()

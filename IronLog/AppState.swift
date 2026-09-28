@@ -876,8 +876,12 @@ final class AppState: ObservableObject {
         persistAll()
     }
 
+    func requestFuelBuddy(query: String, passport: NutritionPassport) async -> FuelBuddyResult {
+        await FuelBuddyService(provider: supabase.fuelBuddyProvider).recommend(passport: passport, query: query)
+    }
+
     func saveNutritionPassport(_ passport: NutritionPassport) {
-        nutritionPassport = passport
+        nutritionPassport = passport.normalized
         persistAll()
         showToast(passport.isComplete ? "Nutrition Passport saved" : "Passport progress saved")
     }
@@ -1388,7 +1392,7 @@ final class AppState: ObservableObject {
         currentWeightUnit = unitPreference
         bodyWeight = snapshot.bodyWeight
         currentBodyWeight = snapshot.bodyWeight ?? 0
-        nutritionPassport = snapshot.nutritionPassport
+        nutritionPassport = snapshot.nutritionPassport?.normalized
         timerMax = snapshot.timerPreset.flatMap { restTimerPresets.contains($0) ? $0 : nil } ?? 90
         timerSecs = timerMax
         hasOnboarded = snapshot.hasOnboarded ?? false
@@ -1656,11 +1660,11 @@ extension AppState {
         guard let index = arguments.firstIndex(of: "UITest_IronFuelPassport"),
               arguments.indices.contains(index + 1) else { return }
         switch arguments[index + 1] {
-        case "ready", "routed":
+        case "ready", "routed", "omnivore":
             nutritionPassport = NutritionPassport(
                 sexContext: .preferNotToSay,
                 goals: [.supportTraining, .steadyEnergy],
-                dietaryIdentity: .vegetarian,
+                dietaryIdentity: arguments[index + 1] == "omnivore" ? .omnivore : .vegetarian,
                 allergies: ["peanut"],
                 neverSuggest: ["mushroom"],
                 preferredCuisines: ["Indian"],

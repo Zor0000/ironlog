@@ -4,6 +4,7 @@ project_id = "dvqevdydldxjqjrpkkjc"
 verify_jwt = true
 
 [auth]
+enable_anonymous_sign_ins = true
 additional_redirect_urls = ["https://github.com/Zor0000/ironlog", "ironlog://auth/callback", "ironlog://auth/reset-password"]
 site_url = "http://localhost:3000"
 
@@ -28,3 +29,6 @@ max_client_conn = 200
 
 [storage.vector]
 enabled = false
+
+[functions.fuel-buddy]
+verify_jwt = true

@@ -6,6 +6,11 @@ struct IronFuelView: View {
     @State private var showDeleteConfirmation = false
     @State private var request = ""
     @State private var outcome: FuelBuddyOutcome?
+    @State private var resultSource: FuelBuddyResult.Source?
+    @State private var requestTask: Task<Void, Never>?
+    @State private var activeRequestID: UUID?
+    @State private var isLoading = false
+    @FocusState private var requestIsFocused: Bool
 
     private var status: EnergyFirewallStatus { EnergyFirewallStatus(passport: app.nutritionPassport) }
 
@@ -52,9 +57,10 @@ struct IronFuelView: View {
                 }
             }
         }
-        .onChange(of: app.nutritionPassport) { _, _ in
-            outcome = nil
-        }
+        .onChange(of: app.nutritionPassport) { _, _ in clearResult() }
+        .onChange(of: app.user?.id) { _, _ in clearResult() }
+        .onChange(of: request) { _, _ in clearResult() }
+        .onDisappear { clearResult() }
     }
 
     private var firewallCard: some View {
@@ -188,7 +194,7 @@ struct IronFuelView: View {
                         .foregroundStyle(Theme.muted2)
                 }
                 Spacer()
-                Label("Local", systemImage: "iphone.and.arrow.forward")
+                Label(sourceLabel, systemImage: "sparkles")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Theme.success)
             }
@@ -197,24 +203,38 @@ struct IronFuelView: View {
                 .lineLimit(2...4)
                 .fieldStyle()
                 .accessibilityIdentifier("fuel-buddy-request-field")
+                .focused($requestIsFocused)
                 .disabled(passport.requiresProfessionalGuidance)
 
             Button {
                 NativeFeedback.light()
-                outcome = debugOutcome ?? FuelBuddyRecommendationEngine.recommend(passport: passport, query: request)
+                submit(passport)
             } label: {
-                Label("Find compatible options", systemImage: "sparkles")
+                if isLoading {
+                    HStack {
+                        SwiftUI.ProgressView().tint(.black)
+                        Text("Finding options…")
+                    }
+                } else {
+                    Label("Find compatible options", systemImage: "sparkles")
+                }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || passport.requiresProfessionalGuidance)
+            .disabled(isLoading || request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || passport.requiresProfessionalGuidance)
             .accessibilityIdentifier("fuel-buddy-submit-button")
+
+            Text(sourceDetail)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.muted2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("fuel-buddy-source-detail")
 
             if passport.requiresProfessionalGuidance {
                 responseMessage(icon: "stethoscope", title: "Use your care plan", detail: status.detail, color: Theme.accent)
             } else if let outcome {
                 outcomeView(outcome)
             } else {
-                Label("All results pass Passport hard rules and the Energy Firewall before presentation.", systemImage: "checkmark.shield")
+                Label("Get 1–5 AI-generated dish names matched to your meal request and food preferences.", systemImage: "checkmark.shield")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.muted2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -227,11 +247,11 @@ struct IronFuelView: View {
     private func outcomeView(_ outcome: FuelBuddyOutcome) -> some View {
         switch outcome {
         case .suggestions(let options):
-            suggestionList(options, offline: false)
+            suggestionList(options)
         case .offline(let options):
-            suggestionList(options, offline: true)
+            suggestionList(options)
         case .noCompatibleResult:
-            responseMessage(icon: "magnifyingglass", title: "No compatible result", detail: "Nothing in the approved catalog satisfies every Passport hard rule and this request. Try a broader meal or add available foods—your rules were not relaxed.", color: Theme.muted2)
+            responseMessage(icon: "magnifyingglass", title: "No compatible result", detail: "AI could not find a suitable meal for that combination. Try changing the meal or cooking time, or review your Passport preferences.", color: Theme.muted2)
         case .blocked(let detail):
             responseMessage(icon: "hand.raised.fill", title: "That request is outside IronFuel", detail: detail, color: Theme.danger)
         case .routed(let detail):
@@ -241,34 +261,29 @@ struct IronFuelView: View {
         }
     }
 
-    private func suggestionList(_ options: [FuelOption], offline: Bool) -> some View {
+    private func suggestionList(_ options: [FuelOption]) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            if offline {
-                Label("Offline — using the approved on-device catalog", systemImage: "wifi.slash")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-            }
-            ForEach(options) { option in
-                VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                HStack(alignment: .top, spacing: 10) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.accent)
                     Text(option.name)
-                        .font(.system(size: 14, weight: .bold))
-                    Text(option.approvedFacts.joined(separator: "  •  "))
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.muted2)
+                        .accessibilityIdentifier("fuel-buddy-dish-name-\(index)")
+                        .font(.system(size: 15, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(11)
+                .padding(13)
                 .background(Theme.surface2)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
             }
-            Text("Why these: ranked only by approved catalog facts such as cuisine, preparation time, budget, and your recorded preferences.")
-                .font(.system(size: 10))
-                .foregroundStyle(Theme.muted)
-            Text("For allergies, check the actual product label and cross-contact risk before eating. Catalog filters cannot verify either.")
-                .font(.system(size: 10))
-                .foregroundStyle(Theme.accent)
+            if !(app.nutritionPassport?.allergies.isEmpty ?? true) {
+                Text("AI suggestions cannot verify allergens or cross-contact. Check ingredients before eating.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.muted2)
+            }
         }
     }
 
@@ -288,13 +303,65 @@ struct IronFuelView: View {
         .accessibilityIdentifier("fuel-buddy-response")
     }
 
+    private var sourceLabel: String {
+        if isLoading { return "Generating" }
+        return resultSource == .unavailable ? "Unavailable" : "AI"
+    }
+
+    private var sourceDetail: String {
+        switch resultSource {
+        case .ai: return "Generated for your request and Passport preferences."
+        case .unavailable: return "Check your connection and try again."
+        default: return "AI uses your meal request and food preferences to suggest dish names."
+        }
+    }
+
+    private func clearResult() {
+        requestTask?.cancel()
+        requestTask = nil
+        activeRequestID = nil
+        isLoading = false
+        outcome = nil
+        resultSource = nil
+    }
+
+    private func submit(_ passport: NutritionPassport) {
+        requestIsFocused = false
+        clearResult()
+        if let debugOutcome {
+            outcome = debugOutcome
+            if case .suggestions = debugOutcome { resultSource = .ai } else { resultSource = .safety }
+            return
+        }
+        let query = request
+        let requestID = UUID()
+        activeRequestID = requestID
+        isLoading = true
+        requestTask = Task { @MainActor in
+            let result = await app.requestFuelBuddy(query: query, passport: passport)
+            guard !Task.isCancelled, activeRequestID == requestID,
+                  app.nutritionPassport == passport, request == query else { return }
+            outcome = result.outcome
+            resultSource = result.source
+            isLoading = false
+            requestTask = nil
+        }
+    }
+
     private var debugOutcome: FuelBuddyOutcome? {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: "UITest_IronFuelState"), args.indices.contains(index + 1) else { return nil }
         switch args[index + 1] {
-        case "offline": return FuelBuddyRecommendationEngine.recommend(passport: app.nutritionPassport, query: request, isOffline: true)
-        case "error": return .error("The optional wording service is unavailable. Your Passport is safe; try again or use the local catalog.")
+        case "generated":
+            // Deterministic rendering fixture; live generation has a separate opt-in UI test.
+            let names = request.localizedCaseInsensitiveContains("egg") ? ["Egg Fried Rice", "Masala Egg Rice"]
+                : request.localizedCaseInsensitiveContains("breakfast") ? ["Paneer Bhurji with Toast", "Besan Cheela"]
+                : ["Paneer Bhurji", "Vegetable Pulao", "Masoor Dal"]
+            return .suggestions(names.map { FuelOption(id: $0, name: $0, cuisine: "Indian", prepMinutes: 20,
+                budget: .value, ingredients: [], ruleTags: [], approvedFacts: []) })
+        case "offline": return .error("You’re offline. Connect to generate AI meal suggestions.")
+        case "error": return .error("AI suggestions are unavailable. Please try again.")
         case "no-results": return .noCompatibleResult
         default: return nil
         }
@@ -326,7 +393,7 @@ private struct NutritionPassportEditor: View {
     let onSave: (NutritionPassport) -> Void
 
     init(passport: NutritionPassport, onSave: @escaping (NutritionPassport) -> Void) {
-        _draft = State(initialValue: passport)
+        _draft = State(initialValue: passport.normalized)
         self.onSave = onSave
     }
 
@@ -511,7 +578,10 @@ private struct NutritionPassportEditor: View {
     private var safetyStep: some View {
         VStack(alignment: .leading, spacing: 14) {
             SafetyToggle(title: "Under 18", detail: "A parent/guardian and qualified professional should guide nutrition.", isOn: $draft.isMinor)
-            SafetyToggle(title: "Pregnant or breastfeeding", detail: "Nutrition needs should be discussed with your care team.", isOn: $draft.isPregnantOrBreastfeeding)
+            if draft.supportsPregnancyQuestion {
+                SafetyToggle(title: "Pregnant or breastfeeding", detail: "Nutrition needs should be discussed with your care team.", isOn: $draft.isPregnantOrBreastfeeding)
+                    .accessibilityIdentifier("passport-pregnancy-toggle")
+            }
             SafetyToggle(title: "Eating-disorder history or concern", detail: "IronFuel will not personalize food suggestions.", isOn: $draft.hasEatingDisorderHistory)
             SafetyToggle(title: "Prescribed or professionally managed diet", detail: "Your clinician or dietitian's plan takes priority.", isOn: $draft.followsPrescribedDiet)
             Divider().overlay(Theme.border)
@@ -521,6 +591,7 @@ private struct NutritionPassportEditor: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .cardStyle()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("passport-safety-step")
     }
 

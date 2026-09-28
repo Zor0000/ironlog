@@ -9,6 +9,9 @@ class SupabaseService {
     private let projectURL = SupabaseService.projectURL
     private let anonKey = SupabaseService.anonKey
     private let client: SupabaseClient
+    // Separate storage prevents AI guest sessions from changing the app account,
+    // cloud-sync owner or local workout data.
+    private let fuelBuddyGuest = FuelBuddyGuestSession()
     private let sessionService = "IronLogSupabaseSession"
     private let sessionAccount = "current"
     private static let iso8601 = ISO8601DateFormatter()
@@ -824,4 +827,42 @@ struct RemoteSessionSet: Codable {
     var usesMinutes: Bool?
     var setType: String?
     var exercises: RemoteExerciseName?
+}
+
+extension SupabaseService {
+    var fuelBuddyProvider: FuelBuddyRecipeProvider {
+        let client = self.client
+        let signedIn = isAuthenticated
+        let guest = fuelBuddyGuest
+        return FuelBuddyHTTPProvider(
+            endpoint: Self.projectURL.appendingPathComponent("functions/v1/fuel-buddy"),
+            publicKey: Self.anonKey,
+            accessToken: {
+                if signedIn { return try await client.auth.session.accessToken }
+                return try await guest.accessToken()
+            }
+        )
+    }
+
+    fileprivate static func makeFuelBuddyGuestClient() -> SupabaseClient {
+        SupabaseClient(supabaseURL: projectURL, supabaseKey: anonKey,
+                       options: .init(auth: .init(storageKey: "ironlog-fuel-buddy-guest", emitLocalSessionAsInitialSession: true)))
+    }
+}
+
+private actor FuelBuddyGuestSession {
+    private let client = SupabaseService.makeFuelBuddyGuestClient()
+    private var pending: Task<String, Error>?
+
+    func accessToken() async throws -> String {
+        if let pending { return try await pending.value }
+        let client = self.client
+        let task = Task<String, Error> {
+            if client.auth.currentSession != nil { return try await client.auth.session.accessToken }
+            return try await client.auth.signInAnonymously().accessToken
+        }
+        pending = task
+        defer { pending = nil }
+        return try await task.value
+    }
 }
