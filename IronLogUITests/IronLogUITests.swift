@@ -70,6 +70,41 @@ final class IronLogUITests: XCTestCase {
         app.launch()
     }
 
+    func testHistoryCalendarFiltersWorkoutsAndNavigatesMonths() {
+        app.terminate()
+        app.launchArguments = ["-seedDemo", "YES", "-seedTab", "history", "-AppleLocale", "en_US"]
+        app.launch()
+        let month = app.staticTexts["history-calendar-month"]
+        XCTAssertTrue(month.waitForExistence(timeout: 8))
+        let initialMonth = month.label
+        let today = Calendar.current.component(.day, from: Date())
+        let todayButton = app.buttons["history-day-\(today)"]
+        XCTAssertTrue(todayButton.label.contains("2 workouts"))
+        todayButton.tap()
+        XCTAssertTrue(app.buttons["history-show-all"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "history-card-toggle").count, 2)
+        let selected = XCTAttachment(screenshot: app.screenshot())
+        selected.name = "history-calendar-selected-day"
+        selected.lifetime = .keepAlways
+        add(selected)
+        app.buttons["history-show-all"].tap()
+        XCTAssertGreaterThan(app.buttons.matching(identifier: "history-card-toggle").count, 2)
+        app.buttons["history-next-month"].tap()
+        XCTAssertNotEqual(month.label, initialMonth)
+        app.buttons["history-day-15"].tap()
+        XCTAssertTrue(app.staticTexts["No workouts on this day."].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "history-card-toggle").count, 0)
+        app.buttons["history-previous-month"].tap()
+        XCTAssertEqual(month.label, initialMonth)
+        XCTAssertFalse(app.buttons["history-show-all"].exists)
+        app.buttons["history-calendar-today"].tap()
+        XCTAssertEqual(app.buttons.matching(identifier: "history-card-toggle").count, 2)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "history-calendar-today"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testAuthScreenOffersPasswordResetAndGoogle() {
         app.terminate()
         app.launchArguments = ["UITest_ResetStore", "UITest_ShowAuth"]

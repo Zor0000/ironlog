@@ -9,13 +9,35 @@ struct HistoryView: View {
     @EnvironmentObject private var app: AppState
     @State private var deleteTarget: WorkoutSession?
     @State private var editTarget: WorkoutSession?
+    @State private var displayedMonth = Calendar.current.startOfDay(for: Date())
+    @State private var selectedDay: Date?
     var showTitle = true
+
+    private var visibleSessions: [WorkoutSession] {
+        HistoryCalendarMonth.sessions(app.sessions, on: selectedDay, calendar: .current)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if showTitle {
                     TitleBlock(title: "History", subtitle: "All your past sessions")
+                }
+                HistoryMonthCalendar(sessions: app.sessions, month: $displayedMonth, selectedDay: $selectedDay)
+
+                HStack {
+                    Text(selectedDay.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "Saved workouts")
+                        .font(.system(size: 17, weight: .semibold))
+                    Spacer()
+                    if selectedDay != nil {
+                        Button("All workouts") {
+                            NativeFeedback.selection()
+                            selectedDay = nil
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .accessibilityIdentifier("history-show-all")
+                    }
                 }
                 HStack(spacing: 10) {
                     Text(app.syncMessage)
@@ -40,8 +62,14 @@ struct HistoryView: View {
 
                 if app.sessions.isEmpty {
                     emptyState
+                } else if visibleSessions.isEmpty {
+                    Text("No workouts on this day.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.muted2)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
                 } else {
-                    ForEach(Array(app.sessions.enumerated()), id: \.element.id) { index, session in
+                    ForEach(Array(visibleSessions.enumerated()), id: \.element.id) { index, session in
                         HistoryCard(session: session, deleteTarget: $deleteTarget, editTarget: $editTarget)
                             .entrance(index)
                     }
@@ -90,6 +118,146 @@ struct HistoryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 42)
+    }
+}
+
+/// Calendar arithmetic uses local days (including daylight-saving changes),
+/// and the user's preferred first weekday rather than fixed 24-hour offsets.
+struct HistoryCalendarMonth {
+    let start: Date
+    let days: [Date?]
+
+    init(containing date: Date, calendar: Calendar) {
+        let start = calendar.dateInterval(of: .month, for: date)!.start
+        self.start = start
+        let leadingDays = (calendar.component(.weekday, from: start) - calendar.firstWeekday + 7) % 7
+        let dayCount = calendar.range(of: .day, in: .month, for: start)!.count
+        days = (0..<42).map { index in
+            let offset = index - leadingDays
+            guard (0..<dayCount).contains(offset) else { return nil }
+            return calendar.date(byAdding: .day, value: offset, to: start)
+        }
+    }
+
+    static func sessions(_ sessions: [WorkoutSession], on day: Date?, calendar: Calendar) -> [WorkoutSession] {
+        guard let day else { return sessions }
+        return sessions.filter { calendar.isDate($0.createdAt, inSameDayAs: day) }
+    }
+}
+
+private struct HistoryMonthCalendar: View {
+    let sessions: [WorkoutSession]
+    @Binding var month: Date
+    @Binding var selectedDay: Date?
+    @Environment(\.calendar) private var calendar
+
+    private var workoutCounts: [Date: Int] {
+        Dictionary(grouping: sessions) { calendar.startOfDay(for: $0.createdAt) }.mapValues(\.count)
+    }
+
+    var body: some View {
+        let page = HistoryCalendarMonth(containing: month, calendar: calendar)
+        let counts = workoutCounts
+        VStack(spacing: 10) {
+            HStack(spacing: 0) {
+                Text(month.formatted(.dateTime.month(.wide).year()))
+                    .font(.system(size: 20, weight: .semibold))
+                    .accessibilityIdentifier("history-calendar-month")
+                Spacer(minLength: 4)
+                Button("Today") {
+                    NativeFeedback.selection()
+                    month = Date()
+                    selectedDay = calendar.startOfDay(for: Date())
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .accessibilityIdentifier("history-calendar-today")
+                monthButton(offset: -1, symbol: "chevron.left", label: "Previous month")
+                monthButton(offset: 1, symbol: "chevron.right", label: "Next month")
+            }
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { index in
+                    let weekday = (calendar.firstWeekday - 1 + index) % 7
+                    Text(calendar.veryShortStandaloneWeekdaySymbols[weekday])
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.muted2)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityHidden(true)
+                }
+            }
+            VStack(spacing: 0) {
+                ForEach(0..<6, id: \.self) { week in
+                    HStack(spacing: 0) {
+                        ForEach(0..<7, id: \.self) { weekday in
+                            if let date = page.days[week * 7 + weekday] {
+                                dayButton(date, count: counts[date, default: 0])
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+            }
+            HStack(spacing: 6) {
+                Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                Text("Workout logged")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.muted2)
+                Spacer()
+            }
+        }
+        .padding(16)
+        .aspectRatio(1, contentMode: .fit)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border))
+    }
+
+    private func monthButton(offset: Int, symbol: String, label: String) -> some View {
+        Button {
+            NativeFeedback.selection()
+            let start = calendar.dateInterval(of: .month, for: month)!.start
+            if let next = calendar.date(byAdding: .month, value: offset, to: start) {
+                month = next
+                selectedDay = nil
+            }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 32, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(offset < 0 ? "history-previous-month" : "history-next-month")
+    }
+
+    private func dayButton(_ date: Date, count: Int) -> some View {
+        let isSelected = selectedDay.map { calendar.isDate($0, inSameDayAs: date) } ?? false
+        let isToday = calendar.isDateInToday(date)
+        return Button {
+            NativeFeedback.selection()
+            selectedDay = isSelected ? nil : date
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(calendar.component(.day, from: date))")
+                    .font(.system(size: 15, weight: isToday || isSelected ? .bold : .medium))
+                    .foregroundStyle(isSelected ? Theme.bg : (isToday ? Theme.accent : Theme.text))
+                    .frame(width: 30, height: 30)
+                    .background(isSelected ? Theme.accent : Color.clear, in: Circle())
+                    .overlay(Circle().stroke(isToday && !isSelected ? Theme.accent : .clear, lineWidth: 1))
+                Circle().fill(count > 0 ? Theme.accent : .clear).frame(width: 4, height: 4)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(date.formatted(date: .complete, time: .omitted)), \(count) workout\(count == 1 ? "" : "s")\(isToday ? ", today" : "")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("history-day-\(calendar.component(.day, from: date))")
     }
 }
 
