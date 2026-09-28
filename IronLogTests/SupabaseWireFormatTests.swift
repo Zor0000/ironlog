@@ -108,8 +108,33 @@ final class SupabaseWireFormatTests: XCTestCase {
         let keys = Set(try json(body).keys)
         XCTAssertEqual(keys, [
             "session_id", "exercise_id", "weight_kg", "reps",
-            "set_index", "bodyweight", "timed", "uses_minutes"
+            "set_index", "bodyweight", "timed", "uses_minutes", "set_type"
         ])
+    }
+
+    func testMixedSetBatchHasIdenticalKeysAndPreservesOptionalValues() throws {
+        let rows = [
+            RemoteSetInsert(sessionID: "s1", exerciseID: "weighted", weightKg: 60, reps: 7.5,
+                setIndex: 0, bodyweight: false, timed: false, usesMinutes: false, setType: "warmup"),
+            RemoteSetInsert(sessionID: "s1", exerciseID: "weighted", weightKg: 100, reps: 5,
+                setIndex: 1, bodyweight: false, timed: false, usesMinutes: false, setType: nil),
+            RemoteSetInsert(sessionID: "s1", exerciseID: "bodyweight", weightKg: nil, reps: 12,
+                setIndex: 2, bodyweight: true, timed: false, usesMinutes: false, setType: nil),
+            RemoteSetInsert(sessionID: "s1", exerciseID: "timed", weightKg: nil, reps: 1200,
+                setIndex: 3, bodyweight: false, timed: true, usesMinutes: true,
+                setType: encodeSetMetadata(type: nil, remark: "Steady pace"))
+        ]
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(rows)) as? [[String: Any]])
+        let expectedKeys: Set<String> = ["session_id", "exercise_id", "weight_kg", "reps",
+            "set_index", "bodyweight", "timed", "uses_minutes", "set_type"]
+        for row in payload { XCTAssertEqual(Set(row.keys), expectedKeys) }
+        XCTAssertEqual(payload[0]["weight_kg"] as? Double, 60)
+        XCTAssertEqual(payload[0]["set_type"] as? String, "warmup")
+        XCTAssertEqual(payload[0]["reps"] as? Double, 7.5)
+        XCTAssertTrue(payload[1]["set_type"] is NSNull)
+        XCTAssertTrue(payload[2]["weight_kg"] is NSNull)
+        XCTAssertTrue(payload[3]["weight_kg"] is NSNull)
+        XCTAssertEqual(decodeSetMetadata(payload[3]["set_type"] as? String).remark, "Steady pace")
     }
 
     func testExerciseUpsertBatchUsesOneRowPerUniqueName() throws {
@@ -322,14 +347,13 @@ final class SupabaseWireFormatTests: XCTestCase {
         XCTAssertTrue(sets[1].isWorkingSet)
     }
 
-    /// An ordinary set omits the key entirely rather than sending a null, which
-    /// is what lets the column keep its default.
-    func testAnOrdinarySetOmitsTheTypeKey() throws {
+    /// Explicit null keeps ordinary sets compatible with tagged sets in a batch.
+    func testAnOrdinarySetSendsNullType() throws {
         let body = RemoteSetInsert(
             sessionID: "s1", exerciseID: "e1", weightKg: 100, reps: 5,
             setIndex: 0, bodyweight: false, timed: false, usesMinutes: false, setType: nil
         )
-        XCTAssertFalse(try json(body).keys.contains("set_type"))
+        XCTAssertTrue(try json(body)["set_type"] is NSNull)
     }
 
     /// A loaded pull-up used to lose its bodyweight flag, because that was

@@ -1713,6 +1713,7 @@ private final class OfflineCloud: SupabaseService {
     var deletedSessionIDs: [String] = []
     var deletedRoutineIDs: [UUID] = []
     var uploadedRecordSets: [[PersonalRecord]] = []
+    var uploadError: Error?
     var loseNextUploadResponse = false
     var loseDeleteResponses = 0
     var loseWorkoutWipeResponses = 0
@@ -1745,6 +1746,7 @@ private final class OfflineCloud: SupabaseService {
         remoteRoutines.removeAll { $0.id == id }
     }
     override func backup(session local: WorkoutSession, records: [PersonalRecord]) async throws -> String {
+        if let uploadError { throw uploadError }
         if offline { throw URLError(.notConnectedToInternet) }
         let id = local.cloudID ?? local.id.uuidString.lowercased()
         remoteSessions.removeAll { $0.cloudID == id }
@@ -1944,6 +1946,28 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertTrue(relaunched.sessions.isEmpty)
     }
 
+    func testBackupFailureShowsFriendlyStatusAndRetryClearsIt() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        cloud.uploadError = SupabaseError.requestFailed("All object keys must match")
+        let pending = WorkoutSession(createdAt: Date(), split: "Strength", exercises: [], syncState: .pending)
+        try await store.save(AppSnapshot(sessions: [pending]), ownerID: "account-a")
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        XCTAssertEqual(app.sessions.first?.syncState, .failed)
+        XCTAssertEqual(app.syncMessage, "Saved on this device. Cloud backup pending. We'll retry automatically.")
+        let saved = try await store.load(ownerID: "account-a")
+        XCTAssertEqual(saved.sessions.first?.id, pending.id)
+        cloud.uploadError = nil
+        await app.syncPending()
+        XCTAssertEqual(app.sessions.first?.syncState, .synced)
+        XCTAssertEqual(app.syncMessage, "Synced with Supabase")
+        XCTAssertEqual(cloud.remoteSessions.count, 1)
+    }
+
     func testLostUploadResponseAndRepeatedDeleteDoNotDuplicateOrResurrect() async throws {
         let folder = try directory()
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -2108,5 +2132,53 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertEqual(app.bodyWeight, 70)
         app.setBodyWeight(nil)
         XCTAssertNil(app.bodyWeight)
+    }
+}
+
+final class HistoryCalendarTests: XCTestCase {
+    private func calendar(firstWeekday: Int = 1, timeZone: String = "UTC") -> Calendar {
+        var result = Calendar(identifier: .gregorian)
+        result.firstWeekday = firstWeekday
+        result.timeZone = TimeZone(identifier: timeZone)!
+        return result
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, calendar: Calendar) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day))!
+    }
+
+    func testLeapMonthAndFirstWeekdayAlignment() {
+        let sunday = calendar()
+        let february = HistoryCalendarMonth(containing: date(2024, 2, 15, calendar: sunday), calendar: sunday)
+        XCTAssertEqual(february.days.count, 42)
+        XCTAssertEqual(february.days.compactMap { $0 }.count, 29)
+        XCTAssertNil(february.days[3])
+        XCTAssertEqual(february.days[4], date(2024, 2, 1, calendar: sunday))
+        let monday = calendar(firstWeekday: 2)
+        let mondayMonth = HistoryCalendarMonth(containing: date(2024, 2, 15, calendar: monday), calendar: monday)
+        XCTAssertEqual(mondayMonth.days[3], date(2024, 2, 1, calendar: monday))
+    }
+
+    func testSixWeekMonthKeepsLastDay() {
+        let cal = calendar()
+        let month = HistoryCalendarMonth(containing: date(2026, 8, 31, calendar: cal), calendar: cal)
+        XCTAssertEqual(month.days[36], date(2026, 8, 31, calendar: cal))
+        XCTAssertEqual(month.days.compactMap { $0 }.count, 31)
+    }
+
+    func testWorkoutFilteringUsesLocalDaysAcrossDaylightSavingAndIncludesAllSessions() {
+        let cal = calendar(timeZone: "America/Los_Angeles")
+        let start = date(2026, 3, 8, calendar: cal)
+        let nextDay = date(2026, 3, 9, calendar: cal)
+        XCTAssertEqual(nextDay.timeIntervalSince(start), 23 * 3600)
+        let sessions = [start.addingTimeInterval(-1), start, nextDay.addingTimeInterval(-1), nextDay].map {
+            WorkoutSession(createdAt: $0, exercises: [], syncState: .localOnly)
+        }
+        XCTAssertEqual(HistoryCalendarMonth.sessions(sessions, on: start, calendar: cal).map(\.id),
+            [sessions[1].id, sessions[2].id])
+        XCTAssertEqual(HistoryCalendarMonth.sessions(sessions, on: nil, calendar: cal).count, 4)
+        let days = HistoryCalendarMonth(containing: start, calendar: cal).days.compactMap { $0 }
+        XCTAssertEqual(Set(days).count, 31)
+        XCTAssertTrue(days.allSatisfy { cal.component(.hour, from: $0) == 0 })
     }
 }

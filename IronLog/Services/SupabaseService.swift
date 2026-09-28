@@ -684,6 +684,26 @@ struct RemoteSetInsert: Encodable {
     /// Backward-compatible set metadata. Old rows contain `SetType.rawValue`;
     /// rows with a custom remark use the versioned representation below.
     var setType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID, exerciseID, weightKg, reps, setIndex
+        case bodyweight, timed, usesMinutes, setType
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionID, forKey: .sessionID)
+        try container.encode(exerciseID, forKey: .exerciseID)
+        // PostgREST bulk inserts require identical keys in every row. Explicit
+        // nulls keep ordinary, tagged, bodyweight and timed sets in one batch.
+        try container.encode(weightKg, forKey: .weightKg)
+        try container.encode(reps, forKey: .reps)
+        try container.encode(setIndex, forKey: .setIndex)
+        try container.encode(bodyweight, forKey: .bodyweight)
+        try container.encode(timed, forKey: .timed)
+        try container.encode(usesMinutes, forKey: .usesMinutes)
+        try container.encode(setType, forKey: .setType)
+    }
 }
 
 private let setMetadataPrefix = "ironlog:v1:"

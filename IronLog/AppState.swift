@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import OSLog
 
 @MainActor
 final class AppState: ObservableObject {
@@ -1106,6 +1107,7 @@ final class AppState: ObservableObject {
             scheduleSyncRetry()
         } else {
             if resetRetryOnSuccess { cancelSyncRetry(resetAttempt: true) }
+            if uploadCount > 0 { syncMessage = "Synced with Supabase" }
             if reportMigrationProgress, uploadCount > 0 {
                 let message = "Uploaded \(uploadCount) workout\(uploadCount == 1 ? "" : "s") to Supabase"
                 syncMessage = message
@@ -1533,7 +1535,9 @@ final class AppState: ObservableObject {
         if let index = sessions.firstIndex(where: { $0.id == id }) {
             sessions[index].syncState = .failed
         }
-        syncMessage = "Saved locally. Backup failed: \(error.localizedDescription)"
+        Logger(subsystem: Bundle.main.bundleIdentifier ?? "IronLog", category: "Sync")
+            .error("Workout backup failed: \(error.localizedDescription, privacy: .private)")
+        syncMessage = "Saved on this device. Cloud backup pending. We'll retry automatically."
         persistAll()
         scheduleSyncRetry()
     }
