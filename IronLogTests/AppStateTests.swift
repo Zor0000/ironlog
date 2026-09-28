@@ -1784,6 +1784,103 @@ private final class OfflineCloud: SupabaseService {
 
 @MainActor
 final class ReleaseReadinessTests: XCTestCase {
+    func testUnfinishedWorkoutRestoresAsDraftUntilExplicitSave() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let app = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        app.startFreeWorkout()
+        app.addExercise(name: "Push Ups")
+        let exerciseID = app.todayExercises[0].id
+        let setID = app.todayExercises[0].sets[0].id
+        app.updateSet(exerciseID: exerciseID, setID: setID, reps: "12")
+        app.toggleDone(exerciseID: exerciseID, setID: setID)
+        app.updateWorkoutNote("Not saved yet")
+        // Account transitions drain the queued disk writes and reload the draft.
+        await app.signOut()
+        let draftSnapshot = try await store.load()
+        XCTAssertTrue(draftSnapshot.sessions.isEmpty)
+        XCTAssertEqual(draftSnapshot.draft?.exercises.first?.sets.first?.done, true)
+
+        let relaunched = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await relaunched.boot()
+        XCTAssertTrue(relaunched.sessions.isEmpty)
+        XCTAssertEqual(relaunched.stats.sets, 0)
+        XCTAssertEqual(relaunched.stats.streak, 0)
+        XCTAssertTrue(relaunched.personalRecords.isEmpty)
+        XCTAssertEqual(relaunched.validCompletedSetCount, 1)
+
+        await relaunched.finishWorkout(note: relaunched.workoutNote)
+        await relaunched.finishWorkout(note: "Duplicate tap")
+        let saved = try await store.load()
+        XCTAssertEqual(saved.sessions.count, 1)
+        XCTAssertNil(saved.draft)
+        XCTAssertEqual(saved.sessions.first?.exercises.first?.sets.first?.reps, 12)
+    }
+
+    func testDiscardingStartedWorkoutNeverCreatesHistory() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let app = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        app.startFreeWorkout()
+        app.addExercise(name: "Push Ups")
+        app.discardWorkout()
+        await app.signOut()
+        let saved = try await store.load()
+        XCTAssertTrue(saved.sessions.isEmpty)
+        XCTAssertNil(saved.draft)
+    }
+
+    func testEmptyLocalAndCloudSessionsStayOutOfHistoryAndCanRecoverOnRetry() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
+        let id = UUID()
+        let empty = WorkoutSession(id: id, cloudID: id.uuidString.lowercased(),
+            createdAt: Date(), split: "PPL", exercises: [], syncState: .synced)
+        var invalid = empty
+        invalid.id = UUID()
+        invalid.cloudID = invalid.id.uuidString.lowercased()
+        invalid.exercises = [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false,
+            sets: [LoggedSet(weight: nil, reps: 0)])]
+        let runID = UUID()
+        let run = WorkoutSession(id: runID, cloudID: runID.uuidString.lowercased(),
+            createdAt: Date().addingTimeInterval(-86_400), split: "Walk", exercises: [], syncState: .synced,
+            activity: CardioActivity(kind: .walk, duration: 600, distance: 0, route: []))
+        cloud.remoteSessions = [empty, invalid, run]
+        try await store.save(AppSnapshot(sessions: [empty, invalid, run]), ownerID: "account-a")
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        XCTAssertEqual(app.sessions.map(\.id), [runID])
+        XCTAssertEqual(app.stats.streak, 0)
+        XCTAssertTrue(cloud.deletedSessionIDs.isEmpty, "Incomplete uploads must remain recoverable")
+
+        var completed = empty
+        completed.exercises = [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false,
+            sets: [LoggedSet(weight: nil, reps: 12)])]
+        cloud.remoteSessions = [completed, run]
+        await app.syncNow()
+        await app.syncNow()
+        XCTAssertEqual(Set(app.sessions.map(\.id)), Set([id, runID]))
+        XCTAssertEqual(app.sessions.count, 2)
+        XCTAssertEqual(app.stats.sets, 1)
+    }
+
+    func testEmptyRunCannotBeSaved() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let app = AppState(localStore: LocalStore(directory: folder), supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        let saved = await app.saveRun(CardioActivity(kind: .run, duration: 0, distance: 0, route: []))
+        XCTAssertFalse(saved)
+        XCTAssertTrue(app.sessions.isEmpty)
+    }
+
     private func directory() throws -> URL {
         // Screenshot capture can leave this launch preference behind on a
         // reused simulator; it would replace the test's loaded account state.
@@ -1807,7 +1904,7 @@ final class ReleaseReadinessTests: XCTestCase {
         let cloud = OfflineCloud()
         cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
         let id = UUID()
-        let session = WorkoutSession(id: id, cloudID: id.uuidString.lowercased(), createdAt: Date(), split: "Strength", exercises: [], syncState: .synced)
+        let session = WorkoutSession(id: id, cloudID: id.uuidString.lowercased(), createdAt: Date(), split: "Strength", exercises: [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [LoggedSet(reps: 10)])], syncState: .synced)
         cloud.remoteSessions = [session]
         try await store.save(AppSnapshot(sessions: [session]), ownerID: "account-a")
         let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
@@ -1859,7 +1956,7 @@ final class ReleaseReadinessTests: XCTestCase {
     func testRejectedSessionEditReturnsFailure() async throws {
         let folder = try directory()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let session = WorkoutSession(createdAt: Date(), split: "Strength", note: "Keep me", exercises: [], syncState: .localOnly)
+        let session = WorkoutSession(createdAt: Date(), split: "Strength", note: "Keep me", exercises: [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [LoggedSet(reps: 10)])], syncState: .localOnly)
         let store = LocalStore(directory: folder)
         try await store.save(AppSnapshot(sessions: [session]))
         let app = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
@@ -1875,7 +1972,7 @@ final class ReleaseReadinessTests: XCTestCase {
         let store = LocalStore(directory: folder)
         let cloud = OfflineCloud()
         cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
-        let session = WorkoutSession(createdAt: Date(), split: "Strength", exercises: [], syncState: .synced)
+        let session = WorkoutSession(createdAt: Date(), split: "Strength", exercises: [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [LoggedSet(reps: 10)])], syncState: .synced)
         let routine = SavedRoutine(name: "Leg Day", exercises: [])
         cloud.remoteSessions = [session]
         cloud.remoteRoutines = [routine]
@@ -1914,7 +2011,7 @@ final class ReleaseReadinessTests: XCTestCase {
         cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
         let id = UUID()
         let saved = WorkoutSession(id: id, cloudID: id.uuidString.lowercased(), userID: "account-a",
-            createdAt: Date(), split: "Strength", exercises: [], syncState: .synced)
+            createdAt: Date(), split: "Strength", exercises: [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [LoggedSet(reps: 10)])], syncState: .synced)
         cloud.remoteSessions = [saved]
         try await store.save(AppSnapshot(sessions: [saved]), ownerID: "account-a")
         cloud.offline = true
@@ -1953,7 +2050,9 @@ final class ReleaseReadinessTests: XCTestCase {
         let cloud = OfflineCloud()
         cloud.profile = UserProfile(id: "account-a", email: "a@example.com", fullName: "A")
         cloud.uploadError = SupabaseError.requestFailed("All object keys must match")
-        let pending = WorkoutSession(createdAt: Date(), split: "Strength", exercises: [], syncState: .pending)
+        let pending = WorkoutSession(createdAt: Date(), split: "Strength",
+            exercises: [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false,
+                sets: [LoggedSet(reps: 10)])], syncState: .pending)
         try await store.save(AppSnapshot(sessions: [pending]), ownerID: "account-a")
         let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
         await app.boot()

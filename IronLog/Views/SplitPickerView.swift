@@ -64,7 +64,7 @@ struct SplitProgram: Equatable {
 }
 
 /// Two-column grid of program cards. Collapses to one column at accessibility
-/// text sizes so the summary never wraps into a sliver next to the glyph.
+/// text sizes so titles and cadence stay easy to read.
 struct SplitProgramGrid: View {
     let splits: [String]
     let days: [String: [SplitDay]]
@@ -101,23 +101,16 @@ struct SplitProgramCard: View {
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: program.systemImage)
-                    .font(.system(.body, weight: .bold))
+                    .font(.system(.title2, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 48, height: 48)
                     .background(Theme.accentDim)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(program.name)
-                        .font(.system(.subheadline, weight: .bold))
-                        .foregroundStyle(Theme.text)
-                    Text(program.summary)
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
+                Text(program.name)
+                    .font(.system(.headline, weight: .bold))
+                    .foregroundStyle(Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Label(program.cadence, systemImage: "calendar")
                     .font(.system(.caption2, weight: .semibold))

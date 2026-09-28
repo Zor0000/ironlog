@@ -178,9 +178,11 @@ struct IronFuelView: View {
                         .clipShape(Circle())
                     Text(goal)
                         .font(.system(size: 14, weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
     }
 

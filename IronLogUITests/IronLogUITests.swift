@@ -259,7 +259,7 @@ final class IronLogUITests: XCTestCase {
         app.buttons["History"].tap()
         XCTAssertTrue(app.buttons["Set Up Sync"].waitForExistence(timeout: 3))
 
-        app.buttons["Today"].tap()
+        app.buttons["main-tab-today"].tap()
         app.buttons["Progress"].tap()
         XCTAssertTrue(app.buttons["Set Up Sync"].waitForExistence(timeout: 3))
     }

@@ -899,6 +899,10 @@ final class AppState: ObservableObject {
     /// `at` can back-date a run the user did before opening the app.
     @discardableResult
     func saveRun(_ activity: CardioActivity, at date: Date = Date()) async -> Bool {
+        guard activity.duration > 0 else {
+            showToast("Enter a duration first")
+            return false
+        }
         let session = WorkoutSession(
             userID: user?.id,
             createdAt: date,
@@ -1381,7 +1385,7 @@ final class AppState: ObservableObject {
         pendingPRSync = snapshot.pendingPRSync
         pendingWorkoutWipe = snapshot.pendingWorkoutWipe
         sessions = snapshot.sessions.filter { session in
-            !deletedCloudSessionIDs.contains(session.cloudID ?? session.id.uuidString.lowercased())
+            session.hasLoggedWork && !deletedCloudSessionIDs.contains(session.cloudID ?? session.id.uuidString.lowercased())
         }.sorted { $0.createdAt > $1.createdAt }
         personalRecords = Dictionary(
             snapshot.personalRecords.map { ($0.exerciseName, $0) },
@@ -1430,7 +1434,8 @@ final class AppState: ObservableObject {
 
     private func mergeCloudSessions(_ cloudSessions: [WorkoutSession]) {
         for cloud in cloudSessions {
-            guard let cloudID = cloud.cloudID, !deletedCloudSessionIDs.contains(cloudID) else { continue }
+            guard cloud.hasLoggedWork,
+                  let cloudID = cloud.cloudID, !deletedCloudSessionIDs.contains(cloudID) else { continue }
             if sessions.contains(where: { $0.cloudID == cloudID || $0.id.uuidString.lowercased() == cloudID }) { continue }
             sessions.append(cloud)
         }

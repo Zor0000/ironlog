@@ -302,6 +302,16 @@ struct WorkoutSession: Identifiable, Codable, Hashable {
     var activity: CardioActivity?
 
     var isCardio: Bool { activity != nil }
+
+    /// Drafts live in WorkoutDraft. A history entry must also contain logged
+    /// work: interrupted cloud uploads can leave a session header without sets.
+    /// Runs and walks are valid without sets, including time-only activities.
+    var hasLoggedWork: Bool {
+        if let activity { return activity.duration > 0 }
+        return exercises.contains { exercise in
+            exercise.sets.contains { $0.reps.isFinite && $0.reps > 0 }
+        }
+    }
 }
 
 extension WorkoutSession {

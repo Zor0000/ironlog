@@ -193,4 +193,38 @@ final class EvidenceCaptureTests: XCTestCase {
         app.buttons["set-done-button"].firstMatch.tap()
         snap("set-logged")
     }
+
+    /// A completed set is still a draft until the user taps Finish & Save.
+    func testScenarioSessionHistory() {
+        waitFor(app.buttons["Today"])
+        app.buttons["Today"].tap()
+        waitFor(app.buttons["start-free-workout-button"])
+        app.buttons["start-free-workout-button"].tap()
+
+        let customField = app.textFields["new-exercise-name-field"]
+        app.buttons["add-exercise-mode-custom"].tap()
+        waitFor(customField)
+        customField.tap()
+        customField.typeText("Push Ups")
+        app.buttons["confirm-add-exercise-button"].tap()
+        let reps = app.textFields["set-reps-input"].firstMatch
+        waitFor(reps)
+        reps.tap()
+        reps.typeText("12")
+        app.buttons["set-done-button"].firstMatch.tap()
+
+        app.buttons["Progress"].tap()
+        app.buttons["History"].tap()
+        waitFor(app.staticTexts["No sessions yet.\nComplete your first workout."])
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        waitFor(app.staticTexts["No sessions yet.\nComplete your first workout."])
+        snap("unfinished-not-in-history")
+
+        app.buttons["main-tab-today"].tap()
+        waitFor(app.buttons["finish-workout-button"])
+        app.buttons["finish-workout-button"].tap()
+        waitFor(app.staticTexts["1 set · Free Workout · local"])
+        snap("saved-in-history")
+    }
 }

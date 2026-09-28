@@ -200,14 +200,9 @@ struct WorkoutsView: View {
                     .frame(width: 40, height: 40)
                     .background(Theme.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Free Workout")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Theme.text)
-                    Text("Start empty — add any exercise on the fly")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted2)
-                }
+                Text("Free Workout")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.text)
                 Spacer()
                 Image(systemName: "arrow.right")
                     .font(.system(size: 13, weight: .bold))
