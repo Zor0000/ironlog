@@ -66,9 +66,9 @@ def main():
     bundle_id = bundle_ids[0]["id"]
     capabilities = resources(asc("bundle-ids", "capabilities", "list", "--bundle", bundle_id),
                              "bundleIdCapabilities")
-    if not any(item["attributes"].get("capabilityType") == "SIGN_IN_WITH_APPLE" for item in capabilities):
+    if not any(item["attributes"].get("capabilityType") == "APPLE_ID_AUTH" for item in capabilities):
         asc("bundle-ids", "capabilities", "add", "--bundle", bundle_id,
-            "--capability", "SIGN_IN_WITH_APPLE", "--if-exists", "skip")
+            "--capability", "APPLE_ID_AUTH", "--if-exists", "skip")
 
     app = resources(asc("apps", "view", "--id", APP_ID), "apps")[0]
     primary_locale = app["attributes"]["primaryLocale"]
