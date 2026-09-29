@@ -34,10 +34,11 @@ report["appInfo"] = asc("localizations", "list", "--app", APP_ID, "--type", "app
 report["betaApp"] = asc("testflight", "app-localizations", "list", "--app", APP_ID, "--paginate")
 report["groups"] = asc("testflight", "groups", "list", "--app", APP_ID, "--paginate")
 report["ageRating"] = asc("age-rating", "view", "--app", APP_ID)
-bundle_ids = asc("bundle-ids", "list", "--identifier", "com.parthjadhav.ironlog")
+bundle_ids = asc("bundle-ids", "list", "--paginate")
 report["iosBundleIDs"] = bundle_ids
 for bundle in resources(bundle_ids, "bundleIds"):
-    report["iosCapabilities"] = asc("bundle-ids", "capabilities", "list", "--bundle", bundle["id"])
+    if bundle["attributes"].get("identifier") == "com.parthjadhav.ironlog":
+        report["iosCapabilities"] = asc("bundle-ids", "capabilities", "list", "--bundle", bundle["id"])
 report["reviewDetails"] = []
 for version in report["versions"]:
     if version["attributes"].get("appStoreState") == "PREPARE_FOR_SUBMISSION":

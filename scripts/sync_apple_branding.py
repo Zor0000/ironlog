@@ -58,9 +58,11 @@ def changed_fields(attributes, fields):
 
 
 def main():
-    bundle_ids = resources(asc("bundle-ids", "list", "--identifier", IOS_BUNDLE_ID), "bundleIds")
+    registered_bundle_ids = resources(asc("bundle-ids", "list", "--paginate"), "bundleIds")
+    bundle_ids = [item for item in registered_bundle_ids
+                  if item["attributes"].get("identifier") == IOS_BUNDLE_ID]
     if len(bundle_ids) != 1:
-        raise RuntimeError("Could not identify the existing iOS bundle ID")
+        raise RuntimeError(f"Could not identify the existing iOS bundle ID among {len(registered_bundle_ids)} returned")
     bundle_id = bundle_ids[0]["id"]
     capabilities = resources(asc("bundle-ids", "capabilities", "list", "--bundle", bundle_id),
                              "bundleIdCapabilities")
@@ -126,7 +128,8 @@ def main():
         ("com.parthjadhav.ironlog", "Setzo"),
         ("com.parthjadhav.ironlog.IronLogWidget", "Setzo Widget"),
     ]:
-        bundles = resources(asc("bundle-ids", "list", "--identifier", identifier), "bundleIds")
+        bundles = [item for item in resources(asc("bundle-ids", "list", "--paginate"), "bundleIds")
+                   if item["attributes"].get("identifier") == identifier]
         for bundle in bundles:
             if bundle["attributes"]["name"] != name:
                 asc("bundle-ids", "update", "--id", bundle["id"], "--name", name)
