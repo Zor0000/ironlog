@@ -9,6 +9,7 @@ jobs:
     timeout-minutes: 15
     env:
       ASC_APP_ID: "6771258872"
+      ASC_REVIEW_CONTACT_PHONE: ${{ secrets.ASC_REVIEW_CONTACT_PHONE }}
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
     steps:

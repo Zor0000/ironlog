@@ -138,9 +138,14 @@ def main():
 
     for version in resources(asc("versions", "list", "--app", APP_ID, "--paginate"), "appStoreVersions"):
         if version["attributes"].get("appStoreState") == "PREPARE_FOR_SUBMISSION":
+            contact_phone = os.environ.get("ASC_REVIEW_CONTACT_PHONE", "").strip()
+            if not contact_phone:
+                print("App Review contact remains a release gate: ASC_REVIEW_CONTACT_PHONE is required.")
+                continue
             asc("review", "details-create", "--version-id", version["id"],
                 "--contact-first-name", "Neeraj", "--contact-last-name", "Chormale",
-                "--contact-email", SUPPORT_EMAIL, "--if-exists", "update")
+                "--contact-email", SUPPORT_EMAIL, "--contact-phone", contact_phone,
+                "--if-exists", "update")
 
     betas = resources(asc("testflight", "app-localizations", "list", "--app", APP_ID,
                           "--paginate"), "betaAppLocalizations")
