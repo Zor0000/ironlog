@@ -40,24 +40,10 @@ Deno.serve(async (request) => {
     auth: { persistSession: false },
   });
 
-  // Remove child rows before their sessions because session_sets has no user_id.
-  const { data: sessions, error: sessionLookupError } = await admin
-    .from("sessions")
-    .select("id")
-    .eq("user_id", user.id);
-  if (sessionLookupError) return serverError(sessionLookupError);
-
-  const sessionIDs = (sessions ?? []).map((session) => session.id);
-  if (sessionIDs.length > 0) {
-    const { error } = await admin.from("session_sets").delete().in("session_id", sessionIDs);
-    if (error) return serverError(error);
-  }
-
-  for (const table of ["sessions", "personal_records", "routines"]) {
-    const { error } = await admin.from(table).delete().eq("user_id", user.id);
-    if (error) return serverError(error);
-  }
-
+  // The schema has ON DELETE CASCADE from auth.users to every owned table,
+  // and from sessions to session_sets. Deleting the Auth row lets Postgres
+  // perform the entire cleanup atomically, without a capped SELECT or a
+  // partially completed sequence of HTTP deletes.
   const { error: deleteUserError } = await admin.auth.admin.deleteUser(user.id);
   if (deleteUserError) return serverError(deleteUserError);
 

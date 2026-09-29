@@ -112,6 +112,10 @@ final class SetzoUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["forgot-password-button"].waitForExistence(timeout: 6))
         XCTAssertTrue(app.buttons["google-sign-in-button"].exists)
+        XCTAssertTrue(app.buttons["apple-sign-in-button"].exists)
+        XCTAssertTrue(app.links["Privacy Policy"].exists)
+        XCTAssertTrue(app.links["Terms of Use"].exists)
+        XCTAssertFalse(app.buttons["google-sign-in-button"].isEnabled)
         app.buttons["forgot-password-button"].tap()
         XCTAssertTrue(app.staticTexts["Reset password"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["send-reset-link-button"].exists)

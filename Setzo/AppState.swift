@@ -4,6 +4,8 @@ import OSLog
 
 @MainActor
 final class AppState: ObservableObject {
+    private static let pendingDeletedAccountIDKey = "setzo-pending-deleted-account-local-cleanup"
+    private static let pendingDeletionReauthIDKey = "setzo-pending-account-deletion-reauth"
     @Published var library = ExerciseLibrary.bundled
     @Published var user: UserProfile?
     @Published var selectedTab: WorkoutTab = .workouts
@@ -13,6 +15,7 @@ final class AppState: ObservableObject {
     @Published var nutritionPassport: NutritionPassport?
     @Published var authMessage: String?
     @Published var isPasswordRecovery = false
+    @Published var needsDeletionReconfirmation = false
     @Published var toast: String?
     @Published var isBusy = false
 
@@ -179,6 +182,8 @@ final class AppState: ObservableObject {
 
     func boot() async {
         defer { isBooting = false }
+        guard await finishPendingDeletedAccountCleanup() else { return }
+        await supabase.retryPendingFuelBuddyGuestDeletion()
         await supabase.restoreSessionIfNeeded()
         var suppressOnboarding = false
         #if DEBUG
@@ -235,7 +240,10 @@ final class AppState: ObservableObject {
         // The local snapshot and any launch-only seed are now applied. Allow
         // interaction before network sync, which may take time while offline.
         isBooting = false
-        if restoredUser != nil { await refreshAndSync() }
+        if restoredUser != nil {
+            if await purgeRemotelyDeletedAccountIfNeeded() { return }
+            await refreshAndSync()
+        }
     }
 
     func signIn(email: String, password: String) async {
@@ -261,6 +269,13 @@ final class AppState: ObservableObject {
     func signInWithGoogle() async {
         await runBusy {
             let profile = try await supabase.signInWithGoogle()
+            await finishAuthentication(profile)
+        }
+    }
+
+    func signInWithApple(idToken: String, nonce: String, fullName: String?) async {
+        await runBusy {
+            let profile = try await supabase.signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
             await finishAuthentication(profile)
         }
     }
@@ -308,7 +323,18 @@ final class AppState: ObservableObject {
         showingAuth = false
         isPasswordRecovery = false
         authMessage = nil
-        await refreshAndSync(reportMigrationProgress: true)
+        needsDeletionReconfirmation = UserDefaults.standard.string(forKey: Self.pendingDeletionReauthIDKey) == profile.id
+        if !needsDeletionReconfirmation {
+            await refreshAndSync(reportMigrationProgress: true)
+        }
+    }
+
+    func cancelPendingDeletionRequest() {
+        UserDefaults.standard.removeObject(forKey: Self.pendingDeletionReauthIDKey)
+        needsDeletionReconfirmation = false
+        if supabase.isAuthenticated && !isDeletingAllData {
+            Task { await refreshAndSync(reportMigrationProgress: true) }
+        }
     }
 
     func signOut() async {
@@ -362,14 +388,25 @@ final class AppState: ObservableObject {
         defer { isDeletingAllData = false }
         while isSyncing { try? await Task.sleep(for: .milliseconds(100)) }
         await routineSyncTask?.value
+        await saveTask?.value
         if removingAccount {
             guard supabase.isAuthenticated else {
                 showToast("Sign in again before deleting your account")
                 return false
             }
+            // Start guest cleanup before the signed-in identity disappears.
+            // A failed guest request stays queued in its own persisted session.
+            try? await supabase.deleteFuelBuddyGuestAccountIfPresent()
             do {
                 try await supabase.deleteAccount()
+                cancelPendingDeletionRequest()
+                if let activeStoreOwnerID {
+                    UserDefaults.standard.set(activeStoreOwnerID, forKey: Self.pendingDeletedAccountIDKey)
+                }
             } catch SupabaseError.sessionExpired {
+                if let activeStoreOwnerID {
+                    UserDefaults.standard.set(activeStoreOwnerID, forKey: Self.pendingDeletionReauthIDKey)
+                }
                 await handleExpiredSession()
                 return false
             } catch {
@@ -377,34 +414,78 @@ final class AppState: ObservableObject {
                 return false
             }
         }
-        clearWorkoutState()
-        pendingWorkoutWipe = !removingAccount && activeStoreOwnerID != nil
-        persistAll(clearDraft: true, replacingBackup: true)
-        await saveTask?.value
-        guard storageError == nil else { return false }
+        clearWorkoutState(includeNutritionPassport: removingAccount || activeStoreOwnerID == nil)
         selectedTab = .workouts
         if removingAccount {
-            await supabase.signOut()
-            do { try await localStore.clear(ownerID: activeStoreOwnerID) }
-            catch { storageError = error.localizedDescription; return false }
+            // The remote deletion is complete. Never write another account
+            // snapshot; clear every local copy, with a durable restart retry.
+            guard await finishPendingDeletedAccountCleanup() else { return false }
             activeStoreOwnerID = nil
-            do { applySnapshot(try await localStore.load(ownerID: nil), suppressOnboarding: true) }
-            catch { storageError = error.localizedDescription; return false }
+            applySnapshot(AppSnapshot(), suppressOnboarding: true)
             hasOnboarded = true
             user = localUser
             showingAuth = false
             authMessage = nil
             syncMessage = "Saved on this iPhone"
+            persistAll(clearDraft: true, replacingBackup: true)
+            await saveTask?.value
             showToast("Account deleted")
         } else {
+            pendingWorkoutWipe = activeStoreOwnerID != nil
+            persistAll(clearDraft: true, replacingBackup: true)
+            await saveTask?.value
+            guard storageError == nil else { return false }
             if pendingWorkoutWipe { _ = await flushPendingWorkoutWipe() }
             syncMessage = pendingWorkoutWipe ? "Deleted locally. Cloud deletion pending." : "Workout data deleted"
             showToast(syncMessage)
         }
+        do {
+            try await supabase.deleteFuelBuddyGuestAccountIfPresent()
+        } catch {
+            showToast("Local data deleted. AI guest account deletion will retry online.")
+        }
         return true
     }
 
-    private func clearWorkoutState() {
+    private func finishPendingDeletedAccountCleanup() async -> Bool {
+        guard let ownerID = UserDefaults.standard.string(forKey: Self.pendingDeletedAccountIDKey) else { return true }
+        do {
+            try await localStore.clear(ownerID: ownerID)
+            // The guest snapshot and backup can retain workouts or a Passport
+            // created before this account signed in.
+            try await localStore.clear(ownerID: nil)
+            await supabase.signOut()
+            UserDefaults.standard.removeObject(forKey: Self.pendingDeletedAccountIDKey)
+            return true
+        } catch {
+            storageError = "Account deleted in the cloud, but local cleanup is pending: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    private func purgeRemotelyDeletedAccountIfNeeded() async -> Bool {
+        guard let ownerID = activeStoreOwnerID else { return false }
+        guard await supabase.isCurrentAccountDeleted() else { return false }
+        isDeletingAllData = true
+        defer { isDeletingAllData = false }
+        cancelSyncRetry(resetAttempt: true)
+        while isSyncing { try? await Task.sleep(for: .milliseconds(100)) }
+        await routineSyncTask?.value
+        await saveTask?.value
+        UserDefaults.standard.set(ownerID, forKey: Self.pendingDeletedAccountIDKey)
+        guard await finishPendingDeletedAccountCleanup() else { return true }
+        activeStoreOwnerID = nil
+        applySnapshot(AppSnapshot(), suppressOnboarding: true)
+        hasOnboarded = true
+        user = localUser
+        syncMessage = "Account was deleted. Local copies were removed."
+        persistAll(clearDraft: true, replacingBackup: true)
+        await saveTask?.value
+        showToast(syncMessage)
+        return true
+    }
+
+    private func clearWorkoutState(includeNutritionPassport: Bool = false) {
         sessions = []
         personalRecords = [:]
         deletedCloudSessionIDs = []
@@ -415,6 +496,7 @@ final class AppState: ObservableObject {
         waterByDay = [:]
         routines = []
         bodyWeight = nil
+        if includeNutritionPassport { nutritionPassport = nil }
         currentBodyWeight = 0
         resetActiveWorkout()
         updateLiveActivity(clearedDraft: true)
@@ -1279,7 +1361,9 @@ final class AppState: ObservableObject {
     }
 
     func resumeForegroundSync() async {
+        await supabase.retryPendingFuelBuddyGuestDeletion()
         guard !isBooting, storageError == nil, supabase.isAuthenticated else { return }
+        if await purgeRemotelyDeletedAccountIfNeeded() { return }
         cancelSyncRetry(resetAttempt: true)
         await refreshAndSync()
     }

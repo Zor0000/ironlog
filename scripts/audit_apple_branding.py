@@ -33,6 +33,15 @@ for build in builds:
 report["appInfo"] = asc("localizations", "list", "--app", APP_ID, "--type", "app-info", "--paginate")
 report["betaApp"] = asc("testflight", "app-localizations", "list", "--app", APP_ID, "--paginate")
 report["groups"] = asc("testflight", "groups", "list", "--app", APP_ID, "--paginate")
+report["ageRating"] = asc("age-rating", "view", "--app", APP_ID)
+bundle_ids = asc("bundle-ids", "list", "--identifier", "com.parthjadhav.ironlog")
+report["iosBundleIDs"] = bundle_ids
+for bundle in resources(bundle_ids, "bundleIds"):
+    report["iosCapabilities"] = asc("bundle-ids", "capabilities", "list", "--bundle", bundle["id"])
+report["reviewDetails"] = []
+for version in report["versions"]:
+    if version["attributes"].get("appStoreState") == "PREPARE_FOR_SUBMISSION":
+        report["reviewDetails"].append(asc("review", "details-for-version", "--version-id", version["id"]))
 Path("build").mkdir(exist_ok=True)
 Path("build/apple-branding-audit.json").write_text(json.dumps(report, indent=2) + "\n")
 print("Audited", len(report["versions"]), "store versions and refreshed latest TestFlight notes.")

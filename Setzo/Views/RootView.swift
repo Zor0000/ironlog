@@ -1,3 +1,5 @@
+import AuthenticationServices
+import CryptoKit
 import SwiftUI
 
 struct RootView: View {
@@ -21,7 +23,7 @@ struct RootView: View {
                     Button("Retry") { Task { await app.retryStorage() } }
                         .disabled(app.isRetryingStorage)
                         .accessibilityIdentifier("retry-storage-button")
-                    Link("Contact support", destination: URL(string: "mailto:neerajchormale39@gmail.com")!)
+                    Link("Contact support", destination: URL(string: "mailto:neerajcwork@gmail.com")!)
                 }
                 .padding(28)
             } else if app.isBooting {
@@ -59,6 +61,14 @@ struct RootView: View {
         .animation(AppMotion.smooth, value: app.toast)
         .animation(AppMotion.screen, value: app.showingAuth)
         .animation(AppMotion.screen, value: app.showingOnboarding)
+        .alert("Finish account deletion?", isPresented: $app.needsDeletionReconfirmation) {
+            Button("Delete Account & Data", role: .destructive) {
+                Task { _ = await app.deleteAccount() }
+            }
+            Button("Keep Account", role: .cancel) { app.cancelPendingDeletionRequest() }
+        } message: {
+            Text("Your session expired before deletion. You have signed in again; confirm to delete this account and its data.")
+        }
     }
 }
 
@@ -155,6 +165,8 @@ struct AuthView: View {
     @State private var password = ""
     @State private var confirmation = ""
     @State private var showForgotPassword = false
+    @State private var isAdult = false
+    @State private var appleNonce: String?
 
     var body: some View {
         VStack(spacing: 22) {
@@ -223,6 +235,11 @@ struct AuthView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
+                    Toggle("I am 18 or older (account creation / social sign-in)", isOn: $isAdult)
+                        .font(.system(size: 12))
+                        .tint(Theme.accent)
+                        .accessibilityIdentifier("account-age-confirmation")
+
                     Button {
                         NativeFeedback.light()
                         Task {
@@ -263,8 +280,57 @@ struct AuthView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle())
-                    .disabled(app.isBusy)
+                    .disabled(app.isBusy || !isAdult)
                     .accessibilityIdentifier("google-sign-in-button")
+
+                    SignInWithAppleButton(.signIn) { request in
+                        let nonce = UUID().uuidString
+                        appleNonce = nonce
+                        request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
+                        request.requestedScopes = [.email, .fullName]
+                    } onCompletion: { result in
+                        let nonce = appleNonce
+                        appleNonce = nil
+                        switch result {
+                        case .success(let authorization):
+                            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                                  let tokenData = credential.identityToken,
+                                  let idToken = String(data: tokenData, encoding: .utf8),
+                                  let nonce else {
+                                app.authMessage = "Apple sign-in did not return a valid identity. Try again."
+                                return
+                            }
+                            Task {
+                                await app.signInWithApple(
+                                    idToken: idToken,
+                                    nonce: nonce,
+                                    fullName: credential.fullName?.formatted()
+                                )
+                            }
+                        case .failure(let error):
+                            if (error as? ASAuthorizationError)?.code != .canceled {
+                                app.authMessage = error.localizedDescription
+                            }
+                        }
+                    }
+                    .signInWithAppleButtonStyle(.white)
+                    .frame(height: 48)
+                    .disabled(app.isBusy || !isAdult)
+                    .accessibilityIdentifier("apple-sign-in-button")
+
+                    VStack(spacing: 4) {
+                        Text("Accounts and social sign-in are for adults 18+. Under-18s can use local workouts with a parent or guardian; Fuel Buddy is unavailable.")
+                            .multilineTextAlignment(.center)
+                        Text("Before creating an account, read:")
+                        HStack(spacing: 12) {
+                            Link("Privacy Policy", destination: URL(string: "https://zor0000.github.io/setzo/privacy.html")!)
+                            Link("Terms of Use", destination: URL(string: "https://zor0000.github.io/setzo/terms.html")!)
+                        }
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.muted2)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("auth-privacy-policy")
 
                     Button {
                         NativeFeedback.selection()
@@ -348,7 +414,7 @@ struct AuthView: View {
               !cleanEmail.isEmpty,
               !password.isEmpty else { return false }
         if mode == .signUp {
-            return password.count >= 8 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return isAdult && password.count >= 8 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         return true
     }

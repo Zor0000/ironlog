@@ -16,25 +16,32 @@
 </head>
 <body>
 <h1>Setzo Privacy Policy</h1>
-<p class="muted">Last updated: September 28, 2026</p>
+<p class="muted">Last updated: September 29, 2026</p>
+<p>Setzo is published by Neeraj Chormale. Privacy requests: <a href="mailto:neerajcwork@gmail.com">neerajcwork@gmail.com</a>.</p>
 
 <p>Setzo can be used without an account. In local mode, your workouts, run and walk entries, notes, routines, water log, body weight, and Nutrition Passport are stored on your device. We do not receive those local entries. Fuel Buddy sends a meal request and selected food preferences to generate suggestions when you use it, as described below. The app uses local storage and device notifications for its workout and rest-timer features.</p>
 
 <h2>Accounts and cloud sync</h2>
 <p>If you create or sign in to an account, Setzo uses Supabase for authentication and cloud sync. Supabase receives your email address, optional name, and account ID for your account. The app sends your saved workout sessions, exercise and set details, personal records, routine names and contents, free-text workout notes and set remarks, and saved run or walk details (time, distance, elevation, terrain, any calorie value) to Supabase so they can sync across your devices. Those records are associated with your account ID. Setzo does not collect or upload GPS or location data. A workout started while signed out is uploaded when you later sign in. Cloud requests necessarily include technical connection information handled by Supabase under its own terms.</p>
-<p>If you choose Google sign-in, Google and Supabase handle the sign-in exchange. Setzo uses the resulting account profile; it does not request your Google contacts, calendar, or fitness data. We do not use advertising or cross-app tracking.</p>
+<p>If you choose Google sign-in, Google and Supabase handle the sign-in exchange. If you choose Sign in with Apple, Apple and Supabase handle the exchange; Apple can hide your email address from Setzo. Setzo uses the resulting account profile and does not request contacts, calendar, or fitness data from either sign-in provider. We do not use advertising or cross-app tracking.</p>
 
 <h2>Fuel Buddy meal suggestions</h2>
 <p>When you request a Fuel Buddy suggestion, Setzo sends your meal request and the food preferences needed to answer it to our Supabase function. These include dietary identity, excluded ingredients (including allergies and intolerances), dislikes, preferred cuisines, available foods, budget, cooking time, and cooking ability. The function sends this information to Groq to generate dish names. The request is scrubbed for common contact details and body measurements before it is sent. Do not include other sensitive personal details in a meal request.</p>
+<p>Allergies and intolerances are health information. Dietary identity and restrictions may reveal sensitive beliefs or health information. They are sent only when you ask for a suggestion, associated with your signed-in or anonymous Supabase session, and used for app functionality. Setzo does not use them for advertising or tracking.</p>
 <p>Fuel Buddy works for guests through a separate anonymous Supabase authentication session. Signed-in users use their existing session. The function checks the session before calling Groq. We do not send your complete Nutrition Passport, goals, safety answers, body weight, or energy target to Groq. Generated dish names are shown in the app; Setzo does not save a history of Fuel Buddy requests or suggestions to its cloud database. Supabase and Groq may process connection details and operational logs under their respective terms. AI suggestions cannot verify an ingredient label or cross-contact.</p>
+<p>Fuel Buddy offers general food ideas, not medical advice, diagnosis, treatment, or a substitute for a clinician or dietitian. It does not provide personalized suggestions when your Passport says you are under 18, pregnant or breastfeeding, have an eating-disorder concern, or follow a prescribed diet. Follow your care plan and verify ingredients directly.</p>
 
 <h2>Other data that stays on your device</h2>
 <p>Your full Nutrition Passport, including goals and safety answers, is stored in the local snapshot for the current device and account. Your body weight, water log, and unfinished workout draft also stay on the device. Saved cardio calorie values may sync, but the body weight used to estimate them does not. The Live Activity uses device-local state for Lock Screen workout controls.</p>
 
 <h2>Retention and deletion</h2>
-<p>Local data remains until you delete it in Setzo or remove the app. Signed-in cloud records remain until you delete the relevant records, use Settings → Delete Workout Data, or delete your account. Individual and bulk workout deletions made offline are kept on this device and retried when cloud sync is available; the app shows when cloud deletion is pending. Deleting the account requires a successful connection and shows an error if the cloud request fails. Settings → Delete Account &amp; Data requests deletion of the account and its cloud workout records, then removes its local snapshot. Service backups and operational logs may follow Supabase's retention practices; immediate removal from every backup cannot be guaranteed by the app.</p>
+<p>Local data remains until you delete it in Setzo or remove the app. Signed-in cloud records remain until you delete the relevant records, use Settings → Delete Workout Data, or delete your account. Individual and bulk workout deletions made offline are kept on this device and retried when cloud sync is available; the app shows when cloud deletion is pending. Deleting a signed-in account requires a connection; Settings → Delete Account &amp; Data requests deletion of the account and its cloud records, then removes that account's local snapshot and any earlier guest snapshot and Nutrition Passport. If local cleanup is interrupted, the app retries it at launch. Settings → Delete Local Data &amp; Guest Account removes local data and requests deletion of the separate anonymous Fuel Buddy account; if its network request fails, it is retried on a later launch or Fuel Buddy request. Service backups and operational logs may follow Supabase's and Groq's retention practices; immediate removal from every backup or log cannot be guaranteed by the app.</p>
+
+<h2>Age and account use</h2>
+<p>Setzo account creation and social sign-in are intended for adults aged 18 or older. Under-18 users can use local workout tracking with a parent or guardian, but Fuel Buddy does not produce suggestions for them. Setzo does not provide a parental consent workflow for cloud accounts, so minors should not create one.</p>
 
 <h2>Contact</h2>
-<p>For privacy questions or deletion help, email <a href="mailto:neerajchormale39@gmail.com">neerajchormale39@gmail.com</a>.</p>
+<p>For privacy questions or deletion help, email <a href="mailto:neerajcwork@gmail.com">neerajcwork@gmail.com</a>.</p>
+<p><a href="terms.html">Terms of Use</a> · <a href="support.html">Support</a></p>
 </body>
 </html>

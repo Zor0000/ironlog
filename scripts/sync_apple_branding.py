@@ -11,6 +11,8 @@ APP_ID = os.environ["ASC_APP_ID"]
 PRIVACY_URL = "https://zor0000.github.io/setzo/privacy.html"
 WEBSITE_URL = "https://zor0000.github.io/setzo/"
 SUPPORT_URL = WEBSITE_URL + "support.html"
+SUPPORT_EMAIL = "neerajcwork@gmail.com"
+IOS_BUNDLE_ID = "com.parthjadhav.ironlog"
 
 
 def asc(*args):
@@ -56,6 +58,16 @@ def changed_fields(attributes, fields):
 
 
 def main():
+    bundle_ids = resources(asc("bundle-ids", "list", "--identifier", IOS_BUNDLE_ID), "bundleIds")
+    if len(bundle_ids) != 1:
+        raise RuntimeError("Could not identify the existing iOS bundle ID")
+    bundle_id = bundle_ids[0]["id"]
+    capabilities = resources(asc("bundle-ids", "capabilities", "list", "--bundle", bundle_id),
+                             "bundleIdCapabilities")
+    if not any(item["attributes"].get("capabilityType") == "SIGN_IN_WITH_APPLE" for item in capabilities):
+        asc("bundle-ids", "capabilities", "add", "--bundle", bundle_id,
+            "--capability", "SIGN_IN_WITH_APPLE", "--if-exists", "skip")
+
     app = resources(asc("apps", "view", "--id", APP_ID), "apps")[0]
     primary_locale = app["attributes"]["primaryLocale"]
     asc("apps", "rename", "--app", APP_ID, "--locale", primary_locale, "--name", "Setzo")
@@ -81,6 +93,16 @@ def main():
         })
         asc("localizations", "update", "--id", version["id"],
             "--marketing-url", WEBSITE_URL, "--support-url", SUPPORT_URL, *flags)
+
+    # IronFuel and workout guidance are health/wellness topics in Apple's age
+    # questionnaire. Preserve the other age-rating answers for human review.
+    asc("age-rating", "edit", "--app", APP_ID, "--health-or-wellness-topics", "true")
+
+    for version in resources(asc("versions", "list", "--app", APP_ID, "--paginate"), "appStoreVersions"):
+        if version["attributes"].get("appStoreState") == "PREPARE_FOR_SUBMISSION":
+            asc("review", "details-create", "--version-id", version["id"],
+                "--contact-first-name", "Neeraj", "--contact-last-name", "Chormale",
+                "--contact-email", SUPPORT_EMAIL, "--if-exists", "update")
 
     betas = resources(asc("testflight", "app-localizations", "list", "--app", APP_ID,
                           "--paginate"), "betaAppLocalizations")

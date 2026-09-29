@@ -846,6 +846,8 @@ final class AppStateTests: XCTestCase {
     func testDeleteWorkoutDataWipesWorkoutStateAndKeepsCurrentProfile() async {
         let app = AppState()
         app.continueLocally()
+        app.saveNutritionPassport(NutritionPassport())
+        XCTAssertNotNil(app.nutritionPassport)
         app.startFreeWorkout()
         app.setAddExerciseWeighted(true)
         app.addExercise(name: "Bench Press")
@@ -863,6 +865,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(app.sessions.isEmpty)
         XCTAssertTrue(app.personalRecords.isEmpty)
         XCTAssertTrue(app.waterByDay.isEmpty)
+        XCTAssertNil(app.nutritionPassport)
         XCTAssertFalse(app.hasActiveWorkout)
         XCTAssertFalse(app.showingAuth)
         XCTAssertEqual(app.user?.id, "local")

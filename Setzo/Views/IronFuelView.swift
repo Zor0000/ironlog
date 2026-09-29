@@ -231,6 +231,12 @@ struct IronFuelView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("fuel-buddy-source-detail")
 
+            Text("Food ideas only, not medical advice or a treatment plan. A Supabase function sends your meal request, allergies, intolerances, and food preferences to Groq when you tap Find. AI can make mistakes: check labels and cross-contact, and follow your clinician or dietitian's advice for medical needs.")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.muted2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("fuel-buddy-medical-disclaimer")
+
             if passport.requiresProfessionalGuidance {
                 responseMessage(icon: "stethoscope", title: "Use your care plan", detail: status.detail, color: Theme.accent)
             } else if let outcome {

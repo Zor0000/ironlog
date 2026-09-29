@@ -56,9 +56,9 @@ struct SettingsView: View {
                     if deleted {
                         dismiss()
                     } else {
-                        dataDeletionError = isCloudUser
-                            ? "Couldn’t delete your account. Check your connection and try again. Your local data was kept."
-                            : "Couldn’t delete workout data. Check your connection and try again. Nothing was removed from this iPhone."
+                        dataDeletionError = app.storageError ?? (isCloudUser
+                            ? "Account deletion did not finish. Check your connection or sign in again, then retry."
+                            : "Couldn’t delete local data. Please try again.")
                     }
                 }
             }
@@ -122,18 +122,18 @@ struct SettingsView: View {
     }
 
     private var deleteActionTitle: String {
-        isCloudUser ? "Delete Account & Data" : "Delete Workout Data"
+        isCloudUser ? "Delete Account & Data" : "Delete Local Data & Guest Account"
     }
 
     private var deleteConfirmationTitle: String {
-        isCloudUser ? "Delete account?" : "Delete workout data?"
+        isCloudUser ? "Delete account?" : "Delete local data?"
     }
 
     private var deleteConfirmationMessage: String {
         if isCloudUser {
-            return "This permanently deletes your sign-in account, workouts, personal records, routines, body weight, and water history from this iPhone and the cloud. This cannot be undone."
+            return "This requests deletion of your sign-in account and its cloud records, then removes this account's local data, Nutrition Passport, and earlier guest data from this iPhone. A connection is needed. This cannot be undone."
         }
-        return "This permanently deletes your workouts, personal records, routines, body weight, and water history from this iPhone. This cannot be undone."
+        return "This permanently removes local workouts, routines, body weight, water history, and Nutrition Passport. If you used Fuel Buddy, its anonymous guest account will be deleted online or retried later. This cannot be undone."
     }
 
     // MARK: Units
@@ -285,7 +285,10 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://zor0000.github.io/setzo/privacy.html")!) {
                 aboutRow("Privacy Policy", systemImage: "hand.raised")
             }
-            Link(destination: URL(string: "mailto:neerajchormale39@gmail.com")!) {
+            Link(destination: URL(string: "https://zor0000.github.io/setzo/terms.html")!) {
+                aboutRow("Terms of Use", systemImage: "doc.text")
+            }
+            Link(destination: URL(string: "mailto:neerajcwork@gmail.com")!) {
                 aboutRow("Support", systemImage: "envelope")
             }
         }

@@ -41,7 +41,7 @@ Setzo makes it easy to plan a workout, log every set, record a run, see the prog
 
 ## Privacy at a glance
 
-Need help with Setzo? Visit [Setzo Support](https://zor0000.github.io/setzo/support.html).
+Need help with Setzo? Visit [Setzo Support](https://zor0000.github.io/setzo/support.html), the [Privacy Policy](https://zor0000.github.io/setzo/privacy.html), or the [Terms of Use](https://zor0000.github.io/setzo/terms.html).
 
 Without an account, workout and run entries stay on this iPhone. With an account, saved workouts, runs/walks, records, routines, and their notes sync through Supabase; a guest workout is uploaded after sign-in. Setzo does not collect or upload GPS or location data. The full Nutrition Passport, body weight, water log, and unfinished workout draft stay on-device. When you use Fuel Buddy, your meal request and relevant food preferences go through Supabase to Groq to generate dish names; guests use a separate anonymous Supabase session. The app links the Supabase Swift SDK and Liveline; it has no advertising or analytics SDK. See the [privacy policy](privacy.html) and [App Store privacy checklist](docs/ios-release.md#app-store-privacy-checklist) before setting the App Store Connect privacy answers.
 

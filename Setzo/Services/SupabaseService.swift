@@ -4,6 +4,8 @@ import Supabase
 class SupabaseService {
     private static let projectURL = URL(string: "https://dvqevdydldxjqjrpkkjc.supabase.co")!
     private static let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2cWV2ZHlkbGR4anFqcnBra2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NzE3NDQsImV4cCI6MjA4ODA0Nzc0NH0.HrLewQwabuPNeD-8BZu4Muxju_4IDcJ3FuNhfwWm3t0"
+    fileprivate static var publicKey: String { anonKey }
+    fileprivate static var accountDeletionURL: URL { projectURL.appendingPathComponent("functions/v1/delete-account") }
     private static let authCallbackURL = URL(string: "setzo://auth/callback")!
     private static let passwordRecoveryURL = URL(string: "setzo://auth/reset-password")!
     private let projectURL = SupabaseService.projectURL
@@ -70,6 +72,25 @@ class SupabaseService {
         auth?.accessToken.isEmpty == false
     }
 
+    /// A second device can retain a locally valid JWT after another device
+    /// deletes the account. Ask Auth for the live user before syncing; only an
+    /// explicit user_not_found response authorizes local data removal.
+    func isCurrentAccountDeleted() async -> Bool {
+        guard let token = auth?.accessToken else { return false }
+        var request = URLRequest(url: apiURL("/auth/v1/user"))
+        request.timeoutInterval = 8
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let response = response as? HTTPURLResponse, response.statusCode == 403 else { return false }
+            return (try? Self.makeDecoder().decode(SupabaseErrorPayload.self, from: data))?.errorCode == "user_not_found"
+        } catch {
+            // Offline and transient failures must not erase local workouts.
+            return false
+        }
+    }
+
     func signIn(email: String, password: String) async throws -> UserProfile {
         let session = try await client.auth.signIn(email: email, password: password)
         apply(session)
@@ -98,6 +119,19 @@ class SupabaseService {
             redirectTo: Self.authCallbackURL
         )
         apply(session)
+        guard let currentUser else { throw SupabaseError.emptyResponse }
+        return currentUser
+    }
+
+    func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> UserProfile {
+        let session = try await client.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+        apply(session)
+        if let fullName, !fullName.isEmpty {
+            _ = try? await client.auth.update(user: UserAttributes(data: ["full_name": .string(fullName)]))
+            if let updatedSession = client.auth.currentSession { apply(updatedSession) }
+        }
         guard let currentUser else { throw SupabaseError.emptyResponse }
         return currentUser
     }
@@ -298,6 +332,14 @@ class SupabaseService {
         let _: [EmptyResponse] = try await decodeWithAuthRetry(request, emptyValue: [])
         auth = nil
         KeychainStore.delete(service: sessionService, account: sessionAccount)
+    }
+
+    func deleteFuelBuddyGuestAccountIfPresent() async throws {
+        try await fuelBuddyGuest.deleteIfPresent()
+    }
+
+    func retryPendingFuelBuddyGuestDeletion() async {
+        await fuelBuddyGuest.retryPendingDeletion()
     }
 
     private func insertSession(_ session: WorkoutSession, userID: String) async throws -> RemoteSessionInsertResult {
@@ -873,10 +915,14 @@ extension SupabaseService {
 }
 
 private actor FuelBuddyGuestSession {
+    private static let pendingDeletionKey = "ironlog-fuel-buddy-guest-deletion-pending"
     private let client = SupabaseService.makeFuelBuddyGuestClient()
     private var pending: Task<String, Error>?
 
     func accessToken() async throws -> String {
+        if UserDefaults.standard.bool(forKey: Self.pendingDeletionKey) {
+            try await deleteIfPresent()
+        }
         if let pending { return try await pending.value }
         let client = self.client
         let task = Task<String, Error> {
@@ -886,5 +932,31 @@ private actor FuelBuddyGuestSession {
         pending = task
         defer { pending = nil }
         return try await task.value
+    }
+
+    func retryPendingDeletion() async {
+        guard UserDefaults.standard.bool(forKey: Self.pendingDeletionKey) else { return }
+        try? await deleteIfPresent()
+    }
+
+    func deleteIfPresent() async throws {
+        guard client.auth.currentSession != nil else {
+            UserDefaults.standard.removeObject(forKey: Self.pendingDeletionKey)
+            return
+        }
+        // Keep the request durable across a lost connection or app restart.
+        UserDefaults.standard.set(true, forKey: Self.pendingDeletionKey)
+        var request = URLRequest(url: SupabaseService.accountDeletionURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(try await client.auth.session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("\(SupabaseService.publicKey)", forHTTPHeaderField: "apikey")
+        request.httpBody = Data("{}".utf8)
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse, response.statusCode == 204 else {
+            throw SupabaseError.requestFailed("Guest account deletion is pending. Try again online.")
+        }
+        try? await client.auth.signOut(scope: .local)
+        UserDefaults.standard.removeObject(forKey: Self.pendingDeletionKey)
     }
 }

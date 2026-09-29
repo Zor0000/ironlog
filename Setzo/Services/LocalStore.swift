@@ -92,6 +92,7 @@ actor LocalStore {
             try data.write(to: backupURL(for: destination), options: .atomic)
         }
         try data.write(to: destination, options: .atomic)
+        if replacingBackup { try removeDamagedCopies(for: destination) }
     }
 
     func clear(ownerID: String? = nil) throws {
@@ -99,6 +100,17 @@ actor LocalStore {
         let backup = backupURL(for: destination)
         if FileManager.default.fileExists(atPath: backup.path) { try FileManager.default.removeItem(at: backup) }
         if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
+        try removeDamagedCopies(for: destination)
+    }
+
+    private func removeDamagedCopies(for destination: URL) throws {
+        // A prior recovery may have moved a damaged snapshot aside. It still
+        // contains the user's data and must go when that owner's data is deleted.
+        let prefix = destination.deletingPathExtension().lastPathComponent + ".damaged-"
+        for file in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        where file.lastPathComponent.hasPrefix(prefix) && file.pathExtension == "json" {
+            try FileManager.default.removeItem(at: file)
+        }
     }
 
     private func decode(_ data: Data) throws -> AppSnapshot {

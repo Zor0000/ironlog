@@ -89,7 +89,7 @@ struct WorkoutsView: View {
                     Text("Built-in plans couldn’t load. You can still start a Free Workout above.")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.muted2)
-                    Link(destination: URL(string: "mailto:neerajchormale39@gmail.com?subject=Setzo%20workout%20library")!) {
+                    Link(destination: URL(string: "mailto:neerajcwork@gmail.com?subject=Setzo%20workout%20library")!) {
                         Label("Contact Support", systemImage: "envelope")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Theme.text)
