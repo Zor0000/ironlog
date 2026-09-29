@@ -68,7 +68,10 @@ def main():
                              "bundleIdCapabilities")
     if not any(item["attributes"].get("capabilityType") == "APPLE_ID_AUTH" for item in capabilities):
         asc("bundle-ids", "capabilities", "add", "--bundle", bundle_id,
-            "--capability", "APPLE_ID_AUTH", "--if-exists", "skip")
+            "--capability", "APPLE_ID_AUTH", "--if-exists", "skip",
+            "--settings", json.dumps([{"key": "APPLE_ID_AUTH_APP_CONSENT", "options": [
+                {"key": "PRIMARY_APP_CONSENT", "enabled": True}
+            ]}]))
 
     app = resources(asc("apps", "view", "--id", APP_ID), "apps")[0]
     primary_locale = app["attributes"]["primaryLocale"]
