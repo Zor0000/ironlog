@@ -124,6 +124,15 @@ def main():
     rating_flags = []
     for field, flag in frequency_fields.items():
         rating_flags.extend([flag, attributes.get(field) or "NONE"])
+    for field, flag in {
+        "advertising": "--advertising", "ageAssurance": "--age-assurance",
+        "gambling": "--gambling", "lootBox": "--loot-box",
+        "messagingAndChat": "--messaging-and-chat", "parentalControls": "--parental-controls",
+        "socialMedia": "--social-media", "socialMediaAgeRestricted": "--social-media-age-restricted",
+        "unrestrictedWebAccess": "--unrestricted-web-access",
+        "userGeneratedContent": "--user-generated-content",
+    }.items():
+        rating_flags.extend([flag, str(bool(attributes.get(field))).lower()])
     asc("age-rating", "edit", "--id", declarations[0]["id"],
         "--health-or-wellness-topics", "true", *rating_flags)
 
