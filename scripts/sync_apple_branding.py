@@ -101,7 +101,31 @@ def main():
 
     # IronFuel and workout guidance are health/wellness topics in Apple's age
     # questionnaire. Preserve the other age-rating answers for human review.
-    asc("age-rating", "edit", "--app", APP_ID, "--health-or-wellness-topics", "true")
+    declarations = resources(asc("age-rating", "view", "--app", APP_ID), "ageRatingDeclarations")
+    if len(declarations) != 1:
+        raise RuntimeError("Could not identify the current age-rating declaration")
+    attributes = declarations[0]["attributes"]
+    # Apple requires the content-frequency fields even for a partial update.
+    # Preserve existing answers; absent fields describe content Setzo does not offer.
+    frequency_fields = {
+        "alcoholTobaccoOrDrugUseOrReferences": "--alcohol-tobacco-drug-use",
+        "contests": "--contests", "gamblingSimulated": "--gambling-simulated",
+        "gunsOrOtherWeapons": "--guns-or-other-weapons",
+        "horrorOrFearThemes": "--horror-fear",
+        "matureOrSuggestiveThemes": "--mature-suggestive",
+        "medicalOrTreatmentInformation": "--medical-treatment",
+        "profanityOrCrudeHumor": "--profanity-humor",
+        "sexualContentGraphicAndNudity": "--sexual-content-graphic-nudity",
+        "sexualContentOrNudity": "--sexual-content-nudity",
+        "violenceCartoonOrFantasy": "--violence-cartoon",
+        "violenceRealistic": "--violence-realistic",
+        "violenceRealisticProlongedGraphicOrSadistic": "--violence-realistic-graphic",
+    }
+    rating_flags = []
+    for field, flag in frequency_fields.items():
+        rating_flags.extend([flag, attributes.get(field) or "NONE"])
+    asc("age-rating", "edit", "--id", declarations[0]["id"],
+        "--health-or-wellness-topics", "true", *rating_flags)
 
     for version in resources(asc("versions", "list", "--app", APP_ID, "--paginate"), "appStoreVersions"):
         if version["attributes"].get("appStoreState") == "PREPARE_FOR_SUBMISSION":
