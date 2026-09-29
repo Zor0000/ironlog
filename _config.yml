@@ -14,11 +14,5 @@ defaults:
         height: 1024
         alt: Setzo app icon
 exclude:
-  - supabase
-  - scripts
   - build
-  - Setzo
-  - SetzoTests
-  - SetzoUITests
-  - SetzoWidget
-  - Setzo.xcodeproj
+  - supabase/email-branding.json
