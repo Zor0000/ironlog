@@ -21,7 +21,7 @@ for build in builds:
     notes = resources(asc("builds", "test-notes", "list", "--build-id", build["id"]), "betaBuildLocalizations")
     for note in notes:
         old = note["attributes"].get("whatsNew") or ""
-        updated = renamed(old)
+        updated = old if notice in old else renamed(old)
         if note["attributes"]["locale"].startswith("en") and notice not in old:
             updated = notice + ("\n\n" + updated if updated else "")
         if updated != old:

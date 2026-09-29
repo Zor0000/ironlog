@@ -1,0 +1,24 @@
+title: Setzo
+description: Setzo — a free iPhone workout, running, and progress tracker.
+url: https://zor0000.github.io
+baseurl: /setzo
+twitter:
+  card: summary_large_image
+defaults:
+  - scope:
+      path: ""
+    values:
+      image:
+        path: /website/public/app-icon.png
+        width: 1024
+        height: 1024
+        alt: Setzo app icon
+exclude:
+  - supabase
+  - scripts
+  - build
+  - Setzo
+  - SetzoTests
+  - SetzoUITests
+  - SetzoWidget
+  - Setzo.xcodeproj

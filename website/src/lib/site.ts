@@ -4,6 +4,8 @@ export const SITE = {
   description:
     "A fast, free, no-nonsense gym tracker. Log every set, run any split, and watch your PRs and streaks grow.",
   github: "https://github.com/Zor0000/setzo",
+  support: "https://zor0000.github.io/setzo/support.html",
+  privacy: "https://zor0000.github.io/setzo/privacy.html",
 };
 
 export const NAV_LINKS = [

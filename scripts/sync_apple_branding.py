@@ -9,6 +9,8 @@ import subprocess
 
 APP_ID = os.environ["ASC_APP_ID"]
 PRIVACY_URL = "https://zor0000.github.io/setzo/privacy.html"
+WEBSITE_URL = "https://zor0000.github.io/setzo/"
+SUPPORT_URL = WEBSITE_URL + "support.html"
 
 
 def asc(*args):
@@ -76,20 +78,19 @@ def main():
         flags = changed_fields(version["attributes"], {
             "description": "--description", "keywords": "--keywords",
             "promotionalText": "--promotional-text", "whatsNew": "--whats-new",
-            "marketingUrl": "--marketing-url", "supportUrl": "--support-url",
         })
-        if flags:
-            asc("localizations", "update", "--id", version["id"], *flags)
+        asc("localizations", "update", "--id", version["id"],
+            "--marketing-url", WEBSITE_URL, "--support-url", SUPPORT_URL, *flags)
 
     betas = resources(asc("testflight", "app-localizations", "list", "--app", APP_ID,
                           "--paginate"), "betaAppLocalizations")
     for beta in betas:
         flags = changed_fields(beta["attributes"], {
-            "description": "--description", "marketingUrl": "--marketing-url",
+            "description": "--description",
             "tvOsPrivacyPolicy": "--tv-os-privacy-policy",
         })
         asc("testflight", "app-localizations", "update", "--id", beta["id"],
-            "--privacy-policy-url", PRIVACY_URL, *flags)
+            "--privacy-policy-url", PRIVACY_URL, "--marketing-url", WEBSITE_URL, *flags)
 
     groups = resources(asc("testflight", "groups", "list", "--app", APP_ID,
                            "--paginate"), "betaGroups")
