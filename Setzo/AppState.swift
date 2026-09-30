@@ -210,7 +210,11 @@ final class AppState: ObservableObject {
             do { try await localStore.migrateLegacyStoreIfNeeded(to: ownerID) }
             catch { storageError = error.localizedDescription; user = restoredUser ?? localUser; return }
         }
-        do { applySnapshot(try await localStore.load(ownerID: activeStoreOwnerID), suppressOnboarding: suppressOnboarding) }
+        await LiveWorkoutEngine.shared.waitForPendingOperations()
+        do {
+            applySnapshot(try await localStore.load(ownerID: activeStoreOwnerID),
+                          suppressOnboarding: suppressOnboarding, syncLiveActivity: false)
+        }
         catch { storageError = error.localizedDescription; user = restoredUser ?? localUser; return }
         if await localStore.didRecoverFromBackup {
             syncMessage = "Recovered the previous local save. Check your recent changes."
@@ -232,6 +236,8 @@ final class AppState: ObservableObject {
         if hasActiveWorkout {
             reconcileFromLiveActivity()
             updateLiveActivity(clearedDraft: false)
+        } else {
+            updateLiveActivity(clearedDraft: true)
         }
 
         #if DEBUG
@@ -1485,7 +1491,8 @@ final class AppState: ObservableObject {
         )
     }
 
-    private func applySnapshot(_ snapshot: AppSnapshot, suppressOnboarding: Bool = false) {
+    private func applySnapshot(_ snapshot: AppSnapshot, suppressOnboarding: Bool = false,
+                               syncLiveActivity: Bool = true) {
         resetActiveWorkout()
         selectedTab = .workouts
         deletedCloudSessionIDs = snapshot.deletedCloudSessionIDs
@@ -1526,7 +1533,7 @@ final class AppState: ObservableObject {
                 selectedTab = .log
             }
         }
-        updateLiveActivity(clearedDraft: snapshot.draft == nil)
+        if syncLiveActivity { updateLiveActivity(clearedDraft: snapshot.draft == nil) }
     }
 
     @discardableResult

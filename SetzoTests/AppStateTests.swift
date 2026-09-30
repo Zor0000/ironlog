@@ -1886,6 +1886,33 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertEqual(saved.sessions.first?.exercises.first?.sets.first?.reps, 12)
     }
 
+    func testColdLaunchPreservesNewerLockScreenSetEdits() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = LocalStore(directory: folder)
+        let app = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await app.boot()
+        app.startFreeWorkout()
+        app.addExercise(name: "Push Ups")
+        await app.signOut()
+        // The disk draft is incomplete; the lock-screen intent completes it.
+        await LiveWorkoutEngine.shared.mutate { state in
+            var edited = state
+            edited.exercises[0].sets[0].reps = "15"
+            edited.exercises[0].sets[0].done = true
+            return edited
+        }
+        let relaunched = AppState(localStore: store, supabase: OfflineCloud(), allowDebugSeeds: false)
+        await relaunched.boot()
+        XCTAssertEqual(relaunched.todayExercises.first?.sets.first?.reps, "15")
+        XCTAssertEqual(relaunched.validCompletedSetCount, 1)
+        await relaunched.finishWorkout(note: "From the lock screen")
+        let saved = try await store.load()
+        XCTAssertEqual(saved.sessions.first?.exercises.first?.sets.first?.reps, 15)
+        LiveWorkoutEngine.shared.end()
+        await LiveWorkoutEngine.shared.waitForPendingOperations()
+    }
+
     func testDiscardingStartedWorkoutNeverCreatesHistory() async throws {
         let folder = try directory()
         defer { try? FileManager.default.removeItem(at: folder) }

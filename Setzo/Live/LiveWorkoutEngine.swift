@@ -180,10 +180,8 @@ final class LiveWorkoutEngine {
         return ActivityContent(state: .init(workout: state), staleDate: stale)
     }
 
-    #if DEBUG
-    /// Test hook: await all queued operations so assertions see a settled state.
+    /// Finish queued app/intent updates before reading a persisted snapshot.
     func waitForPendingOperations() async {
         await tail.value
     }
-    #endif
 }
