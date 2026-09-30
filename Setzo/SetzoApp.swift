@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 @main
 struct SetzoApp: App {
@@ -12,6 +13,9 @@ struct SetzoApp: App {
                 .tint(Theme.accent)
                 .task {
                     await appState.boot()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+                    Task { await appState.handleAppleCredentialRevocation() }
                 }
                 .onOpenURL { url in
                     Task { await appState.handleAuthURL(url) }

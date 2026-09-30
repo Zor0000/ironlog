@@ -55,7 +55,7 @@ struct SettingsView: View {
                         : await app.deleteWorkoutData()
                     if deleted {
                         dismiss()
-                    } else {
+                    } else if !app.needsAppleRevocationFallback {
                         dataDeletionError = app.storageError ?? (isCloudUser
                             ? "Account deletion did not finish. Check your connection or sign in again, then retry."
                             : "Couldn’t delete local data. Please try again.")
@@ -65,6 +65,20 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(deleteConfirmationMessage)
+        }
+        .alert("Remove Apple access manually?", isPresented: $app.needsAppleRevocationFallback) {
+            Button("Delete Account & Data", role: .destructive) {
+                Task {
+                    if await app.deleteAccount(allowManualAppleRevocation: true) {
+                        dismiss()
+                    } else {
+                        dataDeletionError = app.storageError ?? "Account deletion did not finish. Please try again."
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Automatic Apple revocation is unavailable. You can still delete your Setzo account and data. Then open iPhone Settings → your name → Sign in with Apple → Setzo and stop using Sign in with Apple.")
         }
         .task {
             notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
@@ -95,6 +109,7 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+                .disabled(app.isBusy)
             } else {
                 settingsButton("Sign In / Create Account", systemImage: "person.badge.plus") {
                     dismiss()
@@ -282,13 +297,13 @@ struct SettingsView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.muted2)
             }
-            Link(destination: URL(string: "https://zor0000.github.io/setzo/privacy.html")!) {
+            Link(destination: URL(string: "https://www.neeraj.works/setzo/privacy.html")!) {
                 aboutRow("Privacy Policy", systemImage: "hand.raised")
             }
-            Link(destination: URL(string: "https://zor0000.github.io/setzo/terms.html")!) {
+            Link(destination: URL(string: "https://www.neeraj.works/setzo/terms.html")!) {
                 aboutRow("Terms of Use", systemImage: "doc.text")
             }
-            Link(destination: URL(string: "mailto:neerajcwork@gmail.com")!) {
+            Link(destination: URL(string: "mailto:neerajchormale39@gmail.com")!) {
                 aboutRow("Support", systemImage: "envelope")
             }
         }

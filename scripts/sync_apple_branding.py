@@ -8,10 +8,10 @@ import subprocess
 
 
 APP_ID = os.environ["ASC_APP_ID"]
-PRIVACY_URL = "https://zor0000.github.io/setzo/privacy.html"
-WEBSITE_URL = "https://zor0000.github.io/setzo/"
+PRIVACY_URL = "https://www.neeraj.works/setzo/privacy.html"
+WEBSITE_URL = "https://www.neeraj.works/setzo/"
 SUPPORT_URL = WEBSITE_URL + "support.html"
-SUPPORT_EMAIL = "neerajcwork@gmail.com"
+SUPPORT_EMAIL = "neerajchormale39@gmail.com"
 IOS_BUNDLE_ID = "com.parthjadhav.ironlog"
 
 
@@ -138,6 +138,20 @@ def main():
 
     for version in resources(asc("versions", "list", "--app", APP_ID, "--paginate"), "appStoreVersions"):
         if version["attributes"].get("appStoreState") == "PREPARE_FOR_SUBMISSION":
+            existing_details = resources(asc("review", "details-for-version", "--version-id", version["id"]),
+                                         "appStoreReviewDetails")
+            if existing_details:
+                detail = existing_details[0]
+                asc("review", "details-update", "--id", detail["id"],
+                    "--contact-first-name", "Neeraj", "--contact-last-name", "Chormale",
+                    "--contact-email", SUPPORT_EMAIL)
+                verified_details = resources(asc("review", "details-get", "--id", detail["id"]),
+                                             "appStoreReviewDetails")
+                assert verified_details and verified_details[0]["attributes"]["contactEmail"] == SUPPORT_EMAIL
+                for field in ("contactPhone", "notes", "demoAccountRequired", "demoAccountName"):
+                    assert verified_details[0]["attributes"].get(field) == detail["attributes"].get(field), field
+                print("Verified existing App Review contact email; phone and reviewer instructions preserved.")
+                continue
             contact_phone = os.environ.get("ASC_REVIEW_CONTACT_PHONE", "").strip()
             if not contact_phone:
                 print("App Review contact remains a release gate: ASC_REVIEW_CONTACT_PHONE is required.")

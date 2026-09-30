@@ -6,7 +6,7 @@ verify_jwt = true
 [auth]
 enable_anonymous_sign_ins = true
 additional_redirect_urls = ["https://github.com/Zor0000/setzo", "setzo://auth/callback", "setzo://auth/reset-password", "ironlog://auth/callback", "ironlog://auth/reset-password"]
-site_url = "https://zor0000.github.io/setzo/"
+site_url = "https://www.neeraj.works/setzo/"
 
 [auth.email]
 max_frequency = "1m0s"

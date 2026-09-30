@@ -67,11 +67,13 @@ jobs:
 
       - name: Sync Setzo name and Apple metadata
         run: |
+          set -euo pipefail
           asc auth login --name setzo \
             --key-id "$ASC_API_KEY_ID" \
             --issuer-id "$ASC_API_ISSUER_ID" \
             --private-key "$ASC_API_PRIVATE_KEY_PATH" > /dev/null
-          python3 scripts/sync_apple_branding.py
+          mkdir -p build
+          python3 scripts/sync_apple_branding.py | tee build/apple-metadata-sync.log
 
       - name: Select an installed iPhone simulator
         run: |
@@ -88,7 +90,8 @@ jobs:
             -scheme Setzo \
             -destination "id=$SIMULATOR_ID" \
             -only-testing:SetzoTests \
-            CODE_SIGNING_ALLOWED=NO
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO
 
       # Without a distribution certificate already on the runner, xcodebuild's
       # -allowProvisioningUpdates mints a fresh one per run until the account
@@ -138,6 +141,18 @@ jobs:
 
       - name: Upload build with asc
         run: scripts/upload_testflight.sh
+
+      - name: Preserve the signed archive and release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Setzo-release-${{ github.run_id }}
+          path: |
+            build/Setzo.xcarchive
+            build/export/Setzo.ipa
+            build/apple-metadata-sync.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Delete the signing keychain
         if: always()

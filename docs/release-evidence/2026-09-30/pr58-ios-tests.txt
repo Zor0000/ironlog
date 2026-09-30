@@ -1,0 +1,12 @@
+Test Suite 'Selected tests' passed at 2026-09-30 16:35:34.270.
+	 Executed 27 tests, with 0 failures (0 unexpected) in 0.059 (0.065) seconds
+2026-09-30 16:35:34.593 xcodebuild[58724:23960725] [MT] IDETestOperationsObserverDebug: 16.711 elapsed -- Testing started completed.
+2026-09-30 16:35:34.593 xcodebuild[58724:23960725] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-30 16:35:34.593 xcodebuild[58724:23960725] [MT] IDETestOperationsObserverDebug: 16.711 sec, +16.711 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/setzo-pr58-derived/Logs/Test/Test-Setzo-2026.09.30_16-35-14-+0530.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

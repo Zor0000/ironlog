@@ -1721,6 +1721,22 @@ private final class OfflineCloud: SupabaseService {
     var loseDeleteResponses = 0
     var loseWorkoutWipeResponses = 0
     var workoutWipeCalls = 0
+    var accountDeletionError: Error?
+    var manualRevocationRequired = false
+    var accountDeletionCalls = 0
+    var guestDeletionCalls = 0
+
+    @MainActor
+    override func deleteAccount(allowManualAppleRevocation: Bool = false) async throws -> Bool {
+        accountDeletionCalls += 1
+        if let accountDeletionError { throw accountDeletionError }
+        profile = nil
+        return manualRevocationRequired
+    }
+
+    override func deleteFuelBuddyGuestAccountIfPresent() async throws {
+        guestDeletionCalls += 1
+    }
 
     override var currentUser: UserProfile? { profile }
     override var isAuthenticated: Bool { profile != nil }
@@ -1787,6 +1803,54 @@ private final class OfflineCloud: SupabaseService {
 
 @MainActor
 final class ReleaseReadinessTests: XCTestCase {
+    func testCancelledAppleDeletionPreservesAccountWorkoutsAndGuest() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "apple-account", email: "apple@example.com", fullName: "Apple")
+        cloud.accountDeletionError = CancellationError()
+        let session = WorkoutSession(createdAt: Date(), split: "Strength", exercises: [LoggedExercise(name: "Push Ups", bodyweight: true, timed: false, sets: [LoggedSet(reps: 10)])], syncState: .synced)
+        cloud.remoteSessions = [session]
+        let store = LocalStore(directory: folder)
+        try await store.save(AppSnapshot(sessions: [session]), ownerID: "apple-account")
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        let deleted = await app.deleteAccount()
+        XCTAssertFalse(deleted)
+        XCTAssertEqual(app.user?.id, "apple-account")
+        XCTAssertEqual(app.sessions.map(\.id), [session.id])
+        XCTAssertEqual(cloud.guestDeletionCalls, 0)
+        XCTAssertFalse(app.needsAppleRevocationFallback)
+    }
+
+    func testManualRevocationReminderSurvivesDeletionAndRelaunch() async throws {
+        let key = "setzo-apple-manual-revocation"
+        let previous = UserDefaults.standard.object(forKey: key)
+        defer { UserDefaults.standard.set(previous, forKey: key) }
+        UserDefaults.standard.removeObject(forKey: key)
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cloud = OfflineCloud()
+        cloud.profile = UserProfile(id: "apple-account", email: "apple@example.com", fullName: "Apple")
+        cloud.accountDeletionError = SupabaseError.appleRevocationUnconfigured
+        let store = LocalStore(directory: folder)
+        let app = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        await app.boot()
+        let blocked = await app.deleteAccount()
+        XCTAssertFalse(blocked)
+        XCTAssertTrue(app.needsAppleRevocationFallback)
+        cloud.accountDeletionError = nil
+        cloud.manualRevocationRequired = true
+        let deleted = await app.deleteAccount(allowManualAppleRevocation: true)
+        XCTAssertTrue(deleted)
+        XCTAssertTrue(app.showAppleRevocationInstructions)
+        XCTAssertEqual(cloud.guestDeletionCalls, 1)
+        let relaunched = AppState(localStore: store, supabase: cloud, allowDebugSeeds: false)
+        XCTAssertTrue(relaunched.showAppleRevocationInstructions)
+        relaunched.showAppleRevocationInstructions = false
+        XCTAssertFalse(AppState(localStore: store, supabase: cloud, allowDebugSeeds: false).showAppleRevocationInstructions)
+    }
+
     func testUnfinishedWorkoutRestoresAsDraftUntilExplicitSave() async throws {
         let folder = try directory()
         defer { try? FileManager.default.removeItem(at: folder) }

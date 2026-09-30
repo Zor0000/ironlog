@@ -1,0 +1,29 @@
+running 12 tests from ./supabase/functions/delete-account/handler.test.ts
+rejects missing or invalid authentication before deletion ... ok (6ms)
+rejects unsupported methods and malformed bodies ... ok (3ms)
+requires fresh Apple authorization and ignores supplied target IDs ...
+------- output -------
+Apple authorization revoked
+----- output end -----
+requires fresh Apple authorization and ignores supplied target IDs ... ok (1ms)
+missing credentials need explicit boolean manual-revocation acknowledgement ...
+------- output -------
+Manual Apple revocation selected
+----- output end -----
+missing credentials need explicit boolean manual-revocation acknowledgement ... ok (621µs)
+manual flag cannot bypass configured Apple revocation or a provider failure ... ok (672µs)
+email and guest accounts delete without Apple credentials ... ok (56µs)
+malformed Apple identities fail closed ... ok (63µs)
+database failure never reports successful account deletion ...
+------- output -------
+Apple authorization revoked
+Account deletion failed
+----- output end -----
+database failure never reports successful account deletion ... ok (253µs)
+Apple exchange verifies signed identity and revokes the refresh token ... ok (169ms)
+Apple exchange can revoke an access token when no refresh token is supplied ... ok (107ms)
+mismatched Apple subject, audience, issuer and expiry never reach revocation ... ok (175ms)
+Apple exchange, missing-token and revocation failures are surfaced ... ok (411ms)
+
+ok | 12 passed | 0 failed (880ms)
+
