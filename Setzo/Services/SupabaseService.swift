@@ -1,5 +1,7 @@
 import Foundation
 import Supabase
+import AuthenticationServices
+import UIKit
 
 class SupabaseService {
     private static let projectURL = URL(string: "https://dvqevdydldxjqjrpkkjc.supabase.co")!
@@ -323,15 +325,26 @@ class SupabaseService {
 
     /// The service-role key stays inside this authenticated Edge Function. The
     /// app sends only its user JWT and never receives administrative credentials.
-    func deleteAccount() async throws {
+    @MainActor
+    func deleteAccount(allowManualAppleRevocation: Bool = false) async throws {
         guard isAuthenticated else { throw SupabaseError.notAuthenticated }
         var request = URLRequest(url: apiURL("/functions/v1/delete-account"))
         request.httpMethod = "POST"
         addRestHeaders(to: &request)
-        request.httpBody = Data("{}".utf8)
-        let _: [EmptyResponse] = try await decodeWithAuthRetry(request, emptyValue: [])
-        auth = nil
-        KeychainStore.delete(service: sessionService, account: sessionAccount)
+        request.httpBody = try encode(AccountDeletionRequest(
+            manualAppleRevocation: allowManualAppleRevocation
+        ))
+        do {
+            let _: EmptyResponse = try await decodeWithAuthRetry(request, emptyValue: EmptyResponse())
+        } catch SupabaseError.appleAuthorizationRequired {
+            // Apple codes are single-use and short-lived. Obtain one only for
+            // this deletion attempt; never save it in the account snapshot.
+            let authorizer = AppleDeletionAuthorization()
+            let code = try await authorizer.authorizationCode()
+            request.httpBody = try encode(AccountDeletionRequest(appleAuthorizationCode: code))
+            let _: EmptyResponse = try await decodeWithAuthRetry(request, emptyValue: EmptyResponse())
+        }
+        await signOut()
     }
 
     func deleteFuelBuddyGuestAccountIfPresent() async throws {
@@ -492,6 +505,12 @@ class SupabaseService {
         guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
             let payload = try? Self.makeDecoder().decode(SupabaseErrorPayload.self, from: data)
+            if payload?.errorCode == "apple_reauthorization_required" {
+                throw SupabaseError.appleAuthorizationRequired
+            }
+            if payload?.errorCode == "apple_revocation_unavailable" {
+                throw SupabaseError.appleRevocationUnconfigured
+            }
             let message = payload?.msg
                 ?? payload?.message
                 ?? String(data: data, encoding: .utf8)
@@ -557,6 +576,7 @@ class SupabaseService {
 
 enum SupabaseError: LocalizedError {
     case notAuthenticated, sessionExpired, invalidResponse, emptyResponse, unauthorized(String), requestFailed(String), partialBackup(backup: String, cleanup: String)
+    case appleAuthorizationRequired, appleRevocationUnconfigured
 
     var errorDescription: String? {
         switch self {
@@ -564,6 +584,8 @@ enum SupabaseError: LocalizedError {
         case .sessionExpired: "Your session expired. Please sign in again."
         case .invalidResponse: "Supabase returned an invalid response."
         case .emptyResponse: "Supabase returned no data."
+        case .appleAuthorizationRequired: "Confirm with Apple to delete your account."
+        case .appleRevocationUnconfigured: "Automatic Apple revocation is unavailable."
         case .unauthorized(let message): message
         case .requestFailed(let message): message
         case .partialBackup(let backup, let cleanup):
@@ -573,6 +595,63 @@ enum SupabaseError: LocalizedError {
 }
 
 struct EmptyResponse: Codable {}
+
+struct AccountDeletionRequest: Encodable {
+    var appleAuthorizationCode: String? = nil
+    var manualAppleRevocation: Bool = false
+}
+
+@MainActor
+private final class AppleDeletionAuthorization: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private var continuation: CheckedContinuation<String, Error>?
+    private var controller: ASAuthorizationController?
+    private var window: UIWindow?
+
+    func authorizationCode() async throws -> String {
+        window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive }
+            .flatMap(\.windows).first { $0.isKeyWindow }
+        guard window != nil else { throw SupabaseError.requestFailed("Open Setzo and try again.") }
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            self.controller = controller
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
+        }
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        // Captured before starting the authorization; keep the window alive
+        // until Apple's delegate finishes.
+        window!
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let data = credential.authorizationCode,
+              let code = String(data: data, encoding: .utf8), !code.isEmpty else {
+            finish(.failure(SupabaseError.requestFailed("Apple did not confirm deletion. Please try again.")))
+            return
+        }
+        finish(.success(code))
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        finish(.failure(error))
+    }
+
+    private func finish(_ result: Result<String, Error>) {
+        let pending = continuation
+        continuation = nil
+        controller = nil
+        window = nil
+        pending?.resume(with: result)
+    }
+}
 
 struct AuthSession: Codable {
     var accessToken: String

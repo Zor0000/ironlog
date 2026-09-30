@@ -16,6 +16,19 @@ final class SupabaseWireFormatTests: XCTestCase {
 
     // MARK: - Auth
 
+    func testAccountDeletionOnlySendsFreshCodeAndExplicitManualChoice() throws {
+        let normal = try json(AccountDeletionRequest())
+        XCTAssertEqual(normal["manual_apple_revocation"] as? Bool, false)
+        XCTAssertNil(normal["apple_authorization_code"])
+        let apple = try json(AccountDeletionRequest(appleAuthorizationCode: "fresh-code"))
+        XCTAssertEqual(apple["apple_authorization_code"] as? String, "fresh-code")
+        XCTAssertEqual(apple["manual_apple_revocation"] as? Bool, false)
+        let manual = try json(AccountDeletionRequest(manualAppleRevocation: true))
+        XCTAssertEqual(manual["manual_apple_revocation"] as? Bool, true)
+        XCTAssertNil(manual["apple_authorization_code"])
+        XCTAssertNil(apple["user_id"])
+    }
+
     func testAutoConfirmedSignupCarriesAUsableSession() throws {
         let payload = """
         {

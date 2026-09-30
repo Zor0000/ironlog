@@ -52,7 +52,7 @@ Before submission, create a fresh signed archive, export its privacy report, and
 - Supabase email branding was updated and read back. Mailbox delivery itself has not been tested.
 - Apple metadata workflow run `36610273223` passed the capability and URL-update steps, then failed at the age-rating request because required content-frequency fields were omitted. Run `36611135018` passed the age-rating update with existing answers preserved and Health or Wellness Topics enabled. It then stopped because Apple requires an App Review contact phone number; that value has been requested. Workflow `36611336392` completed successfully and its downloaded audit confirms both URLs, `healthOrWellnessTopics: true`, and the Apple capability. App Review details are absent pending the required phone number.
 - The signed-in App Store Connect team is **Parth Jadhav**. Neeraj confirmed that the app should remain in Parth’s account with permission. Public pages identify Parth as App Store distributor and Neeraj as developer/support contact.
-- **Additional Apple deletion gate:** implement server-side Sign in with Apple token exchange/revocation using an Apple Sign in key, and verify revocation during account deletion. Deleting the Supabase Auth user alone does not satisfy Apple's token-revocation guidance. Do not treat the new Apple sign-in button as production-ready until this is complete.
+- **Additional Apple deletion gate:** configure a Sign in with Apple key and verify revocation during account deletion. The source now includes the fresh Apple confirmation, server-side exchange/revocation, and explicit manual fallback. Deleting the Supabase Auth user alone does not satisfy Apple's token-revocation guidance. The production credential setup and physical-device check remain open in [issue #57](https://github.com/Zor0000/setzo/issues/57).
 - Browser automation lost click/scroll access (`noWindowsAvailable`) while completing privacy setup; no publication or Google production-status change was made.
 
 ### September 29 implementation and external gates
@@ -62,6 +62,31 @@ The source now adds the missing Health and Sensitive Info manifest rows, pre-sig
 The live App Store Connect privacy answers, Google production status, Apple capability/profile and physical sign-in test, age rating, contact metadata, two-device deletion behavior, and hosted-page ownership are separate release gates. Do not mark them complete from source changes or from a TestFlight upload. The Gmail address and publisher name were supplied by Neeraj Chormale; no project domain was supplied.
 
 References: [Apple App Privacy](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy), [Apple privacy manifest data types](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatype), [Apple account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app), [Apple age ratings](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating), [Apple login-services guideline](https://developer.apple.com/app-store/review/guidelines/uk/), [Google audience and publishing](https://support.google.com/cloud/answer/15549945), [Supabase Apple sign-in](https://supabase.com/docs/guides/auth/social-login/auth-apple), [Supabase user deletion](https://supabase.com/docs/guides/auth/managing-user-data).
+
+### Apple account-deletion credentials
+
+Create a dedicated **Sign in with Apple** key under team `75LRT8TRQY`, configured for primary App ID `com.parthjadhav.ironlog` (Setzo). An App Store Connect API key cannot sign Apple authorization requests.
+
+Store these values in the production project's [Edge Function secrets](https://supabase.com/dashboard/project/dvqevdydldxjqjrpkkjc/functions/secrets):
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_CLIENT_ID` | `com.parthjadhav.ironlog` |
+| `APPLE_TEAM_ID` | `75LRT8TRQY` |
+| `APPLE_KEY_ID` | Key ID of the dedicated Sign in with Apple key |
+| `APPLE_PRIVATE_KEY` | Complete downloaded `.p8` contents, with real newlines and BEGIN/END lines |
+
+Keep the private key out of Git, screenshots, issue comments, and logs. Supabase exposes secret updates to the deployed function without another deployment. Source changes to the function do require deployment:
+
+```bash
+npx supabase functions deploy delete-account --project-ref dvqevdydldxjqjrpkkjc
+```
+
+The client recognizes the deployed `apple_reauthorization_required` and `apple_revocation_unavailable` error codes. An Apple account needs a fresh authorization code, whose verified subject must match its Auth identity before revocation and database deletion. The source permits manual revocation only when signing credentials are absent; configured exchange/revocation failures keep the account intact. Email, Google, and anonymous accounts do not require Apple confirmation.
+
+September 30 source verification: 253 iOS unit tests passed, the Simulator build passed, and 12 backend tests cover authorization, manual fallback, deletion ordering, signed Apple claims, mismatched identities, and upstream failures. The deployed version 5 source was downloaded for protocol comparison. These checks do not establish a successful live Apple revocation.
+
+Before closing #57, install a build containing this client flow on a physical iPhone, use a disposable Apple account, create a workout, and delete the account through Apple confirmation. Verify `Apple authorization revoked` in function logs, removal of the Auth user and owned records, and removal of Setzo under iPhone Settings → your name → Sign in with Apple. Record the tested build and date in the issue. No connected physical device was available during the September 30 source verification.
 
 The current native app has been verified with:
 

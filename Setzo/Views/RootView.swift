@@ -69,6 +69,17 @@ struct RootView: View {
         } message: {
             Text("Your session expired before deletion. You have signed in again; confirm to delete this account and its data.")
         }
+        .alert("Remove Apple access manually?", isPresented: Binding(
+            get: { app.needsAppleRevocationFallback && !app.showingSettings },
+            set: { app.needsAppleRevocationFallback = $0 }
+        )) {
+            Button("Delete Account & Data", role: .destructive) {
+                Task { _ = await app.deleteAccount(allowManualAppleRevocation: true) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Automatic Apple revocation is unavailable. You can still delete your Setzo account and data. Then open iPhone Settings → your name → Sign in with Apple → Setzo and stop using Sign in with Apple.")
+        }
     }
 }
 
@@ -497,7 +508,6 @@ private struct ForgotPasswordView: View {
 struct AppShellView: View {
     @EnvironmentObject private var app: AppState
     @Namespace private var tabSelection
-    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -554,7 +564,7 @@ struct AppShellView: View {
             }
             Button {
                 NativeFeedback.selection()
-                showSettings = true
+                app.showingSettings = true
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 15, weight: .semibold))
@@ -565,7 +575,7 @@ struct AppShellView: View {
             .buttonStyle(TactileButtonStyle())
             .accessibilityLabel("Settings")
             .accessibilityIdentifier("settings-button")
-            .sheet(isPresented: $showSettings) {
+            .sheet(isPresented: $app.showingSettings) {
                 SettingsView()
             }
         }

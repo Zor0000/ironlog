@@ -4,6 +4,8 @@ import OSLog
 
 @MainActor
 final class AppState: ObservableObject {
+    @Published var needsAppleRevocationFallback = false
+    @Published var showingSettings = false
     private static let pendingDeletedAccountIDKey = "setzo-pending-deleted-account-local-cleanup"
     private static let pendingDeletionReauthIDKey = "setzo-pending-account-deletion-reauth"
     @Published var library = ExerciseLibrary.bundled
@@ -376,11 +378,12 @@ final class AppState: ObservableObject {
 
     /// Delete the authenticated identity and all associated workout data.
     @discardableResult
-    func deleteAccount() async -> Bool {
-        await deleteUserData(removingAccount: true)
+    func deleteAccount(allowManualAppleRevocation: Bool = false) async -> Bool {
+        needsAppleRevocationFallback = false
+        return await deleteUserData(removingAccount: true, allowManualAppleRevocation: allowManualAppleRevocation)
     }
 
-    private func deleteUserData(removingAccount: Bool) async -> Bool {
+    private func deleteUserData(removingAccount: Bool, allowManualAppleRevocation: Bool = false) async -> Bool {
         isBusy = true
         defer { isBusy = false }
         guard storageError == nil, !isDeletingAllData else { return false }
@@ -398,11 +401,14 @@ final class AppState: ObservableObject {
             // A failed guest request stays queued in its own persisted session.
             try? await supabase.deleteFuelBuddyGuestAccountIfPresent()
             do {
-                try await supabase.deleteAccount()
+                try await supabase.deleteAccount(allowManualAppleRevocation: allowManualAppleRevocation)
                 cancelPendingDeletionRequest()
                 if let activeStoreOwnerID {
                     UserDefaults.standard.set(activeStoreOwnerID, forKey: Self.pendingDeletedAccountIDKey)
                 }
+            } catch SupabaseError.appleRevocationUnconfigured {
+                needsAppleRevocationFallback = true
+                return false
             } catch SupabaseError.sessionExpired {
                 if let activeStoreOwnerID {
                     UserDefaults.standard.set(activeStoreOwnerID, forKey: Self.pendingDeletionReauthIDKey)
@@ -410,7 +416,7 @@ final class AppState: ObservableObject {
                 await handleExpiredSession()
                 return false
             } catch {
-                showToast("Couldn't delete your account. Check your connection and try again.")
+                showToast(error.localizedDescription)
                 return false
             }
         }
