@@ -73,10 +73,14 @@ Store these values in the production project's [Edge Function secrets](https://s
 | --- | --- |
 | `APPLE_CLIENT_ID` | `com.parthjadhav.ironlog` |
 | `APPLE_TEAM_ID` | `75LRT8TRQY` |
-| `APPLE_KEY_ID` | Key ID of the dedicated Sign in with Apple key |
+| `APPLE_KEY_ID` | `N452YUC48V` (Setzo Account Deletion) |
 | `APPLE_PRIVATE_KEY` | Complete downloaded `.p8` contents, with real newlines and BEGIN/END lines |
 
-Keep the private key out of Git, screenshots, issue comments, and logs. Supabase exposes secret updates to the deployed function without another deployment. Source changes to the function do require deployment:
+Keep the private key out of Git, screenshots, issue comments, and logs. Supabase exposes secret updates to the deployed function without another deployment.
+
+September 30 production setup: registered the dedicated key under Parth's team and saved all four secrets in project `dvqevdydldxjqjrpkkjc`. Read back each Supabase SHA-256 digest and confirmed it matches the intended value, including the complete private key. The credentials are configured; a real Apple exchange and revocation remain unverified. Production still runs version 5; the source changes below have not been deployed.
+
+Source changes to the function require deployment:
 
 ```bash
 npx supabase functions deploy delete-account --project-ref dvqevdydldxjqjrpkkjc
@@ -86,7 +90,7 @@ The client recognizes the deployed `apple_reauthorization_required` and `apple_r
 
 September 30 source verification: 253 iOS unit tests passed, the Simulator build passed, and 12 backend tests cover authorization, manual fallback, deletion ordering, signed Apple claims, mismatched identities, and upstream failures. The deployed version 5 source was downloaded for protocol comparison. These checks do not establish a successful live Apple revocation.
 
-Before closing #57, install a build containing this client flow on a physical iPhone, use a disposable Apple account, create a workout, and delete the account through Apple confirmation. Verify `Apple authorization revoked` in function logs, removal of the Auth user and owned records, and removal of Setzo under iPhone Settings → your name → Sign in with Apple. Record the tested build and date in the issue. No connected physical device was available during the September 30 source verification.
+Before closing #57, install a build containing this client flow on a physical iPhone, use a disposable Apple account, create a workout, and delete the account through Apple confirmation. Verify `Apple authorization revoked` in function logs, removal of the Auth user and owned records, and removal of Setzo under iPhone Settings → your name → Sign in with Apple. Record the tested build and date in the issue. A signed Debug build from source commit `473bd72`, version `1.0` build `3`, was subsequently installed on the paired iPhone 15 Pro on September 30. Its signed entitlements include Sign in with Apple and team `75LRT8TRQY`. The user chose to perform the live deletion test later; no Apple sign-in or account deletion was attempted.
 
 The current native app has been verified with:
 
