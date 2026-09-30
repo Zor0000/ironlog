@@ -74,6 +74,10 @@ class SupabaseService {
         auth?.accessToken.isEmpty == false
     }
 
+    var usesAppleSignIn: Bool {
+        client.auth.currentUser?.identities?.contains(where: { $0.provider == "apple" }) == true
+    }
+
     /// A second device can retain a locally valid JWT after another device
     /// deletes the account. Ask Auth for the live user before syncing; only an
     /// explicit user_not_found response authorizes local data removal.
@@ -326,25 +330,28 @@ class SupabaseService {
     /// The service-role key stays inside this authenticated Edge Function. The
     /// app sends only its user JWT and never receives administrative credentials.
     @MainActor
-    func deleteAccount(allowManualAppleRevocation: Bool = false) async throws {
+    func deleteAccount(allowManualAppleRevocation: Bool = false) async throws -> Bool {
         guard isAuthenticated else { throw SupabaseError.notAuthenticated }
         var request = URLRequest(url: apiURL("/functions/v1/delete-account"))
         request.httpMethod = "POST"
+        request.timeoutInterval = 35
         addRestHeaders(to: &request)
         request.httpBody = try encode(AccountDeletionRequest(
             manualAppleRevocation: allowManualAppleRevocation
         ))
+        let response: AccountDeletionResponse
         do {
-            let _: EmptyResponse = try await decodeWithAuthRetry(request, emptyValue: EmptyResponse())
+            response = try await decodeWithAuthRetry(request, emptyValue: AccountDeletionResponse())
         } catch SupabaseError.appleAuthorizationRequired {
             // Apple codes are single-use and short-lived. Obtain one only for
             // this deletion attempt; never save it in the account snapshot.
             let authorizer = AppleDeletionAuthorization()
             let code = try await authorizer.authorizationCode()
             request.httpBody = try encode(AccountDeletionRequest(appleAuthorizationCode: code))
-            let _: EmptyResponse = try await decodeWithAuthRetry(request, emptyValue: EmptyResponse())
+            response = try await decodeWithAuthRetry(request, emptyValue: AccountDeletionResponse())
         }
         await signOut()
+        return response.manualAppleRevocationRequired == true
     }
 
     func deleteFuelBuddyGuestAccountIfPresent() async throws {
@@ -601,6 +608,10 @@ struct AccountDeletionRequest: Encodable {
     var manualAppleRevocation: Bool = false
 }
 
+struct AccountDeletionResponse: Decodable {
+    var manualAppleRevocationRequired: Bool? = nil
+}
+
 @MainActor
 private final class AppleDeletionAuthorization: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     private var continuation: CheckedContinuation<String, Error>?
@@ -641,7 +652,7 @@ private final class AppleDeletionAuthorization: NSObject, ASAuthorizationControl
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        finish(.failure(error))
+        finish(.failure((error as? ASAuthorizationError)?.code == .canceled ? CancellationError() : error))
     }
 
     private func finish(_ result: Result<String, Error>) {

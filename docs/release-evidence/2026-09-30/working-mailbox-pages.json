@@ -1,0 +1,30 @@
+[
+  {
+    "url": "https://www.neeraj.works/setzo/",
+    "status": 200,
+    "matches_portfolio_source": true,
+    "new_contact_present": true,
+    "sha256": "42f3e9d51c775efd661c1361736aa7a147bc1bd9ffd0c13067e842c9d24a6e50"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/privacy.html",
+    "status": 200,
+    "matches_portfolio_source": true,
+    "new_contact_present": true,
+    "sha256": "816002a7c8b364681ac7ffcc6b7da3b938d4d8c52e52b5a94703a286bf49a2e5"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/terms.html",
+    "status": 200,
+    "matches_portfolio_source": true,
+    "new_contact_present": true,
+    "sha256": "3d1af4e203024cc042b401cdcc6601c92a873e756cb75b2aa66616c3872b331c"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/support.html",
+    "status": 200,
+    "matches_portfolio_source": true,
+    "new_contact_present": true,
+    "sha256": "17c2949c835cb5a1ddc981be8c6ab6cb636c94715aa64521eebe98fdabe38afb"
+  }
+]

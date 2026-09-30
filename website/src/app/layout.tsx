@@ -17,9 +17,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://zor0000.github.io/setzo/"),
+  metadataBase: new URL("https://www.neeraj.works/setzo/"),
   applicationName: "Setzo",
-  alternates: { canonical: "https://zor0000.github.io/setzo/" },
+  alternates: { canonical: "https://www.neeraj.works/setzo/" },
   title: "Setzo — Track your gains. Own your progress.",
   description:
     "A fast, free, no-nonsense gym tracker. Log every set, run any split, watch your PRs and streaks grow — with a lock-screen Live Activity so you never break your flow.",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
       "A fast, free, no-nonsense gym tracker with a lock-screen Live Activity.",
     type: "website",
     siteName: "Setzo",
-    url: "https://zor0000.github.io/setzo/",
+    url: "https://www.neeraj.works/setzo/",
     images: [{ url: "https://zor0000.github.io/setzo/website/public/app-icon.png", width: 1024, height: 1024, alt: "Setzo app icon" }],
   },
   twitter: {

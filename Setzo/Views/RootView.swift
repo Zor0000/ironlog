@@ -23,7 +23,7 @@ struct RootView: View {
                     Button("Retry") { Task { await app.retryStorage() } }
                         .disabled(app.isRetryingStorage)
                         .accessibilityIdentifier("retry-storage-button")
-                    Link("Contact support", destination: URL(string: "mailto:neerajcwork@gmail.com")!)
+                    Link("Contact support", destination: URL(string: "mailto:neerajchormale39@gmail.com")!)
                 }
                 .padding(28)
             } else if app.isBooting {
@@ -61,6 +61,14 @@ struct RootView: View {
         .animation(AppMotion.smooth, value: app.toast)
         .animation(AppMotion.screen, value: app.showingAuth)
         .animation(AppMotion.screen, value: app.showingOnboarding)
+        .alert("Remove Setzo from Apple sign-in", isPresented: Binding(
+            get: { app.showAppleRevocationInstructions && !app.showingSettings },
+            set: { app.showAppleRevocationInstructions = $0 }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your Setzo account has been deleted. To remove Apple's remaining authorization, open iPhone Settings → your name → Sign in with Apple → Setzo → Delete or Stop Using Apple ID. You can also do this at account.apple.com under Sign-In and Security → Sign in with Apple.")
+        }
         .alert("Finish account deletion?", isPresented: $app.needsDeletionReconfirmation) {
             Button("Delete Account & Data", role: .destructive) {
                 Task { _ = await app.deleteAccount() }
@@ -334,8 +342,8 @@ struct AuthView: View {
                             .multilineTextAlignment(.center)
                         Text("Before creating an account, read:")
                         HStack(spacing: 12) {
-                            Link("Privacy Policy", destination: URL(string: "https://zor0000.github.io/setzo/privacy.html")!)
-                            Link("Terms of Use", destination: URL(string: "https://zor0000.github.io/setzo/terms.html")!)
+                            Link("Privacy Policy", destination: URL(string: "https://www.neeraj.works/setzo/privacy.html")!)
+                            Link("Terms of Use", destination: URL(string: "https://www.neeraj.works/setzo/terms.html")!)
                         }
                     }
                     .font(.system(size: 11))

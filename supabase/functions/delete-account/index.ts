@@ -1,4 +1,4 @@
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2.102.0";
 import { createHandler } from "./handler.ts";
 import { revokeAppleAuthorization } from "./apple.ts";
 

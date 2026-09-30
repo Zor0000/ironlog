@@ -297,13 +297,13 @@ struct SettingsView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.muted2)
             }
-            Link(destination: URL(string: "https://zor0000.github.io/setzo/privacy.html")!) {
+            Link(destination: URL(string: "https://www.neeraj.works/setzo/privacy.html")!) {
                 aboutRow("Privacy Policy", systemImage: "hand.raised")
             }
-            Link(destination: URL(string: "https://zor0000.github.io/setzo/terms.html")!) {
+            Link(destination: URL(string: "https://www.neeraj.works/setzo/terms.html")!) {
                 aboutRow("Terms of Use", systemImage: "doc.text")
             }
-            Link(destination: URL(string: "mailto:neerajcwork@gmail.com")!) {
+            Link(destination: URL(string: "mailto:neerajchormale39@gmail.com")!) {
                 aboutRow("Support", systemImage: "envelope")
             }
         }

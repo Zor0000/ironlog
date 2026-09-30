@@ -1,0 +1,9 @@
+{
+  "support_privacy_destination": "neerajchormale39@gmail.com",
+  "smtp_sender_address": "neerajchormale39@gmail.com",
+  "smtp_sender_name": "Setzo",
+  "template_fields_match_source": true,
+  "templates_checked": 13,
+  "mailbox_operation": "confirmed working by Neeraj; no agent test delivery",
+  "site_url": "https://www.neeraj.works/setzo/"
+}

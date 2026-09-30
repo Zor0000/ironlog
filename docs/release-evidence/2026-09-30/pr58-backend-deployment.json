@@ -1,0 +1,14 @@
+{
+  "version": 7,
+  "status": "ACTIVE",
+  "verify_jwt": true,
+  "source_matches": {
+    "delete-account/index.ts": true,
+    "delete-account/handler.ts": true,
+    "delete-account/apple.ts": true
+  },
+  "unauthenticated_post_status": 401,
+  "apple_secrets_present": true,
+  "client_team_key_digests_match": true,
+  "live_apple_revocation_verified": false
+}

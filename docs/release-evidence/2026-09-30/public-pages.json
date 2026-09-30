@@ -1,0 +1,50 @@
+[
+  {
+    "url": "https://www.neeraj.works/setzo/",
+    "status": 200,
+    "final_url": "https://www.neeraj.works/setzo/",
+    "matches_portfolio_source": true,
+    "sha256": "7a752b88fd648d9720f0dc9a350afcdb2d87fe92278f5285e43662bc01b34cb4",
+    "server": "Vercel"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/privacy.html",
+    "status": 200,
+    "final_url": "https://www.neeraj.works/setzo/privacy.html",
+    "matches_portfolio_source": true,
+    "sha256": "0afffd599653b6d830c607d58b2c2cb373020ad8d0da6dc81dff9a97df1abe83",
+    "server": "Vercel"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/terms.html",
+    "status": 200,
+    "final_url": "https://www.neeraj.works/setzo/terms.html",
+    "matches_portfolio_source": true,
+    "sha256": "75f8ee5f9935fafbcb55d9b7821e1d5e75320973498225ea5fa79999b2f64ad7",
+    "server": "Vercel"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/support.html",
+    "status": 200,
+    "final_url": "https://www.neeraj.works/setzo/support.html",
+    "matches_portfolio_source": true,
+    "sha256": "c52667e36fc74e2df937497c6fcdbf217086a5a3faff3d2686bf990a74800a69",
+    "server": "Vercel"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/styles.css",
+    "status": 200,
+    "final_url": "https://www.neeraj.works/setzo/styles.css",
+    "matches_portfolio_source": true,
+    "sha256": "d7a911522d65a15996063352976f19d3afe5e711f23e835b10ab4400eaef7a2a",
+    "server": "Vercel"
+  },
+  {
+    "url": "https://www.neeraj.works/setzo/favicon.svg",
+    "status": 200,
+    "final_url": "https://www.neeraj.works/setzo/favicon.svg",
+    "matches_portfolio_source": true,
+    "sha256": "a4c54101944bb1d531a718148d6f1737afc8a41c1f7d8a332d19850b37ecb47c",
+    "server": "Vercel"
+  }
+]

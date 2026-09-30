@@ -6,6 +6,10 @@ import OSLog
 final class AppState: ObservableObject {
     @Published var needsAppleRevocationFallback = false
     @Published var showingSettings = false
+    @Published var showAppleRevocationInstructions = UserDefaults.standard.bool(forKey: "setzo-apple-manual-revocation") {
+        didSet { UserDefaults.standard.set(showAppleRevocationInstructions, forKey: "setzo-apple-manual-revocation") }
+    }
+    private var manualAppleDeletionAccountID: String?
     private static let pendingDeletedAccountIDKey = "setzo-pending-deleted-account-local-cleanup"
     private static let pendingDeletionReauthIDKey = "setzo-pending-account-deletion-reauth"
     @Published var library = ExerciseLibrary.bundled
@@ -340,6 +344,8 @@ final class AppState: ObservableObject {
     }
 
     func signOut() async {
+        needsAppleRevocationFallback = false
+        manualAppleDeletionAccountID = nil
         cancelSyncRetry(resetAttempt: true)
         await saveTask?.value
         await supabase.signOut()
@@ -379,6 +385,9 @@ final class AppState: ObservableObject {
     /// Delete the authenticated identity and all associated workout data.
     @discardableResult
     func deleteAccount(allowManualAppleRevocation: Bool = false) async -> Bool {
+        if allowManualAppleRevocation {
+            guard let accountID = manualAppleDeletionAccountID, accountID == user?.id else { return false }
+        }
         needsAppleRevocationFallback = false
         return await deleteUserData(removingAccount: true, allowManualAppleRevocation: allowManualAppleRevocation)
     }
@@ -397,17 +406,19 @@ final class AppState: ObservableObject {
                 showToast("Sign in again before deleting your account")
                 return false
             }
-            // Start guest cleanup before the signed-in identity disappears.
-            // A failed guest request stays queued in its own persisted session.
-            try? await supabase.deleteFuelBuddyGuestAccountIfPresent()
             do {
-                try await supabase.deleteAccount(allowManualAppleRevocation: allowManualAppleRevocation)
+                showAppleRevocationInstructions = try await supabase.deleteAccount(allowManualAppleRevocation: allowManualAppleRevocation)
+                manualAppleDeletionAccountID = nil
                 cancelPendingDeletionRequest()
                 if let activeStoreOwnerID {
                     UserDefaults.standard.set(activeStoreOwnerID, forKey: Self.pendingDeletedAccountIDKey)
                 }
             } catch SupabaseError.appleRevocationUnconfigured {
+                manualAppleDeletionAccountID = user?.id
                 needsAppleRevocationFallback = true
+                return false
+            } catch is CancellationError {
+                showToast("Account deletion cancelled")
                 return false
             } catch SupabaseError.sessionExpired {
                 if let activeStoreOwnerID {
@@ -467,6 +478,14 @@ final class AppState: ObservableObject {
             storageError = "Account deleted in the cloud, but local cleanup is pending: \(error.localizedDescription)"
             return false
         }
+    }
+
+    func handleAppleCredentialRevocation() async {
+        // Ignore our own in-flight deletion; externally revoked credentials
+        // sign out without erasing workouts unless remote deletion is confirmed.
+        guard !isDeletingAllData, supabase.usesAppleSignIn else { return }
+        if await purgeRemotelyDeletedAccountIfNeeded() { return }
+        await signOut()
     }
 
     private func purgeRemotelyDeletedAccountIfNeeded() async -> Bool {

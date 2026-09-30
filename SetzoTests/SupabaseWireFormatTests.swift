@@ -29,6 +29,12 @@ final class SupabaseWireFormatTests: XCTestCase {
         XCTAssertNil(apple["user_id"])
     }
 
+    func testManualAppleRevocationResponseIsRecognized() throws {
+        let response = try decoder.decode(AccountDeletionResponse.self, from: Data(#"{"manual_apple_revocation_required":true}"#.utf8))
+        XCTAssertEqual(response.manualAppleRevocationRequired, true)
+        XCTAssertNil(try decoder.decode(AccountDeletionResponse.self, from: Data("{}".utf8)).manualAppleRevocationRequired)
+    }
+
     func testAutoConfirmedSignupCarriesAUsableSession() throws {
         let payload = """
         {

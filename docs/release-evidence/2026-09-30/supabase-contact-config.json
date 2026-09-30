@@ -1,0 +1,16 @@
+{
+  "project_ref": "dvqevdydldxjqjrpkkjc",
+  "site_url": "https://www.neeraj.works/setzo/",
+  "uri_allow_list": "https://github.com/Zor0000/setzo,ironlog://auth/callback,ironlog://auth/reset-password,setzo://auth/callback,setzo://auth/reset-password",
+  "smtp_sender_name": "Setzo",
+  "smtp_sender_address": "neerajchormale39@gmail.com",
+  "support_privacy_destination": "neerajcwork@gmail.com",
+  "email_branding_fields_match_source": true,
+  "templates_checked": 13,
+  "mailbox_receipt_verified": false,
+  "google_requested_scopes": [
+    "email",
+    "profile"
+  ],
+  "google_redirect_uri": "https://dvqevdydldxjqjrpkkjc.supabase.co/auth/v1/callback"
+}
