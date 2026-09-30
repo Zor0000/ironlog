@@ -90,7 +90,8 @@ jobs:
             -scheme Setzo \
             -destination "id=$SIMULATOR_ID" \
             -only-testing:SetzoTests \
-            CODE_SIGNING_ALLOWED=NO
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO
 
       # Without a distribution certificate already on the runner, xcodebuild's
       # -allowProvisioningUpdates mints a fresh one per run until the account
