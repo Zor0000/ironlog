@@ -1,0 +1,2 @@
+App Review contact remains a release gate: ASC_REVIEW_CONTACT_PHONE is required.
+{"appId": "6771258872", "name": "Setzo", "privacyPolicyUrl": "https://www.neeraj.works/setzo/privacy.html", "locales": ["en-US"]}

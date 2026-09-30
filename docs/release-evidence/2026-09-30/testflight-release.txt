@@ -1,0 +1,12 @@
+Build and upload to TestFlight	Sync Setzo name and Apple metadata	2026-09-30T11:26:27.6112780Z App Review contact remains a release gate: ASC_REVIEW_CONTACT_PHONE is required.
+Build and upload to TestFlight	Run unit tests	2026-09-30T11:32:11.8537520Z 	 Executed 257 tests, with 0 failures (0 unexpected) in 40.010 (68.596) seconds
+Build and upload to TestFlight	Run unit tests	2026-09-30T11:32:11.8781650Z 	 Executed 257 tests, with 0 failures (0 unexpected) in 40.010 (68.747) seconds
+Build and upload to TestFlight	Run unit tests	2026-09-30T11:32:20.7230270Z ** TEST SUCCEEDED **
+Build and upload to TestFlight	Build and archive	2026-09-30T11:36:16.1762770Z ** ARCHIVE SUCCEEDED **
+Build and upload to TestFlight	Build and archive	2026-09-30T11:36:28.8176470Z ** EXPORT SUCCEEDED **
+Build and upload to TestFlight	Upload build with asc	2026-09-30T11:36:33.1696480Z Upload committed in App Store Connect.
+Build and upload to TestFlight	Upload build with asc	2026-09-30T11:36:33.1796090Z Waiting for build 36708492844 (1.0) to appear in App Store Connect...
+Build and upload to TestFlight	Upload build with asc	2026-09-30T11:38:33.9438940Z Build 5c1e8ef2-e2fb-469e-b809-c62f72bc0959 discovered; waiting for processing...
+Build and upload to TestFlight	Upload build with asc	2026-09-30T11:38:35.8010390Z {"uploadId":"5c1e8ef2-e2fb-469e-b809-c62f72bc0959","fileId":"39a996fd-50c1-42e2-9a38-fb9ce532a35c","fileName":"Setzo.ipa","fileSize":7496500,"uploaded":true,"buildId":"5c1e8ef2-e2fb-469e-b809-c62f72bc0959"}
+Build and upload to TestFlight	Upload build with asc	2026-09-30T11:38:37.7115680Z Successfully added 1 group(s) to build 5c1e8ef2-e2fb-469e-b809-c62f72bc0959
+Build and upload to TestFlight	Upload build with asc	2026-09-30T11:38:37.7122250Z {"buildId":"5c1e8ef2-e2fb-469e-b809-c62f72bc0959","groupIds":["6497c060-a90c-4255-ace4-7ce105aff763"],"action":"added"}

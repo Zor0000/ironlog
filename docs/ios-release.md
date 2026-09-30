@@ -33,7 +33,7 @@ Before submission, create a fresh signed archive, export its privacy report, and
 
 ## Current release checklist — September 30, 2026
 
-Neeraj confirmed completion of the App Store Connect settings on September 30. The September 29 console notes below are historical and no longer describe unfinished privacy, age-rating, or review-contact setup. This confirmation is not evidence of App Review approval.
+Neeraj confirmed completion of the App Store Connect settings on September 30. Privacy and age-rating completion remain recorded on that basis. The release metadata synchronization subsequently found no App Review contact record for the pending version: a phone number is needed to create it with Neeraj's name and the chosen mailbox. This fresh API evidence supersedes the earlier review-contact completion assumption. No App Review approval is claimed.
 
 Canonical public pages are hosted in `/Users/neerajchormale/Projects/portfolio`, repository `Zor0000/portfolio`, deployed through Vercel: [homepage](https://www.neeraj.works/setzo/), [privacy](https://www.neeraj.works/setzo/privacy.html), [Terms](https://www.neeraj.works/setzo/terms.html), and [support](https://www.neeraj.works/setzo/support.html). Parth Jadhav is the Apple/App Store seller; Neeraj Chormale is the developer and support/privacy contact. Contact: `neerajchormale39@gmail.com`. Neeraj confirmed this mailbox works and chose it for support/privacy and Google OAuth on September 30; it supersedes the earlier `neerajcwork@gmail.com` choice.
 
@@ -42,9 +42,9 @@ Canonical public pages are hosted in `/Users/neerajchormale/Projects/portfolio`,
 - [x] Source manifest declares Email Address, Name, User ID, Fitness, Other User Content, Health, and Sensitive Info for app functionality with no tracking. Health, Sensitive Info, and Other User Content also declare Product Personalization for tailored meal suggestions. Health covers allergies/intolerances sent to Groq. Sensitive Info covers dietary identity and restrictions that may reveal beliefs or health information. The meal request is Other User Content. All are conservatively marked linked because requests use a signed-in or anonymous Supabase user ID.
 - [x] Source policy discloses Supabase, Groq, the request fields, anonymous guest accounts, local-only Passport/safety answers, and deletion behavior. The auth screen links to the policy and Terms before account creation and social sign-in. The app and public pages identify Parth Jadhav as the App Store seller and Neeraj Chormale as developer/support contact and use `neerajchormale39@gmail.com` as the support and privacy contact.
 - [x] Source still omits Precise Location: no GPS/location data is uploaded. The full Nutrition Passport, body weight, water log, and draft remain on-device; a derived cardio calorie value may sync with a saved activity.
-- [x] **App Store Connect settings:** App Privacy declarations, age-rating answers, and review/contact settings are complete per Neeraj's September 30 confirmation. Do not reopen the stale September 29 checklist as unfinished work.
+- [x] **App Store Connect settings:** App Privacy declarations and age-rating answers are complete per Neeraj's September 30 confirmation; release metadata synchronization also successfully updated branding, canonical URLs, and the existing age-rating declaration. App Review contact is tracked separately below using fresh API evidence.
 - [x] **Public pages and ownership:** homepage, privacy, Terms, support, stylesheet, and favicon returned HTTP 200 over HTTPS on September 30 and matched portfolio source byte-for-byte. All four pages have the agreed seller/developer/contact details and working navigation. Portfolio deployment commit: `591bf3c04948157282a665eedeef2f52df6070fe` (working-mailbox update; Vercel Production deployment `6752713187` succeeded). Search Console confirms `neeraj.works` is verified via Domain name provider; its DNS verification TXT record is present. Search indexing reports are still processing; that is separate from successful ownership verification.
-- [x] **App and backend URLs:** pre-signup and Settings links, local Supabase `site_url`, all 13 email-template footers, website canonical metadata, README/legal canonical URLs, and future Apple metadata synchronization now use `https://www.neeraj.works/setzo/`. Production Supabase auth config was patched and all 28 requested fields were read back successfully. Native callback/reset URLs and OAuth credentials were preserved. Existing App Store GitHub Pages links remain historical known-good URLs; this session did not read or change live Apple metadata because local `asc` authentication is unavailable.
+- [x] **App and backend URLs:** pre-signup and Settings links, local Supabase `site_url`, all 13 email-template footers, website canonical metadata, README/legal canonical URLs, and future Apple metadata synchronization now use `https://www.neeraj.works/setzo/`. Production Supabase auth config was patched and all 28 requested fields were read back successfully. Native callback/reset URLs and OAuth credentials were preserved. Existing App Store GitHub Pages links remain historical URLs. CI used its configured Apple credentials to synchronize the canonical homepage, support and privacy URLs successfully on September 30; local `asc` authentication remains unavailable.
 - [x] **Google audience/publishing:** project `gymbuddy-498919` (display name GymBuddy), with Setzo app branding, is External and In production. No publishing change was needed.
 - [x] **Google links/developer contact:** homepage, privacy and Terms URLs already point to the canonical portfolio pages. Both Google user-support email and developer contact are `neerajchormale39@gmail.com`; the developer-contact change was saved and read back. Authorized domains read back as `dvqevdydldxjqjrpkkjc.supabase.co`, `zor0000.github.io` (legacy hosting), and `neeraj.works`.
 - [x] **Google scopes:** saved only `https://www.googleapis.com/auth/userinfo.email` and `https://www.googleapis.com/auth/userinfo.profile`. Sensitive/restricted scope tables are empty. The production Supabase authorize endpoint returns HTTP 302 to the same OAuth client with `scope=email profile` and callback `https://dvqevdydldxjqjrpkkjc.supabase.co/auth/v1/callback`. The iOS client requests no additional scopes. The active OAuth client's callback was also read back in Google. Its internal console label remains `IronLog Supabase OAuth`: an optional rename attempt returned Google's “Save failed” error and the unchanged label was confirmed in the client list. This label is not shown to end users; public app name/logo are Setzo.
@@ -89,16 +89,28 @@ September 30 source verification: Parth reports 253 iOS unit tests and the Simul
 
 Before closing #57, install a build containing this client flow on a physical iPhone, use a disposable Apple account, create a workout, and delete the account through Apple confirmation. Verify `Apple authorization revoked` in function logs, removal of the Auth user and owned records, and removal of Setzo under iPhone Settings → your name → Sign in with Apple. Record the tested build and date in the issue. A signed Debug build from source commit `473bd72`, version `1.0` build `3`, was subsequently installed on the paired iPhone 15 Pro on September 30. Its signed entitlements include Sign in with Apple and team `75LRT8TRQY`. The user chose to perform the live deletion test later; no Apple sign-in or account deletion was attempted.
 
-PR #58 review: fixed guest deletion before cancelled Apple confirmation, persistent manual-revocation instructions, and account-scoped fallback confirmation. Restored native Apple revocation handling and consolidated the canonical URLs/contact changes. All 27 focused iOS tests passed; 12 backend tests, type checking, lint and formatting passed. The first local Xcode test launch stalled before XCTest loaded; disabling the debug dylib for the focused retry resolved it. CI will run its required full unit suite.
+PR #58 review: fixed guest deletion before cancelled Apple confirmation, persistent manual-revocation instructions, and account-scoped fallback confirmation. Restored native Apple revocation handling and consolidated the canonical URLs/contact changes. All 27 focused iOS tests passed; 12 backend tests, type checking, lint and formatting passed. The first local Xcode test launch stalled before XCTest loaded; disabling the debug dylib for the focused retry resolved it. PR #58 was approved and merged as `b8ca9b9`. Its first release run (`36706838972`) stopped before signing/upload on four assertions in one draft-restore test. Investigation found a real Live Activity queue race: boot published the disk draft before reading newer Lock Screen edits. Follow-up `aafd916` drains prior updates and reconciles the loaded draft before publishing. The previously failing test and two related restore/Lock Screen checks passed locally (3 tests, zero failures); the corrected release run is `36708492844`.
+
+### Reviewed release — September 30
+
+- [x] PR #58 approved and merged (`b8ca9b9`); draft-restoration follow-up `aafd916` included in the release.
+- [x] Required CI suite: **257 iOS unit tests, zero failures**. Focused backend suite: **12 tests, zero failures**; type checking, lint and formatting passed.
+- [x] Signed archive and App Store IPA export succeeded. Version **1.0**, build **36708492844**, build ID `5c1e8ef2-e2fb-469e-b809-c62f72bc0959`. Apple upload and `asc --wait` processing completed successfully; the build was assigned to internal group `6497c060-a90c-4255-ace4-7ce105aff763`. This is TestFlight delivery, not App Review approval or an App Store release.
+- [x] Downloaded archive passed `codesign --verify --deep --strict`. The distributed IPA contains the expected version/bundle ID and app/widget manifests. The final archive includes four valid manifests (app, widget, Crypto, Liveline), all with tracking false and no tracking domains. App required API reasons are FileTimestamp `C617.1` and UserDefaults `CA92.1`; widget uses UserDefaults `CA92.1`. All seven declared data categories are present.
+
+[Successful workflow](https://github.com/Zor0000/setzo/actions/runs/36708492844), [release receipt](release-evidence/2026-09-30/testflight-release.json), [Apple metadata log](release-evidence/2026-09-30/apple-metadata-sync.txt), [focused log evidence](release-evidence/2026-09-30/testflight-release.txt), and [final archive manifests](release-evidence/2026-09-30/final-archive-manifests.json).
+
+The archive and IPA are also preserved locally at `build/release-36708492844/`. GitHub's signed-archive artifact expires after 14 days. Xcode Organizer opened the correct archive and offered Generate Privacy Report, but its Save dialog kept Export disabled; pointer control of that dialog reported `noWindowsAvailable`. Keyboard filename/destination changes did not enable Export. No PDF was exported and no privacy-report/validation approval is claimed. Retry manually by opening `build/release-36708492844/Setzo.xcarchive`, then control-clicking its Organizer row → Generate Privacy Report. Inspect the report before submission.
 
 ### Final build checks retained from the release checklist
 
-These were not repeated during this focused configuration pass and are not covered by the confirmed email-account deletion test:
+Remaining submission checks are tracked independently of the confirmed email-account deletion test:
 
+- [ ] **App Review contact:** supply Neeraj's contact phone number so the currently absent review-contact record can be created with `neerajchormale39@gmail.com`. This is an App Store submission gate, not a TestFlight upload gate.
 - [ ] Export the Xcode privacy report from the final signed archive; review app/widget/dependency reasons and validation notices before submission.
 - [ ] Complete the release-build fresh non-test-user Google sign-in check and remaining physical-device deletion/offline/reauthentication scenarios. The server OAuth redirect and production email-account deletion checks above do not replace client-device verification. Inspect backup/log retention separately if needed.
 
-September 30 contact follow-up: app/source links and future Apple metadata contact were updated; the portfolio change was committed and deployed, and all four live pages matched the new source. Production Supabase's 27 email-branding fields were updated and verified. Live App Store contact metadata was not edited in this session; the source synchronization script will apply the chosen mailbox on its next run.
+September 30 contact follow-up: app/source links and future Apple metadata contact were updated; the portfolio change was committed and deployed, and all four live pages matched the new source. Production Supabase's 27 email-branding fields were updated and verified. Live Apple URL/branding synchronization succeeded in CI. The review-contact record is absent according to that run; its email cannot be applied until the required phone number is supplied.
 
 Evidence: [working-mailbox live pages](release-evidence/2026-09-30/working-mailbox-pages.json), [working-mailbox Google contacts](release-evidence/2026-09-30/google-working-mailbox.png), [public-page HTTP/source comparison](release-evidence/2026-09-30/public-pages.json), [sanitized live Supabase configuration](release-evidence/2026-09-30/supabase-contact-config.json), [domain verification](release-evidence/2026-09-30/domain-ownership.png), [saved scopes](release-evidence/2026-09-30/google-scopes.png), and [Google verification status](release-evidence/2026-09-30/google-verification.png), and [current name/logo/support email](release-evidence/2026-09-30/google-branding.png). No broad regression suite was repeated for URL-only changes.
 
@@ -122,7 +134,7 @@ At the time of the September 29 checks, console setup and hosted-page ownership 
 
 References: [Apple App Privacy](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy), [Apple privacy manifest data types](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatype), [Apple account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app), [Apple age ratings](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating), [Apple login-services guideline](https://developer.apple.com/app-store/review/guidelines/uk/), [Google audience and publishing](https://support.google.com/cloud/answer/15549945), [Supabase Apple sign-in](https://supabase.com/docs/guides/auth/social-login/auth-apple), [Supabase user deletion](https://supabase.com/docs/guides/auth/managing-user-data).
 
-The current native app has been verified with:
+Historical build 3 verification used the following commands (the September 30 reviewed release above is current):
 
 ```bash
 xcodebuild test -project Setzo.xcodeproj -scheme Setzo -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
@@ -166,7 +178,7 @@ scripts/create_asc_app_record.sh
 
 If App Store Connect is already open in a browser, creating the app record through the web UI is also fine.
 
-## Upload
+## Historical build 3 upload
 
 The build was uploaded with the installed `asc` CLI.
 
@@ -183,7 +195,7 @@ Uploaded/TestFlight state:
 - Internal group ID: `6497c060-a90c-4255-ace4-7ce105aff763`
 - Tester invite: `jadhavparth99@gmail.com`
 
-To re-upload a future build, first bump `CFBundleVersion`, rebuild the IPA, then run:
+Current CI releases use the GitHub Actions run ID for `CFBundleVersion`. For a manual future upload, first bump `CFBundleVersion`, rebuild the IPA, then run:
 
 ```bash
 scripts/build_ios_release.sh

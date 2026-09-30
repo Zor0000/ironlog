@@ -1,0 +1,11 @@
+Test Case '-[SetzoTests.AppStateTests testReconcileStopsAnInAppRestTheLockScreenCleared]' started.
+Test Case '-[SetzoTests.AppStateTests testReconcileStopsAnInAppRestTheLockScreenCleared]' passed (0.020 seconds).
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.020 (0.021) seconds
+Test Case '-[SetzoTests.ReleaseReadinessTests testColdLaunchPreservesNewerLockScreenSetEdits]' started.
+Test Case '-[SetzoTests.ReleaseReadinessTests testColdLaunchPreservesNewerLockScreenSetEdits]' passed (0.025 seconds).
+Test Case '-[SetzoTests.ReleaseReadinessTests testUnfinishedWorkoutRestoresAsDraftUntilExplicitSave]' started.
+Test Case '-[SetzoTests.ReleaseReadinessTests testUnfinishedWorkoutRestoresAsDraftUntilExplicitSave]' passed (0.027 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.051 (0.052) seconds
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.072 (0.073) seconds
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.072 (0.074) seconds
+** TEST SUCCEEDED **

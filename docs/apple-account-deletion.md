@@ -34,3 +34,7 @@ Parth completed the key/secret setup below, using key `N452YUC48V` and team `75L
 4. Install a build containing these client changes on an iPhone. Use one disposable Apple account to sign into Setzo, create one workout, and choose **Delete Account & Data**. Complete the Apple confirmation. Confirm the function log contains `Apple authorization revoked`, the Supabase Auth user and associated records are gone, and Setzo no longer appears as authorized under iPhone Settings → your name → Sign in with Apple. That one check is sufficient to finish this feature's live verification.
 
 References: [Apple TN3194](https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple), [Apple token revocation](https://developer.apple.com/documentation/signinwithapplerestapi/revoke-tokens), [Apple manual revocation instructions](https://support.apple.com/102571).
+
+## Reviewed TestFlight build
+
+PR #58 was approved and merged on September 30 (`b8ca9b9`), followed by the verified draft-restore fix `aafd916`. Install TestFlight **1.0 (36708492844)** for the physical Apple check in issue #57. The release workflow passed 257 unit tests, archived/exported/uploaded successfully, waited for Apple processing, and assigned the build to Internal Testers. Production deletion backend remains reviewed version 7. No real Apple-account revocation has been verified by this release workflow.

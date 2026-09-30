@@ -1,0 +1,112 @@
+{
+  "version": "1.0",
+  "build": "36708492844",
+  "bundleId": "com.parthjadhav.ironlog",
+  "nonExemptEncryption": false,
+  "manifests": {
+    "PrivacyInfo.xcprivacy": {
+      "NSPrivacyAccessedAPITypes": [
+        {
+          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+          "NSPrivacyAccessedAPITypeReasons": [
+            "C617.1"
+          ]
+        },
+        {
+          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "NSPrivacyAccessedAPITypeReasons": [
+            "CA92.1"
+          ]
+        }
+      ],
+      "NSPrivacyCollectedDataTypes": [
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeHealth",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+            "NSPrivacyCollectedDataTypePurposeProductPersonalization"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        },
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeSensitiveInfo",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+            "NSPrivacyCollectedDataTypePurposeProductPersonalization"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        },
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        },
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeFitness",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        },
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        },
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        },
+        {
+          "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+          "NSPrivacyCollectedDataTypeLinked": true,
+          "NSPrivacyCollectedDataTypePurposes": [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+            "NSPrivacyCollectedDataTypePurposeProductPersonalization"
+          ],
+          "NSPrivacyCollectedDataTypeTracking": false
+        }
+      ],
+      "NSPrivacyTracking": false,
+      "NSPrivacyTrackingDomains": []
+    },
+    "swift-crypto_Crypto.bundle/PrivacyInfo.xcprivacy": {
+      "NSPrivacyTracking": false,
+      "NSPrivacyAccessedAPITypes": [],
+      "NSPrivacyCollectedDataTypes": [],
+      "NSPrivacyTrackingDomains": []
+    },
+    "Liveline_Liveline.bundle/PrivacyInfo.xcprivacy": {
+      "NSPrivacyAccessedAPITypes": [],
+      "NSPrivacyCollectedDataTypes": [],
+      "NSPrivacyTracking": false,
+      "NSPrivacyTrackingDomains": []
+    },
+    "PlugIns/SetzoWidgetExtension.appex/PrivacyInfo.xcprivacy": {
+      "NSPrivacyAccessedAPITypes": [
+        {
+          "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+          "NSPrivacyAccessedAPITypeReasons": [
+            "CA92.1"
+          ]
+        }
+      ],
+      "NSPrivacyCollectedDataTypes": [],
+      "NSPrivacyTracking": false,
+      "NSPrivacyTrackingDomains": []
+    }
+  }
+}

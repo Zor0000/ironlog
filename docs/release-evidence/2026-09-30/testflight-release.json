@@ -1,0 +1,26 @@
+{
+  "runId": 36708492844,
+  "runUrl": "https://github.com/Zor0000/setzo/actions/runs/36708492844",
+  "conclusion": "success",
+  "sourceCommit": "aafd9162de988d7fc2e3aa89301c901faa88da06",
+  "version": "1.0",
+  "build": "36708492844",
+  "buildId": "5c1e8ef2-e2fb-469e-b809-c62f72bc0959",
+  "uploaded": true,
+  "waitForProcessingSucceeded": true,
+  "internalGroupId": "6497c060-a90c-4255-ace4-7ce105aff763",
+  "internalGroupAssigned": true,
+  "unitTests": {
+    "executed": 257,
+    "failures": 0
+  },
+  "backendTests": {
+    "executed": 12,
+    "failures": 0
+  },
+  "ipaSha256": "003585aafc922f53bd4c06b328cc9c8cd780014bfdbcdf0104acafba57fbf8cf",
+  "privacyReportExported": false,
+  "privacyReportBlocker": "Xcode Save dialog Export disabled; native pointer control reports noWindowsAvailable. All four final archive manifests were inspected independently.",
+  "appReviewContactRecordPresent": false,
+  "appReviewApprovalVerified": false
+}
