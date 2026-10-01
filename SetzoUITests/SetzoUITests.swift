@@ -113,12 +113,31 @@ final class SetzoUITests: XCTestCase {
         XCTAssertTrue(app.buttons["forgot-password-button"].waitForExistence(timeout: 6))
         XCTAssertTrue(app.buttons["google-sign-in-button"].exists)
         XCTAssertTrue(app.buttons["apple-sign-in-button"].exists)
-        XCTAssertTrue(app.links["Privacy Policy"].exists)
-        XCTAssertTrue(app.links["Terms of Use"].exists)
+        XCTAssertTrue(app.buttons["Privacy Policy"].exists)
+        XCTAssertTrue(app.buttons["Terms of Use"].exists)
         XCTAssertFalse(app.buttons["google-sign-in-button"].isEnabled)
         app.buttons["forgot-password-button"].tap()
         XCTAssertTrue(app.staticTexts["Reset password"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["send-reset-link-button"].exists)
+    }
+
+    func testBusyAuthScreenKeepsItsButtonsOnScreen() {
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_ShowAuth", "UITest_AuthBusy"]
+        app.launch()
+
+        let signingIn = app.buttons["Signing In…"]
+        XCTAssertTrue(signingIn.waitForExistence(timeout: 6))
+        XCTAssertLessThan(signingIn.frame.height, 80)
+        XCTAssertTrue(app.frame.contains(signingIn.frame))
+        XCTAssertFalse(app.staticTexts["Your training story, in one place"].exists)
+        let google = app.buttons["google-sign-in-button"]
+        XCTAssertTrue(app.frame.contains(google.frame))
+        XCTAssertFalse(google.isEnabled)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "busy-auth-layout"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func testFreeWorkoutCanAddExerciseCompleteSetAndSave() {

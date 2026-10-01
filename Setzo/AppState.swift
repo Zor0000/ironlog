@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import OSLog
+import AuthenticationServices
 
 @MainActor
 final class AppState: ObservableObject {
@@ -246,6 +247,7 @@ final class AppState: ObservableObject {
             applyIronFuelUITestSeedIfRequested()
             if ProcessInfo.processInfo.arguments.contains("UITest_ShowAuth") {
                 showAuth()
+                isBusy = ProcessInfo.processInfo.arguments.contains("UITest_AuthBusy")
             }
         }
         #endif
@@ -279,9 +281,14 @@ final class AppState: ObservableObject {
     }
 
     func signInWithGoogle() async {
+        authMessage = nil
         await runBusy {
-            let profile = try await supabase.signInWithGoogle()
-            await finishAuthentication(profile)
+            do {
+                let profile = try await supabase.signInWithGoogle()
+                await finishAuthentication(profile)
+            } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+                // Closing Google's sheet is an ordinary return to the sign-in form.
+            }
         }
     }
 

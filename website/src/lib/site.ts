@@ -1,5 +1,7 @@
 export const SITE = {
   name: "Setzo",
+  // Keep empty until the app is publicly available on the App Store.
+  appStoreUrl: "",
   tagline: "Track your gains. Own your progress.",
   description:
     "A fast, free, no-nonsense gym tracker. Log every set, run any split, and watch your PRs and streaks grow.",

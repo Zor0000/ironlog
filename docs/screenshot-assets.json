@@ -1,0 +1,48 @@
+{
+  "captured": "2026-10-01",
+  "source_commit": "e18202f58b40f29cda411b451fd8abdb768500b2",
+  "app": "Setzo",
+  "feature_name": "IronFuel",
+  "device": "iPhone 17 Pro",
+  "os": "iOS 26.5",
+  "dimensions": [
+    1206,
+    2622
+  ],
+  "data": "DEBUG-only synthetic demo seed; no real account data",
+  "copies": {
+    "01-workouts.png": [
+      "website/public/screenshots/01-workouts.png",
+      "screenshot-studio/public/screenshots/01-workouts.png"
+    ],
+    "02-log.png": [
+      "images/workout-logger.png",
+      "website/public/screenshots/02-log.png",
+      "screenshot-studio/public/screenshots/02-log.png"
+    ],
+    "03-run.png": [
+      "images/run.png"
+    ],
+    "04-progress.png": [
+      "images/progress.png",
+      "website/public/screenshots/04-stats.png",
+      "screenshot-studio/public/screenshots/04-progress.png"
+    ],
+    "05-progress-history.png": [
+      "website/public/screenshots/03-history.png",
+      "screenshot-studio/public/screenshots/05-progress-history.png"
+    ],
+    "06-ironfuel.png": [
+      "images/ironfuel.png",
+      "screenshot-studio/public/screenshots/06-ironfuel.png"
+    ]
+  },
+  "sha256": {
+    "01-workouts.png": "1cdcefb1189ed62bc08a7e55302b4fa12ec5b9c025e4e5e826a9d256c8538118",
+    "02-log.png": "3769e1e49528e41940931c2e159a254827042ddfe8905a57f39f8afe50a350d9",
+    "03-run.png": "0dceb0736130a6c8ad4079c31cfbd0208b9adeac0118e5f42e2ef5b6699b4f98",
+    "04-progress.png": "74d481f3c4a4bf0335958f213b16941ba868484eb994caba6a08662a1c0b0781",
+    "05-progress-history.png": "14d19185dec30e2e2156f94925607a118b88fb8627ef672c40cdc04b02fbb150",
+    "06-ironfuel.png": "c4c81611d5cf4a2e7679f77108c30fe4d9505355db9860e6e1e7ee8b41eb85be"
+  }
+}

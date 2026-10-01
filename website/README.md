@@ -43,3 +43,11 @@ skill and pre-filled with Setzo content): run `npm run dev` there and click
 ## Deploy
 
 Vercel-ready. `vercel` (or import the repo) and set the project root to `website/`.
+
+The canonical public Setzo pages currently live in the sibling `portfolio/setzo/`
+directory under `https://www.neeraj.works/setzo/`. This richer site is a draft.
+Keep both drafts local until the App Store launch. All download controls here
+use `SITE.appStoreUrl` in `src/lib/site.ts`, which is intentionally empty and
+renders a disabled button. Fill it with the verified public App Store URL only
+after the app is available; the button then becomes a link. The canonical static
+page has an equivalent disabled button to replace with that same link.

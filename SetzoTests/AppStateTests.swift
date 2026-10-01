@@ -1,8 +1,39 @@
 import XCTest
+import AuthenticationServices
 @testable import Setzo
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    func testCancellingGoogleSignInPreservesLocalWorkoutAndClearsBusyState() async {
+        let cloud = OfflineCloud()
+        cloud.googleSignInError = NSError(domain: ASWebAuthenticationSessionErrorDomain,
+                                         code: ASWebAuthenticationSessionError.canceledLogin.rawValue)
+        let app = AppState(supabase: cloud, allowDebugSeeds: false)
+        app.startFreeWorkout()
+        app.addExercise(name: "Push Ups")
+        let exerciseID = app.todayExercises[0].id
+        app.authMessage = "Previous sign-in failed"
+
+        await app.signInWithGoogle()
+
+        XCTAssertFalse(app.isBusy)
+        XCTAssertNil(app.authMessage)
+        XCTAssertNil(app.user)
+        XCTAssertEqual(app.todayExercises.first?.id, exerciseID)
+    }
+
+    func testGoogleSignInFailureStillShowsTheError() async {
+        let cloud = OfflineCloud()
+        cloud.googleSignInError = URLError(.notConnectedToInternet)
+        let app = AppState(supabase: cloud, allowDebugSeeds: false)
+
+        await app.signInWithGoogle()
+
+        XCTAssertFalse(app.isBusy)
+        XCTAssertEqual(app.authMessage, URLError(.notConnectedToInternet).localizedDescription)
+        XCTAssertNil(app.user)
+    }
+
     func testExerciseCanMoveUpAndDownWithoutLosingItsLoggedWork() {
         let app = AppState()
         app.startFreeWorkout()
@@ -1709,6 +1740,7 @@ final class AppStateTests: XCTestCase {
 }
 
 private final class OfflineCloud: SupabaseService {
+    var googleSignInError: Error?
     var profile: UserProfile?
     var offline = false
     var remoteSessions: [WorkoutSession] = []
@@ -1742,6 +1774,10 @@ private final class OfflineCloud: SupabaseService {
     override var isAuthenticated: Bool { profile != nil }
     override func restoreSessionIfNeeded() async {}
     override func signOut() async { profile = nil }
+    override func signInWithGoogle() async throws -> UserProfile {
+        if let googleSignInError { throw googleSignInError }
+        return try XCTUnwrap(profile)
+    }
     override func pullSessions() async throws -> [WorkoutSession] {
         if offline { throw URLError(.notConnectedToInternet) }
         return remoteSessions

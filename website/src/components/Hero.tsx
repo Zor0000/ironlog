@@ -2,6 +2,7 @@ import { Flame, Trophy, Weight } from "lucide-react";
 import { GithubIcon } from "./Icons";
 import { PhoneFrame } from "./PhoneFrame";
 import { SITE } from "@/lib/site";
+import { AppStoreDownload } from "./AppStoreDownload";
 
 const PROOF = [
   { icon: Flame, value: "5 days", label: "current streak" },
@@ -23,7 +24,7 @@ export function Hero() {
         <div className="text-center lg:text-left">
           <span className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">
             <span className="size-1.5 rounded-full bg-lime" />
-            iOS app + web PWA · free &amp; open source
+            Coming soon to the App Store · free &amp; open source
           </span>
 
           <h1 className="mt-7 font-display text-[3rem] leading-[0.92] text-fg sm:text-7xl lg:text-[5.75rem] xl:text-[6.5rem]">
@@ -39,12 +40,7 @@ export function Hero() {
           </p>
 
           <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
-            <a
-              href="#get"
-              className="w-full rounded-xl bg-lime px-6 py-3.5 text-center text-base font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-[0.98] sm:w-auto"
-            >
-              Get Setzo free
-            </a>
+            <AppStoreDownload className="w-full sm:w-auto" />
             <a
               href={SITE.github}
               target="_blank"
@@ -57,7 +53,7 @@ export function Hero() {
           </div>
 
           <p className="mt-5 text-sm text-muted-2">
-            No ads · No account required · No third-party SDKs
+            No ads · No account required · No advertising or analytics SDKs
           </p>
 
           {/* Proof, in a row instead of floating over the screenshot */}

@@ -418,7 +418,7 @@ struct AuthView: View {
     private func busyLabel(_ title: String, darkSpinner: Bool) -> some View {
         HStack(spacing: 8) {
             if app.isBusy {
-                ProgressView().tint(darkSpinner ? .black : Theme.text)
+                SwiftUI.ProgressView().tint(darkSpinner ? .black : Theme.text)
             }
             Text(title)
         }
@@ -495,7 +495,7 @@ private struct ForgotPasswordView: View {
                         }
                     } label: {
                         HStack(spacing: 8) {
-                            if app.isBusy { ProgressView().tint(.black) }
+                            if app.isBusy { SwiftUI.ProgressView().tint(.black) }
                             Text(app.isBusy ? "Sending…" : "Send Reset Link")
                         }
                     }

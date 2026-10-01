@@ -1,6 +1,7 @@
 import { GithubIcon } from "./Icons";
 import { Logo } from "./Logo";
 import { NAV_LINKS, SITE } from "@/lib/site";
+import { AppStoreDownload } from "./AppStoreDownload";
 
 export function Nav() {
   return (
@@ -32,12 +33,7 @@ export function Nav() {
           >
             <GithubIcon className="size-4" />
           </a>
-          <a
-            href="#get"
-            className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink transition-transform hover:scale-[1.03] active:scale-95"
-          >
-            Get Setzo
-          </a>
+          <AppStoreDownload className="!px-3 !py-2 !text-xs sm:!text-sm" />
         </div>
       </nav>
     </header>
