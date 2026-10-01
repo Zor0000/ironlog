@@ -17,6 +17,8 @@ Use the tools already present: App Store Connect / Xcode Organizer for crashes a
 | Edge Functions | `delete-account` v7 and `fuel-buddy` v3 ACTIVE, JWT verification enabled | Use their logs when investigating account or food-request failures. |
 | Support/legal | Existing public pages and mailbox | Monitor the current inbox. |
 | App distribution | 1.0 in Prepare for Submission; latest uploaded build 36708492844 | Public download remains disabled until the app is available. |
+| Latest release workflow | [Run 36860880606](https://github.com/Zor0000/setzo/actions/runs/36860880606) stopped before tests/build because Apple reported a missing or expired agreement | Parth, as Account Holder, must accept the required agreement in App Store Connect before another upload can proceed. |
+| Coming-soon website | Neeraj authorised publication; portfolio commit `7ce1ee6` deployed successfully and the live `/setzo/` page was verified | Current screenshots are public; the App Store button remains disabled with no download destination. |
 | First-use source check | Local onboarding, workout/run saves, Google sign-in/sync/returning user and live Fuel Buddy passed after authentication UI fixes; 27 automated checks passed | Include the fixes in a new distribution build and verify that exact build on a physical iPhone. See [first-use report](first-use-check.md). |
 | Recovery | No backup schedule or restore drill verified in this session | Close this gap before relying on cloud storage for public users. |
 
@@ -26,7 +28,7 @@ Use the tools already present: App Store Connect / Xcode Organizer for crashes a
 - Complete the final first-use smoke test on that TestFlight build and a physical iPhone. The simulator source check is useful additional evidence, not verification of the signed uploaded binary.
 - Choose a cloud backup method and verify one restore into an isolated environment. On the current Free plan, Supabase recommends regular exports and off-site backups. Proposed minimum: daily encrypted exports, seven-day retention, access limited to the operator, and a monthly restore check. Confirm how Auth and application data are included, and how deleted accounts are kept deleted after recovery. Backups containing user data must stay out of the public repository and CI logs.
 - Record current Supabase/Groq/hosting quotas, billing owners, and a monthly spending ceiling. This draft authorizes no plan upgrade or paid add-on. Decide before launch what to do at quota exhaustion; local workout logging should remain available.
-- Keep the prepared website changes local until launch. When the app is publicly available in the selected regions, verify its real App Store URL, enable the download link, and publish the prepared page. Verify download, support, privacy and Terms navigation on an iPhone.
+- The coming-soon website is now published with Neeraj's approval. Keep its download button disabled until the app is publicly available in the selected regions. Then verify the real App Store URL, enable the download link, and publish that update. Verify download, support, privacy and Terms navigation on an iPhone.
 
 ## Routine
 
