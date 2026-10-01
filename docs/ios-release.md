@@ -31,7 +31,7 @@ Local verification: 233 unit tests passed on iOS 26.5 / iPhone 17. Static analys
 
 Before submission, create a fresh signed archive, export its privacy report, and complete the physical-device checks below. No app upload or submission was performed. The commands and upload details later in this document describe an earlier build 3 release.
 
-## Current release checklist — September 30, 2026
+## Current release checklist — October 1, 2026
 
 Neeraj confirmed completion of the App Store Connect settings on September 30. Privacy and age-rating completion remain recorded on that basis. The release metadata synchronization subsequently found no App Review contact record for the pending version: a phone number is needed to create it with Neeraj's name and the chosen mailbox. This fresh API evidence supersedes the earlier review-contact completion assumption. No App Review approval is claimed.
 
@@ -52,13 +52,14 @@ Canonical public pages are hosted in `/Users/neerajchormale/Projects/portfolio`,
 - [x] **Email-account deletion:** verified against production Supabase. The Auth user and associated records were removed, as confirmed by Neeraj and the recorded disposable-account verification below. This does not prove every physical-device/offline scenario.
 - [x] **Support/privacy configuration:** app links, public pages, future Apple metadata synchronization, Google support/developer contacts, and all 13 production Supabase email templates use `neerajchormale39@gmail.com`; sender display name is Setzo. Existing Gmail SMTP configuration was preserved. The sender address and support/privacy destination now match.
 - [x] **Mailbox operation:** Neeraj confirmed that `neerajchormale39@gmail.com` works. No additional mailbox test is requested. This is user-confirmed operation, not an agent-observed test delivery.
-- [x] **Apple revocation implementation/deployment:** client reauthorization and backend revocation/fallback code are implemented and the backend is deployed. This does not imply signing credentials or live Apple revocation have been verified.
+- [x] **Apple revocation implementation/deployment:** client reauthorization and backend revocation/fallback code are implemented and the backend is deployed. Signing configuration was independently inspected during review; the later live Apple deletion check is complete per Neeraj's October 1 confirmation below.
 
-### Apple setup complete; live verification pending
+### Apple setup and live verification complete
 
 - [x] **Supabase access:** Parth (`jadhavparth99@gmail.com`) is an active Administrator, independently read back from organization membership during PR #58 review. The Free plan uses organization-wide roles; Setzo is currently the organization's only project. [Original invitation evidence](release-evidence/2026-09-30/parth-supabase-invite-sent.png).
 - [x] **Apple signing configuration:** Parth reports registering the dedicated key and verifying all four saved secret digests. Review independently confirmed all four production secrets are present and the client/team/key ID digests match the documented values. The private key was not retrieved.
-- [ ] **One live iPhone check:** [issue #57](https://github.com/Zor0000/setzo/issues/57) remains OPEN for the disposable Apple-account deletion check. Verify actual Apple revocation, removal of the Auth user and associated records, and removal of Setzo in iPhone Settings. See [Apple deletion setup](apple-account-deletion.md).
+- [x] **One live iPhone check:** Neeraj confirmed on October 1 that Parth performed the Apple deletion check and considers it complete. [Issue #57](https://github.com/Zor0000/setzo/issues/57) is completed on that basis. No additional backend logs or tested build number were supplied with this confirmation; this is user-confirmed verification. See [Apple deletion setup](apple-account-deletion.md).
+- [x] **Google sign-in checks:** Neeraj confirmed on October 1 that these are complete. This is user-confirmed device verification, additional to the recorded production OAuth/console checks.
 
 ### Apple account-deletion credentials
 
@@ -75,7 +76,7 @@ Store these values in the production project's [Edge Function secrets](https://s
 
 Keep the private key out of Git, screenshots, issue comments, and logs. Supabase exposes secret updates to the deployed function without another deployment.
 
-September 30 production setup: Parth registered the dedicated key under his team and reports matching the saved SHA-256 digests for all four secrets, including the complete private key. Review independently confirmed secret presence and the client/team/key ID digests. A real Apple exchange and revocation remain unverified. Production was version 6 at review time, still using the earlier implementation; production now runs reviewed version 7, ACTIVE with JWT verification enabled. All three deployed source files match this PR exactly and an unauthenticated POST returned 401. [Deployment evidence](release-evidence/2026-09-30/pr58-backend-deployment.json).
+September 30 production setup: Parth registered the dedicated key under his team and reports matching the saved SHA-256 digests for all four secrets, including the complete private key. Review independently confirmed secret presence and the client/team/key ID digests. A real Apple exchange/revocation was unverified during that September 30 review; Neeraj subsequently confirmed Parth completed the live deletion check on October 1. Production was version 6 at review time, still using the earlier implementation; production now runs reviewed version 7, ACTIVE with JWT verification enabled. All three deployed source files match this PR exactly and an unauthenticated POST returned 401. [Deployment evidence](release-evidence/2026-09-30/pr58-backend-deployment.json).
 
 Source changes to the function require deployment:
 
@@ -87,7 +88,7 @@ The client recognizes the deployed `apple_reauthorization_required` and `apple_r
 
 September 30 source verification: Parth reports 253 iOS unit tests and the Simulator build passed. Review independently reran the 12 backend tests covering authorization, manual fallback, deletion ordering, signed Apple claims, mismatched identities, and upstream failures; type checking, lint and formatting passed. Parth downloaded version 5 for protocol comparison; review read back version 6. These checks do not establish a successful live Apple revocation.
 
-Before closing #57, install a build containing this client flow on a physical iPhone, use a disposable Apple account, create a workout, and delete the account through Apple confirmation. Verify `Apple authorization revoked` in function logs, removal of the Auth user and owned records, and removal of Setzo under iPhone Settings → your name → Sign in with Apple. Record the tested build and date in the issue. A signed Debug build from source commit `473bd72`, version `1.0` build `3`, was subsequently installed on the paired iPhone 15 Pro on September 30. Its signed entitlements include Sign in with Apple and team `75LRT8TRQY`. The user chose to perform the live deletion test later; no Apple sign-in or account deletion was attempted.
+The original live-check procedure was to install a build containing this client flow on a physical iPhone, use a disposable Apple account, create a workout, and delete the account through Apple confirmation. Verify `Apple authorization revoked` in function logs, removal of the Auth user and owned records, and removal of Setzo under iPhone Settings → your name → Sign in with Apple. Record the tested build and date in the issue. A signed Debug build from source commit `473bd72`, version `1.0` build `3`, was subsequently installed on the paired iPhone 15 Pro on September 30. Its signed entitlements include Sign in with Apple and team `75LRT8TRQY`. At that installation session, the user chose to perform the live deletion test later; no Apple sign-in or account deletion was attempted then. Neeraj confirmed completion by Parth on October 1.
 
 PR #58 review: fixed guest deletion before cancelled Apple confirmation, persistent manual-revocation instructions, and account-scoped fallback confirmation. Restored native Apple revocation handling and consolidated the canonical URLs/contact changes. All 27 focused iOS tests passed; 12 backend tests, type checking, lint and formatting passed. The first local Xcode test launch stalled before XCTest loaded; disabling the debug dylib for the focused retry resolved it. PR #58 was approved and merged as `b8ca9b9`. Its first release run (`36706838972`) stopped before signing/upload on four assertions in one draft-restore test. Investigation found a real Live Activity queue race: boot published the disk draft before reading newer Lock Screen edits. Follow-up `aafd916` drains prior updates and reconciles the loaded draft before publishing. The previously failing test and two related restore/Lock Screen checks passed locally (3 tests, zero failures); the corrected release run is `36708492844`.
 
@@ -106,9 +107,10 @@ The archive and IPA are also preserved locally at `build/release-36708492844/`. 
 
 Remaining submission checks are tracked independently of the confirmed email-account deletion test:
 
-- [ ] **App Review contact:** supply Neeraj's contact phone number so the currently absent review-contact record can be created with `neerajchormale39@gmail.com`. This is an App Store submission gate, not a TestFlight upload gate.
+- [ ] **App Review contact:** supply Neeraj's contact phone number so the currently absent review-contact record can be created with `neerajchormale39@gmail.com`. This is an App Store submission gate, not a TestFlight upload gate. In App Store Connect: Apps → Setzo → Distribution → iOS App 1.0 → scroll to App Review Information → Contact Information; enter Neeraj Chormale, `neerajchormale39@gmail.com`, and a phone number including `+` and country code, then Save. [Apple field reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information).
 - [ ] Export the Xcode privacy report from the final signed archive; review app/widget/dependency reasons and validation notices before submission.
-- [ ] Complete the release-build fresh non-test-user Google sign-in check and remaining physical-device deletion/offline/reauthentication scenarios. The server OAuth redirect and production email-account deletion checks above do not replace client-device verification. Inspect backup/log retention separately if needed.
+- [x] Release Google sign-in and the live Apple deletion check are complete per Neeraj's October 1 confirmation.
+- [ ] Other physical-device offline/reauthentication/two-device scenarios retain their previous evidence status; the sign-in/deletion confirmation does not independently verify all of them. Inspect backup/log retention separately if needed.
 
 September 30 contact follow-up: app/source links and future Apple metadata contact were updated; the portfolio change was committed and deployed, and all four live pages matched the new source. Production Supabase's 27 email-branding fields were updated and verified. Live Apple URL/branding synchronization succeeded in CI. The review-contact record is absent according to that run; its email cannot be applied until the required phone number is supplied.
 

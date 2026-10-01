@@ -1,4 +1,4 @@
-# Apple account deletion — September 30, 2026
+# Apple account deletion — October 1, 2026
 
 The app and production `delete-account` function previously deleted the Supabase user without revoking Apple's authorization. The function now requests a fresh native Apple authorization code, exchanges it for tokens on the server, checks Apple's returned subject against the caller's linked Apple identity, and revokes the refresh token before deleting the Supabase user. Existing database cascades and local cleanup remain responsible for removing workout records. No Apple refresh tokens or signing keys are sent back to the app, stored, or logged.
 
@@ -10,13 +10,13 @@ Fresh authorization at deletion also supports accounts created before this chang
 - The iOS Simulator app build passed.
 - Production version 7 is ACTIVE with JWT verification enabled. All three downloaded source files match the reviewed code; an unauthenticated POST returned HTTP 401. The backend preserves existing request/error names and strengthens Apple signature verification and fallback rules.
 - All four production Apple signing secrets are present. The client/team/key ID digests match the documented values; Parth reports also matching the private-key digest.
-- A real Apple exchange/revocation has **not** been verified. No real user accounts were deleted during this review.
+- Neeraj confirmed on October 1 that Parth performed the live Apple deletion check and considers it complete. Issue #57 is completed on that basis. The confirmation did not include a tested build number or additional logs; this is user-confirmed verification. No real user accounts were deleted by the agent during review.
 
 Review verification: 27 focused iOS tests and 12 backend tests passed; Deno type checking, lint and formatting passed.
 
-## Configured credentials and remaining live verification
+## Configured credentials and live-check procedure
 
-Parth completed the key/secret setup below, using key `N452YUC48V` and team `75LRT8TRQY`. The physical-device deletion check remains pending.
+Parth completed the key/secret setup below, using key `N452YUC48V` and team `75LRT8TRQY`. The physical-device deletion check is complete per Neeraj's October 1 confirmation. The setup/check procedure is preserved below for future releases.
 
 1. Sign into [Apple Developer](https://developer.apple.com/account/resources/identifiers/list) using Parth's developer team. Verify the App ID `com.parthjadhav.ironlog` has Sign in with Apple enabled and is the primary App ID for the key.
 2. Open Certificates, Identifiers & Profiles → Keys → +. Create a dedicated key, enable **Sign in with Apple**, click **Configure**, and choose the Setzo primary App ID. Register it, record the Key ID, and download the `.p8` file. This must be a Sign in with Apple key, **not** an App Store Connect API key.
@@ -37,4 +37,4 @@ References: [Apple TN3194](https://developer.apple.com/documentation/technotes/t
 
 ## Reviewed TestFlight build
 
-PR #58 was approved and merged on September 30 (`b8ca9b9`), followed by the verified draft-restore fix `aafd916`. Install TestFlight **1.0 (36708492844)** for the physical Apple check in issue #57. The release workflow passed 257 unit tests, archived/exported/uploaded successfully, waited for Apple processing, and assigned the build to Internal Testers. Production deletion backend remains reviewed version 7. No real Apple-account revocation has been verified by this release workflow.
+PR #58 was approved and merged on September 30 (`b8ca9b9`), followed by the verified draft-restore fix `aafd916`. TestFlight **1.0 (36708492844)** was made available for the physical Apple check in issue #57; the actual tested build was not specified in the completion confirmation. The release workflow passed 257 unit tests, archived/exported/uploaded successfully, waited for Apple processing, and assigned the build to Internal Testers. Production deletion backend remains reviewed version 7. The release workflow itself did not perform a real Apple-account revocation; the later live check was confirmed complete by Neeraj on October 1.
