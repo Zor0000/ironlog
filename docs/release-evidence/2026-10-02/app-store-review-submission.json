@@ -1,0 +1,47 @@
+{
+  "preSubmissionValidation": {
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "blocking": 0
+  },
+  "submission": {
+    "appId": "6771258872",
+    "version": "1.0",
+    "versionId": "dac4b79b-581a-4bf8-aba1-d590a9b2c13f",
+    "buildId": "5b5f5502-242a-42d6-a6b7-1cc3591c2309",
+    "platform": "IOS",
+    "submissionId": "0e81f794-c622-43a1-a581-ed0bf5759a2e",
+    "submittedDate": "2026-10-02T12:16:12.844Z",
+    "buildAttachment": {
+      "versionId": "dac4b79b-581a-4bf8-aba1-d590a9b2c13f",
+      "buildId": "5b5f5502-242a-42d6-a6b7-1cc3591c2309",
+      "currentBuildId": "5b5f5502-242a-42d6-a6b7-1cc3591c2309",
+      "alreadyAttached": true
+    },
+    "messages": [
+      "Reusing existing review submission 0e81f794-c622-43a1-a581-ed0bf5759a2e because it has no review items."
+    ]
+  },
+  "reviewStatus": {
+    "appId": "6771258872",
+    "version": {
+      "id": "dac4b79b-581a-4bf8-aba1-d590a9b2c13f",
+      "version": "1.0",
+      "platform": "IOS",
+      "state": "WAITING_FOR_REVIEW",
+      "createdDate": "2026-05-19T23:22:49-07:00"
+    },
+    "reviewDetailConfigured": true,
+    "reviewDetailId": "70792def-2171-48d8-a1fe-73133e863f3e",
+    "latestSubmission": {
+      "id": "0e81f794-c622-43a1-a581-ed0bf5759a2e",
+      "state": "WAITING_FOR_REVIEW",
+      "platform": "IOS",
+      "submittedDate": "2026-10-02T12:16:12.844Z"
+    },
+    "reviewState": "WAITING_FOR_REVIEW",
+    "nextAction": "Wait for App Store review outcome."
+  },
+  "releaseType": "MANUAL"
+}

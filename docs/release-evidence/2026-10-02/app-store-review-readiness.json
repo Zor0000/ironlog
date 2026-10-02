@@ -54,10 +54,10 @@
       "height": 2778
     }
   ],
-  "appStoreState": "PREPARE_FOR_SUBMISSION",
+  "appStoreState": "WAITING_FOR_REVIEW",
   "currentReleaseType": "MANUAL",
   "releaseChoiceConfirmationPending": false,
-  "appReviewSubmitted": false,
+  "appReviewSubmitted": true,
   "physicalDeviceCheckOfThisBuildCompleted": false,
   "appPrivacyPublication": "Previously user-confirmed; current public API cannot verify publication",
   "checksPerformedThisTurn": [
@@ -69,11 +69,22 @@
     "Free prices and available=true verified for all 175 territories",
     "Manual release saved and verified through the Apple version record",
     "Submission readiness validation repeated: zero errors, warnings or blocking checks",
-    "Actual submission API rejected the missing regulated medical-device declaration; version remains PREPARE_FOR_SUBMISSION"
+    "Initial submission attempt rejected the missing regulated medical-device declaration; version was PREPARE_FOR_SUBMISSION at that point",
+    "Regulated medical-device declaration saved as No in App Store Connect and verified in the UI",
+    "Public review submission accepted; existing draft safely reused",
+    "Apple review status and version record both report WAITING_FOR_REVIEW with MANUAL release"
   ],
   "newTestCasesAdded": 0,
   "releaseChoiceConfirmedByNeeraj": true,
   "submissionAttemptRun": "https://github.com/Zor0000/setzo/actions/runs/37004902216",
-  "draftReviewSubmissionId": "0e81f794-c622-43a1-a581-ed0bf5759a2e",
-  "submissionBlocker": "Apple requires the regulated medical-device declaration on App Information. No declaration has been saved yet; public App Review submission was not accepted."
+  "submissionRun": "https://github.com/Zor0000/setzo/actions/runs/37005631504",
+  "reviewSubmissionId": "0e81f794-c622-43a1-a581-ed0bf5759a2e",
+  "submittedDate": "2026-10-02T12:16:12.844Z",
+  "regulatedMedicalDevice": false,
+  "medicalDeviceDeclarationSavedAndVerified": true,
+  "postSubmissionValidation": {
+    "expectedNonEditableState": "WAITING_FOR_REVIEW",
+    "checkId": "version.state.editable",
+    "explanation": "Readiness validation expects an editable version before submission. The accepted submitted version is locked while waiting for review; this is not a rejected submission."
+  }
 }
