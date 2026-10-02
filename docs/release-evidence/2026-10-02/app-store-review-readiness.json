@@ -14,7 +14,7 @@
   "validation": {
     "errors": 0,
     "warnings": 0,
-    "infos": 1,
+    "infos": 2,
     "blocking": 0
   },
   "screenshots": [
@@ -55,8 +55,8 @@
     }
   ],
   "appStoreState": "PREPARE_FOR_SUBMISSION",
-  "currentReleaseType": "AFTER_APPROVAL",
-  "releaseChoiceConfirmationPending": true,
+  "currentReleaseType": "MANUAL",
+  "releaseChoiceConfirmationPending": false,
   "appReviewSubmitted": false,
   "physicalDeviceCheckOfThisBuildCompleted": false,
   "appPrivacyPublication": "Previously user-confirmed; current public API cannot verify publication",
@@ -66,7 +66,14 @@
     "Five screenshot dimension/opaque-pixel/visual checks passed",
     "Apple screenshot processing complete",
     "Apple readiness validation: zero blocking issues and warnings",
-    "Free prices and available=true verified for all 175 territories"
+    "Free prices and available=true verified for all 175 territories",
+    "Manual release saved and verified through the Apple version record",
+    "Submission readiness validation repeated: zero errors, warnings or blocking checks",
+    "Actual submission API rejected the missing regulated medical-device declaration; version remains PREPARE_FOR_SUBMISSION"
   ],
-  "newTestCasesAdded": 0
+  "newTestCasesAdded": 0,
+  "releaseChoiceConfirmedByNeeraj": true,
+  "submissionAttemptRun": "https://github.com/Zor0000/setzo/actions/runs/37004902216",
+  "draftReviewSubmissionId": "0e81f794-c622-43a1-a581-ed0bf5759a2e",
+  "submissionBlocker": "Apple requires the regulated medical-device declaration on App Information. No declaration has been saved yet; public App Review submission was not accepted."
 }
