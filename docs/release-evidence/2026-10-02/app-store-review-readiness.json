@@ -1,0 +1,72 @@
+{
+  "appId": "6771258872",
+  "version": "1.0",
+  "buildNumber": "36986706508",
+  "buildId": "5b5f5502-242a-42d6-a6b7-1cc3591c2309",
+  "preparedFromCommit": "2653df3",
+  "listingPreparationRun": "https://github.com/Zor0000/setzo/actions/runs/36995065977",
+  "screenshotUploadAndValidationRun": "https://github.com/Zor0000/setzo/actions/runs/36995431015",
+  "copyright": "2026 Neeraj Chormale",
+  "contentRightsPermissionConfirmedByNeeraj": true,
+  "price": "Free",
+  "availableTerritories": 175,
+  "allTerritoriesConfiguredAvailable": true,
+  "validation": {
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "blocking": 0
+  },
+  "screenshots": [
+    {
+      "fileName": "01-hero.png",
+      "id": "c5800019-3993-85f8-8015-478cd7de3be6",
+      "deliveryState": "COMPLETE",
+      "width": 1284,
+      "height": 2778
+    },
+    {
+      "fileName": "02-device-bottom.png",
+      "id": "e4400019-3993-85f8-8014-3b07bb012895",
+      "deliveryState": "COMPLETE",
+      "width": 1284,
+      "height": 2778
+    },
+    {
+      "fileName": "03-device-top.png",
+      "id": "f1000019-3993-85f8-8020-7d4bfb16dbac",
+      "deliveryState": "COMPLETE",
+      "width": 1284,
+      "height": 2778
+    },
+    {
+      "fileName": "04-device-bottom.png",
+      "id": "18800019-3993-85f8-800f-67c4efebd4b5",
+      "deliveryState": "COMPLETE",
+      "width": 1284,
+      "height": 2778
+    },
+    {
+      "fileName": "05-device-top.png",
+      "id": "d4000019-3993-85f8-801b-bf163137d19e",
+      "deliveryState": "COMPLETE",
+      "width": 1284,
+      "height": 2778
+    }
+  ],
+  "appStoreState": "PREPARE_FOR_SUBMISSION",
+  "currentReleaseType": "AFTER_APPROVAL",
+  "releaseChoiceConfirmationPending": true,
+  "appReviewSubmitted": false,
+  "physicalDeviceCheckOfThisBuildCompleted": false,
+  "appPrivacyPublication": "Previously user-confirmed; current public API cannot verify publication",
+  "checksPerformedThisTurn": [
+    "Existing screenshot editor TypeScript check passed",
+    "Listing text limits and Python syntax passed",
+    "Five screenshot dimension/opaque-pixel/visual checks passed",
+    "Apple screenshot processing complete",
+    "Apple readiness validation: zero blocking issues and warnings",
+    "Free prices and available=true verified for all 175 territories"
+  ],
+  "newTestCasesAdded": 0
+}

@@ -254,3 +254,13 @@ scripts/upload_testflight.sh
 ```
 
 Then confirm processing in App Store Connect > TestFlight.
+
+## October 2 public App Store review preparation
+
+Neeraj selected public App Store review for version **1.0**, Free pricing in all supported countries and regions, and **2026 Neeraj Chormale** copyright. Neeraj confirmed permissions for all included content and artwork. The version now has its description, subtitle, keywords, Health & Fitness category, content-rights declaration and build **36986706508** attached. Free prices and `available=true` were verified in all **175** supported territories.
+
+Five refreshed Setzo marketing screenshots were exported from the existing screenshot editor at **1284 × 2778**, checked for dimensions, opaque pixels and readable captions, and uploaded to the en-US iPhone 6.5-inch set. Apple reports all five as **COMPLETE**. The meal slide uses “Meal ideas for your preferences” without an absolute food-safety promise.
+
+[Validation and upload run](https://github.com/Zor0000/setzo/actions/runs/36995431015) passed: **0 blocking issues, 0 errors and 0 warnings**. App Privacy publication is not verifiable through the public API; the earlier user confirmation remains the publication evidence. Existing review contact and credentials were preserved. [Sanitized readiness receipt](release-evidence/2026-10-02/app-store-review-readiness.json), [listing copy](app-store-listing.json), and [screenshot files](../images/app-store/en-US/iphone65/).
+
+**Submission has not been sent.** Apple's version is still `PREPARE_FOR_SUBMISSION`, with `AFTER_APPROVAL` currently configured. Neeraj's pending manual/automatic release choice is required before dispatching the guarded submission operation. The exact-build physical iPhone check remains outstanding before public launch; device access did not establish a passing check. No new test cases were added. The screenshot editor's existing export now retains a download link for retry when the automatic download is suppressed.
