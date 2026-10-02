@@ -33,7 +33,7 @@ Before submission, create a fresh signed archive, export its privacy report, and
 
 ## Current release checklist — October 1, 2026
 
-Neeraj confirmed completion of the App Store Connect settings on September 30. Privacy and age-rating completion remain recorded on that basis. The release metadata synchronization subsequently found no App Review contact record for the pending version: a phone number is needed to create it with Neeraj's name and the chosen mailbox. This fresh API evidence supersedes the earlier review-contact completion assumption. No App Review approval is claimed.
+Neeraj confirmed completion of the App Store Connect settings on September 30. Privacy and age-rating completion remain recorded on that basis. September 30 API evidence found no App Review contact record; the October 2 release synchronization now found an existing record, verified the chosen contact email and preserved its phone and reviewer instructions. This newer evidence supersedes the absent-record status. No App Review approval is claimed.
 
 Canonical public pages are hosted in `/Users/neerajchormale/Projects/portfolio`, repository `Zor0000/portfolio`, deployed through Vercel: [homepage](https://www.neeraj.works/setzo/), [privacy](https://www.neeraj.works/setzo/privacy.html), [Terms](https://www.neeraj.works/setzo/terms.html), and [support](https://www.neeraj.works/setzo/support.html). Parth Jadhav is the Apple/App Store seller; Neeraj Chormale is the developer and support/privacy contact. Contact: `neerajchormale39@gmail.com`. Neeraj confirmed this mailbox works and chose it for support/privacy and Google OAuth on September 30; it supersedes the earlier `neerajcwork@gmail.com` choice.
 
@@ -103,11 +103,19 @@ PR #58 review: fixed guest deletion before cancelled Apple confirmation, persist
 
 The archive and IPA are also preserved locally at `build/release-36708492844/`. GitHub's signed-archive artifact expires after 14 days. Xcode Organizer opened the correct archive and offered Generate Privacy Report, but its Save dialog kept Export disabled; pointer control of that dialog reported `noWindowsAvailable`. Keyboard filename/destination changes did not enable Export. No PDF was exported and no privacy-report/validation approval is claimed. Retry manually by opening `build/release-36708492844/Setzo.xcarchive`, then control-clicking its Organizer row → Generate Privacy Report. Inspect the report before submission.
 
+### Agreement cleared and new TestFlight build — October 2
+
+After Neeraj reported that Parth completed the agreement action, [run 36986706508](https://github.com/Zor0000/setzo/actions/runs/36986706508) succeeded from source commit `ff4c696233f469d4a803e1e8b6ae757578aa6785`, including the October 1 authentication fixes. The existing CI suite passed **259 unit tests with zero failures**. The workflow created and exported the signed archive, uploaded version **1.0**, build **36986706508** (build ID `5b5f5502-242a-42d6-a6b7-1cc3591c2309`), completed Apple's processing wait and assigned the existing internal TestFlight group. Apple API access confirms that the earlier agreement block is cleared.
+
+The archive, IPA and symbols are preserved locally at `build/release-36986706508/`. The downloaded archive passed strict signature verification; archive and IPA identities matched Setzo 1.0 (36986706508), and the widget build matched. Four final archive privacy manifests were inspected, with tracking disabled and all seven app data categories present. [Release receipt](release-evidence/2026-10-02/testflight-release.json), [focused workflow evidence](release-evidence/2026-10-02/testflight-release.txt), [Apple metadata evidence](release-evidence/2026-10-02/apple-metadata-sync.txt), and [final manifests](release-evidence/2026-10-02/final-archive-manifests.json).
+
+No additional test cases were added for this retry. The exact-build physical iPhone smoke test and privacy-report export remain outstanding. TestFlight delivery does not establish App Review approval or App Store availability.
+
 ### Final build checks retained from the release checklist
 
 Remaining submission checks are tracked independently of the confirmed email-account deletion test:
 
-- [ ] **App Review contact:** supply Neeraj's contact phone number so the currently absent review-contact record can be created with `neerajchormale39@gmail.com`. This is an App Store submission gate, not a TestFlight upload gate. In App Store Connect: Apps → Setzo → Distribution → iOS App 1.0 → scroll to App Review Information → Contact Information; enter Neeraj Chormale, `neerajchormale39@gmail.com`, and a phone number including `+` and country code, then Save. [Apple field reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information).
+- [x] **App Review contact record:** October 2 synchronization found an existing record and verified `neerajchormale39@gmail.com`; the phone and reviewer instructions were preserved. Review their accuracy with the remaining submission fields before submitting. [Apple field reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information).
 - [ ] Export the Xcode privacy report from the final signed archive; review app/widget/dependency reasons and validation notices before submission.
 - [x] Release Google sign-in and the live Apple deletion check are complete per Neeraj's October 1 confirmation.
 - [ ] Other physical-device offline/reauthentication/two-device scenarios retain their previous evidence status; the sign-in/deletion confirmation does not independently verify all of them. Inspect backup/log retention separately if needed.

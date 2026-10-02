@@ -1,0 +1,28 @@
+{
+  "runId": 36986706508,
+  "runUrl": "https://github.com/Zor0000/setzo/actions/runs/36986706508",
+  "conclusion": "success",
+  "sourceCommit": "ff4c696233f469d4a803e1e8b6ae757578aa6785",
+  "version": "1.0",
+  "build": "36986706508",
+  "buildId": "5b5f5502-242a-42d6-a6b7-1cc3591c2309",
+  "uploaded": true,
+  "waitForProcessingSucceeded": true,
+  "internalGroupId": "6497c060-a90c-4255-ace4-7ce105aff763",
+  "internalGroupAssigned": true,
+  "unitTests": {
+    "executed": 259,
+    "failures": 0
+  },
+  "ipaSha256": "23a1fccd9a368e0100bc218eebedff59a017f4ed783046c262055f8b9147a9e2",
+  "archiveSignatureVerified": true,
+  "localArchiveDirectory": "build/release-36986706508/",
+  "agreementBlockCleared": true,
+  "appReviewContactRecordPresent": true,
+  "appReviewContactEmailVerified": true,
+  "appReviewPhoneAndInstructionsPreserved": true,
+  "physicalDeviceCheckOfThisBuildCompleted": false,
+  "privacyReportExported": false,
+  "appReviewSubmitted": false,
+  "appStoreReleaseVerified": false
+}

@@ -1,0 +1,2 @@
+Verified existing App Review contact email; phone and reviewer instructions preserved.
+{"appId": "6771258872", "name": "Setzo", "privacyPolicyUrl": "https://www.neeraj.works/setzo/privacy.html", "locales": ["en-US"]}

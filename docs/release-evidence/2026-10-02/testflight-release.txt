@@ -1,0 +1,6 @@
+2026-10-02T09:01:14.3677020Z 	 Executed 259 tests, with 0 failures (0 unexpected) in 20.863 (43.448) seconds
+2026-10-02T09:01:14.3677500Z Test Suite 'All tests' passed at 2026-10-02 09:01:12.242.
+2026-10-02T09:01:14.3677980Z 	 Executed 259 tests, with 0 failures (0 unexpected) in 20.863 (43.449) seconds
+2026-10-02T09:08:47.8403970Z {"uploadId":"5b5f5502-242a-42d6-a6b7-1cc3591c2309","fileId":"11584a1a-4074-4c75-a756-4344e0a86d31","fileName":"Setzo.ipa","fileSize":7499179,"uploaded":true,"buildId":"5b5f5502-242a-42d6-a6b7-1cc3591c2309"}
+2026-10-02T09:08:49.7719550Z Successfully added 1 group(s) to build 5b5f5502-242a-42d6-a6b7-1cc3591c2309
+2026-10-02T09:08:49.7733670Z {"buildId":"5b5f5502-242a-42d6-a6b7-1cc3591c2309","groupIds":["6497c060-a90c-4255-ace4-7ce105aff763"],"action":"added"}

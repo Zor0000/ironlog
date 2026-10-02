@@ -16,10 +16,10 @@ Use the tools already present: App Store Connect / Xcode Organizer for crashes a
 | Keep-alive | Scheduled every 6 hours; latest five runs succeeded. Latest run returned HTTP 200 for exercises, sessions and routines. | This checks reachability, not account sign-in, sync correctness, or backups. Scheduled jobs can be delayed. |
 | Edge Functions | `delete-account` v7 and `fuel-buddy` v3 ACTIVE, JWT verification enabled | Use their logs when investigating account or food-request failures. |
 | Support/legal | Existing public pages and mailbox | Monitor the current inbox. |
-| App distribution | 1.0 in Prepare for Submission; latest uploaded build 36708492844 | Public download remains disabled until the app is available. |
-| Latest release workflow | [Run 36860880606](https://github.com/Zor0000/setzo/actions/runs/36860880606) stopped before tests/build because Apple reported a missing or expired agreement | Parth, as Account Holder, must accept the required agreement in App Store Connect before another upload can proceed. |
+| App distribution (updated 2 October) | Version 1.0, build 36986706508 uploaded, Apple processing completed and existing internal TestFlight group assigned | Public download remains disabled until App Store availability; this is TestFlight delivery. |
+| Latest release workflow (updated 2 October) | [Run 36986706508](https://github.com/Zor0000/setzo/actions/runs/36986706508) succeeded: 259 existing unit tests passed, signed archive/export and upload completed | The agreement block is cleared. Release archive and symbols are preserved locally; [receipt](release-evidence/2026-10-02/testflight-release.json). |
 | Coming-soon website | Neeraj authorised publication; portfolio commit `7ce1ee6` deployed successfully and the live `/setzo/` page was verified | Current screenshots are public; the App Store button remains disabled with no download destination. |
-| First-use source check | Local onboarding, workout/run saves, Google sign-in/sync/returning user and live Fuel Buddy passed after authentication UI fixes; 27 automated checks passed | Include the fixes in a new distribution build and verify that exact build on a physical iPhone. See [first-use report](first-use-check.md). |
+| First-use source check | Local onboarding, workout/run saves, Google sign-in/sync/returning user and live Fuel Buddy passed after authentication UI fixes; 27 automated checks passed | Fixes are now in TestFlight build 36986706508; verify that exact build on a physical iPhone. See [first-use report](first-use-check.md). |
 | Recovery | No backup schedule or restore drill verified in this session | Close this gap before relying on cloud storage for public users. |
 
 ## Before launch
