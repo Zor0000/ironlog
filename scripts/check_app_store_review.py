@@ -54,6 +54,9 @@ def main():
                               "--version", "1.0", "--platform", "IOS", "--paginate"),
         "screenshots": read("screenshots", "list", "--app", APP_ID,
                             "--version", "1.0"),
+        "availability": read("pricing", "availability", "territory-availabilities",
+                             "--availability", APP_ID, "--paginate"),
+        "pricing": read("pricing", "current", "--app", APP_ID, "--all-territories"),
     }
     output = Path("build/app-store-review-readiness.json")
     output.parent.mkdir(exist_ok=True)

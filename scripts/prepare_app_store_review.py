@@ -52,6 +52,12 @@ def prepare():
     run("free price", "pricing", "schedule", "create", "--app", app,
         "--free", "--base-territory", "US")
     run("verify price", "pricing", "current", "--app", app, "--all-territories")
+    upload_screenshots()
+
+
+def upload_screenshots():
+    run("keywords", "localizations", "update", "--id", listing["localizationId"],
+        "--keywords", listing["keywords"])
     screenshots = Path("images/app-store/en-US/iphone65")
     if screenshots.is_dir():
         run("screenshots", "screenshots", "upload", "--version-localization",
@@ -84,6 +90,8 @@ if __name__ == "__main__":
         operation = os.environ.get("REVIEW_OPERATION", "inspect")
         if operation == "prepare":
             prepare()
+        elif operation == "screenshots":
+            upload_screenshots()
         elif operation == "submit":
             submit()
         elif operation != "inspect":
