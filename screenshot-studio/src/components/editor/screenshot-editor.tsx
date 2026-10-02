@@ -33,6 +33,10 @@ export function ScreenshotEditor() {
   const [activeSlideId, setActiveSlideId] = React.useState<string | null>(null);
   const [selectedElement, setSelectedElement] = React.useState<SelectedElement | null>(null);
   const [exporting, setExporting] = React.useState<string | null>(null);
+  const [download, setDownload] = React.useState<{ url: string; filename: string } | null>(null);
+  React.useEffect(() => {
+    return () => { if (download) URL.revokeObjectURL(download.url); };
+  }, [download]);
   const [ready, setReady] = React.useState(false);
   const [exportLocaleOverride, setExportLocaleOverride] = React.useState<string | null>(null);
   const [exportSlideIndex, setExportSlideIndex] = React.useState(0);
@@ -463,11 +467,12 @@ export function ScreenshotEditor() {
       try {
         const blob = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(blob);
+        const filename = `${slugify(state.appName)}-${platform}-${state.device}-${stamp()}.zip`;
+        setDownload({ url, filename });
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${slugify(state.appName)}-${platform}-${state.device}-${stamp()}.zip`;
+        a.download = filename;
         a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
       } catch (e) {
         toast.error("Couldn't bundle export");
         console.error(e);
@@ -582,6 +587,11 @@ export function ScreenshotEditor() {
         busy={busy}
       />
 
+      {download && (
+        <a className="px-4 py-2 text-sm underline" href={download.url} download={download.filename}>
+          Download last export
+        </a>
+      )}
       <div className="flex flex-1 overflow-hidden md:flex-row flex-col">
         <aside className="md:w-72 w-full shrink-0 border-r bg-card md:max-h-none max-h-64 overflow-hidden">
           <Sidebar

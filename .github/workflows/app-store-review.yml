@@ -1,6 +1,17 @@
 name: App Store review readiness
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect readiness or apply the approved listing
+        type: choice
+        default: inspect
+        options: [inspect, prepare, submit]
+      release_type:
+        description: Release choice explicitly confirmed by Neeraj (required for submit)
+        type: choice
+        default: unchanged
+        options: [unchanged, MANUAL, AFTER_APPROVAL]
 permissions:
   contents: read
 jobs:
@@ -11,6 +22,8 @@ jobs:
       ASC_APP_ID: "6771258872"
       ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
       ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+      REVIEW_OPERATION: ${{ inputs.operation }}
+      REVIEW_RELEASE_TYPE: ${{ inputs.release_type }}
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -57,11 +70,13 @@ jobs:
             --key-id "$ASC_API_KEY_ID" \
             --issuer-id "$ASC_API_ISSUER_ID" \
             --private-key "$ASC_API_PRIVATE_KEY_PATH" > /dev/null
-          python3 scripts/check_app_store_review.py
+          python3 scripts/prepare_app_store_review.py
 
       - name: Save sanitized readiness report
         uses: actions/upload-artifact@v4
         with:
           name: app-store-review-readiness
-          path: build/app-store-review-readiness.json
+          path: |
+            build/app-store-review-readiness.json
+            build/app-store-review-operations.json
           retention-days: 7
