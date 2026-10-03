@@ -132,3 +132,7 @@ scripts/            build_ios_release.sh, upload_testflight.sh, install_iphone.s
 ## Notes
 
 - **Keep-alive:** the free Supabase tier pauses after ~1 week of inactivity. [`supabase-keepalive.yml`](.github/workflows/supabase-keepalive.yml) pings it daily to prevent that; if it ever pauses anyway, restore it from the Supabase dashboard.
+
+## End-to-end tests
+
+The app and marketing website have deterministic tester-army suites, alongside the retained XCTest/XCUITest coverage. Run `npm ci`, `npm run test:e2e:ios:build`, then `npm run test:e2e` on the dedicated Setzo E2E simulator. For the website, run `npm --prefix website ci` and `npm --prefix website run test:e2e`; installed Google Chrome is required. See [commands, coverage, results, and external integration boundaries](docs/testing/e2e.md).

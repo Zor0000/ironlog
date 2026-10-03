@@ -54,6 +54,22 @@ final class SetzoUITests: XCTestCase {
         XCTAssertTrue(exerciseField.isHittable, "custom name field must be reachable without scrolling past the catalog")
     }
 
+    private func replaceText(_ field: XCUIElement, with text: String) {
+        XCTAssertTrue(waitUntilStable(field))
+        field.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+        // Use the real edit menu rather than assume a double tap selects all.
+        field.press(forDuration: 1)
+        let selectAll = app.menuItems["Select All"].firstMatch
+        if selectAll.exists {
+            selectAll.tap()
+        } else if app.buttons["Select All"].exists {
+            app.buttons["Select All"].tap()
+        }
+        field.typeText(text)
+        XCTAssertEqual(field.value as? String, text)
+    }
+
     private func addCustomExercise(_ name: String) {
         openCustomExerciseEntry()
         let exerciseField = app.textFields["new-exercise-name-field"]
@@ -113,8 +129,8 @@ final class SetzoUITests: XCTestCase {
         XCTAssertTrue(app.buttons["forgot-password-button"].waitForExistence(timeout: 6))
         XCTAssertTrue(app.buttons["google-sign-in-button"].exists)
         XCTAssertTrue(app.buttons["apple-sign-in-button"].exists)
-        XCTAssertTrue(app.buttons["Privacy Policy"].exists)
-        XCTAssertTrue(app.buttons["Terms of Use"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["auth-privacy-link"].isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["auth-terms-link"].isHittable)
         XCTAssertFalse(app.buttons["google-sign-in-button"].isEnabled)
         app.buttons["forgot-password-button"].tap()
         XCTAssertTrue(app.staticTexts["Reset password"].waitForExistence(timeout: 3))
@@ -162,6 +178,38 @@ final class SetzoUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Push Ups"].exists)
         app.buttons["history-card-toggle"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Push Ups"].waitForExistence(timeout: 3))
+    }
+
+    func testDoneDismissesTheFocusedWorkoutAndIronFuelKeyboards() {
+        app.buttons["Today"].tap()
+        app.buttons["start-free-workout-button"].tap()
+        addCustomExercise("Keyboard Regression")
+        let reps = app.textFields["set-reps-input"].firstMatch
+        reps.tap()
+        reps.typeText("12")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "Done").count, 1)
+        app.buttons["Done"].tap()
+        let keyboardGone = NSPredicate(format: "exists == false")
+        expectation(for: keyboardGone, evaluatedWith: app.keyboards.firstMatch)
+        waitForExpectations(timeout: 3)
+        XCTAssertEqual(reps.value as? String, "12")
+
+        app.terminate()
+        app.launchArguments = ["UITest_ResetStore", "UITest_IronFuelPassport", "ready", "UITest_IronFuelState", "generated"]
+        app.launch()
+        app.buttons["IronFuel"].tap()
+        let request = app.textFields["fuel-buddy-request-field"]
+        XCTAssertTrue(request.waitForExistence(timeout: 3))
+        request.tap()
+        request.typeText("Heavy breakfast")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "Done").count, 1)
+        app.buttons["Done"].tap()
+        expectation(for: keyboardGone, evaluatedWith: app.keyboards.firstMatch)
+        waitForExpectations(timeout: 3)
+        app.buttons["fuel-buddy-submit-button"].tap()
+        XCTAssertTrue(app.staticTexts["Paneer Bhurji with Toast"].waitForExistence(timeout: 3))
     }
 
     func testExerciseAndSetDeletionUseTheRequestedConfirmationRules() {
@@ -432,12 +480,12 @@ final class SetzoUITests: XCTestCase {
         app.buttons["edit-session-button"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Edit Session"].waitForExistence(timeout: 3))
         let editReps = app.textFields["edit-reps-input"].firstMatch
-        editReps.doubleTap() // select-all, so typing replaces "12"
-        editReps.typeText("0")
+        replaceText(editReps, with: "0")
+        app.buttons["Done"].tap()
         app.buttons["save-session-edits-button"].tap()
         XCTAssertTrue(app.staticTexts["Edit Session"].exists, "Rejected edits must keep the sheet open")
-        editReps.doubleTap()
-        editReps.typeText("15")
+        replaceText(editReps, with: "15")
+        app.buttons["Done"].tap()
         app.buttons["save-session-edits-button"].tap()
 
         XCTAssertTrue(app.staticTexts["BW x 15"].waitForExistence(timeout: 4))

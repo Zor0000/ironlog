@@ -835,6 +835,7 @@ struct SmallInput: View {
     var keyboard: UIKeyboardType = .numberPad
     var identifier: String?
     let onChange: (String) -> Void
+    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -846,6 +847,7 @@ struct SmallInput: View {
             }
             TextField(placeholder, text: Binding(get: { value }, set: onChange))
                 .keyboardType(keyboard)
+                .focused($focused)
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
@@ -854,6 +856,14 @@ struct SmallInput: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
                 .accessibilityIdentifier(identifier ?? "\(label.lowercased())-input")
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                if focused {
+                    Spacer()
+                    Button("Done") { focused = false }
+                }
+            }
         }
     }
 }

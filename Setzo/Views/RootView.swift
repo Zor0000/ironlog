@@ -343,13 +343,14 @@ struct AuthView: View {
                         Text("Before creating an account, read:")
                         HStack(spacing: 12) {
                             Link("Privacy Policy", destination: URL(string: "https://www.neeraj.works/setzo/privacy.html")!)
+                                .accessibilityIdentifier("auth-privacy-link")
                             Link("Terms of Use", destination: URL(string: "https://www.neeraj.works/setzo/terms.html")!)
+                                .accessibilityIdentifier("auth-terms-link")
                         }
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.muted2)
                     .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("auth-privacy-policy")
 
                     Button {
                         NativeFeedback.selection()

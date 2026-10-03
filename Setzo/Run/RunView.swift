@@ -125,8 +125,10 @@ struct RunView: View {
         .animation(AppMotion.quick, value: kind)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { focused = false }
+                if focused {
+                    Spacer()
+                    Button("Done") { focused = false }
+                }
             }
         }
     }

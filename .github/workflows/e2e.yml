@@ -1,0 +1,55 @@
+name: Local fixture E2E
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chrome
+      - run: npm run lint && npm run typecheck && npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: website-e2e
+          include-hidden-files: true
+          path: website/.e2e
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Build app, widgets, and XCTest bundles on dedicated simulator
+        run: npm run test:e2e:ios:build
+      - name: Retained unit and native UI coverage
+        run: |
+          setzo_device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"]=="Setzo E2E"))')
+          xcodebuild -project Setzo.xcodeproj -scheme Setzo -configuration Debug -destination "platform=iOS Simulator,id=$setzo_device" -derivedDataPath build/e2e/DerivedData -parallel-testing-enabled NO -only-testing:SetzoTests -only-testing:SetzoUITests/SetzoUITests -resultBundlePath build/e2e/Native.xcresult CODE_SIGNING_ALLOWED=NO test-without-building
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-e2e
+          include-hidden-files: true
+          path: |
+            .e2e
+            build/e2e/Native.xcresult

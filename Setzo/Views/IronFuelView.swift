@@ -35,6 +35,14 @@ struct IronFuelView: View {
             .padding(18)
         }
         .scrollIndicators(.hidden)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                if requestIsFocused {
+                    Spacer()
+                    Button("Done") { requestIsFocused = false }
+                }
+            }
+        }
         .fullScreenCover(isPresented: $showPassportEditor) {
             NutritionPassportEditor(passport: app.nutritionPassport ?? NutritionPassport()) { passport in
                 app.saveNutritionPassport(passport)
