@@ -18,9 +18,11 @@ async function reveal(screen: Screen, target: Locator, options: { direction?: "u
 async function replaceNumber(screen: Screen, device: Device, input: Locator, value: string) {
   await input.tap();
   await expect(screen.getByRole("button", "Done", { exact: true })).toBeVisible();
-  // Numeric values are one word; double-tap selection and actual soft keys
-  // avoid the driver's caret-based fill replacement on a centered input.
-  await input.doubleTap();
+  // Use the actual edit menu: two dispatched taps can leave the old value
+  // unselected. Native soft keys then replace the selection without fill's
+  // caret-based insertion on centered numeric fields.
+  await input.longPress();
+  await screen.getByText("Select All", { exact: true }).tap();
   for (const digit of value) await device.locator(`role=Key label="${digit}"`).tap();
   await expect(input).toHaveValue(value);
 }

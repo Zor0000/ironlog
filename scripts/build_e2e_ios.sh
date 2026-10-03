@@ -6,8 +6,9 @@ if [[ -z "$setzo_device" ]]; then
   setzo_device="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next((d["udid"] for devices in json.load(sys.stdin)["devices"].values() for d in devices if d["name"] == "Setzo E2E"), ""))')"
 fi
 if [[ -z "$setzo_device" ]]; then
-  setzo_runtime="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; print(next(r["identifier"] for r in reversed(json.load(sys.stdin)["runtimes"]) if r.get("isAvailable") and r["name"].startswith("iOS")))')"
-  setzo_type="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; print(next(d["identifier"] for d in reversed(json.load(sys.stdin)["devicetypes"]) if d["name"].startswith("iPhone") and "Max" not in d["name"]))')"
+  setzo_pair="$(xcrun simctl list runtimes -j | python3 scripts/select_e2e_simulator.py)"
+  read -r setzo_runtime setzo_type <<< "$setzo_pair"
+  printf 'Creating Setzo E2E with %s on %s\n' "$setzo_type" "$setzo_runtime"
   setzo_device="$(xcrun simctl create 'Setzo E2E' "$setzo_type" "$setzo_runtime")"
 fi
 # A named/UDID simulator is explicit. Never select an arbitrary booted device.
