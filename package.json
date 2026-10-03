@@ -1,0 +1,18 @@
+{
+  "name": "setzo-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "npx e2e run",
+    "test:e2e:list": "npx e2e list",
+    "test:e2e:ios:build": "bash scripts/build_e2e_ios.sh",
+    "test:e2e:website": "npm --prefix website run test:e2e",
+    "typecheck": "tsc -p tsconfig.e2e.json"
+  },
+  "devDependencies": {
+    "@e2e-dev/mobile": "0.9.1",
+    "@types/node": "24.10.0",
+    "e2e": "0.16.0",
+    "typescript": "5.9.3"
+  }
+}

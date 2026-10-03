@@ -86,3 +86,6 @@ artifacts/
 
 # Evidence captures (scripts/capture_evidence.sh), kept local
 evidence/
+
+# Tester Army reports, traces, and device captures
+.e2e/

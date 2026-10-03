@@ -225,8 +225,10 @@ struct SettingsView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { bodyWeightFocused = false }
+                if bodyWeightFocused {
+                    Spacer()
+                    Button("Done") { bodyWeightFocused = false }
+                }
             }
         }
     }

@@ -13,7 +13,7 @@ import { Reveal } from "./Reveal";
 export function LiveActivity() {
   return (
     <section id="live-activity" className="border-t border-line/60 py-24 lg:py-32">
-      <div className="page grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+      <div className="page grid grid-cols-1 items-center gap-14 lg:grid-cols-2 lg:gap-20">
         {/* Copy */}
         <Reveal>
           <p className="eyebrow">The killer feature</p>
@@ -46,8 +46,8 @@ export function LiveActivity() {
 
         {/* Lock screen mock */}
         <Reveal delay={120}>
-          <div className="flex justify-center rounded-[2rem] border border-line bg-surface/60 px-6 py-10 sm:px-10 sm:py-14">
-            <LockScreen />
+          <div className="flex justify-center rounded-[2rem] border border-line bg-surface/60 px-2 py-10 sm:px-10 sm:py-14">
+            <div aria-hidden="true" className="min-w-0 w-full max-w-[360px]"><LockScreen /></div>
           </div>
         </Reveal>
       </div>
@@ -58,7 +58,7 @@ export function LiveActivity() {
 function LockScreen() {
   return (
     <div className="relative w-full max-w-[360px] rounded-[2.6rem] border border-white/10 bg-black p-3 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.9)]">
-      <div className="flex min-h-[600px] flex-col rounded-[2.1rem] bg-[radial-gradient(120%_60%_at_50%_0%,rgba(212,255,74,0.08),transparent_60%)] px-5 pb-5 pt-8">
+      <div className="flex min-h-[600px] flex-col rounded-[2.1rem] bg-[radial-gradient(120%_60%_at_50%_0%,rgba(212,255,74,0.08),transparent_60%)] px-2 pb-5 pt-8 sm:px-5">
         {/* Status glyphs */}
         <div className="flex items-center justify-center text-muted-2">
           <Lock className="size-4" />
@@ -118,16 +118,16 @@ function LiveActivityCard() {
 
       {/* Actions */}
       <div className="mt-2 flex items-center gap-2">
-        <button className="grid size-9 place-items-center rounded-xl bg-white/[0.11] text-[#f5f5f5]">
+        <div className="grid size-9 place-items-center rounded-xl bg-white/[0.11] text-[#f5f5f5]">
           <ChevronLeft className="size-4" strokeWidth={2.5} />
-        </button>
-        <button className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-lime text-[15px] font-semibold text-ink">
+        </div>
+        <div className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-lime text-[15px] font-semibold text-ink">
           <Check className="size-4" strokeWidth={3} />
           Log set
-        </button>
-        <button className="grid size-9 place-items-center rounded-xl bg-white/[0.11] text-[#f5f5f5]">
+        </div>
+        <div className="grid size-9 place-items-center rounded-xl bg-white/[0.11] text-[#f5f5f5]">
           <ChevronRight className="size-4" strokeWidth={2.5} />
-        </button>
+        </div>
       </div>
     </div>
   );
